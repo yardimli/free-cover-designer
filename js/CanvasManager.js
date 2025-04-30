@@ -8,37 +8,84 @@ class CanvasManager {
 		// Dependencies
 		this.layerManager = options.layerManager;
 		this.historyManager = options.historyManager;
-		this.onZoomChange = options.onZoomChange || (() => {}); // Callback for UI updates
+		this.onZoomChange = options.onZoomChange || (() => {
+		}); // Callback for UI updates
 		
 		// State
 		this.rulers = null;
-		this.currentZoom = 1.0;
-		this.MIN_ZOOM = 0.1;
-		this.MAX_ZOOM = 3.0;
+		this.currentZoom = 0.3;
+		this.MIN_ZOOM = 0.1; // Min zoom level
+		this.MAX_ZOOM = 5.0; // Max zoom level
 		this.isPanning = false;
 		this.lastPanX = 0;
 		this.lastPanY = 0;
+		
+		// Default Canvas Size (can be overridden by loaded designs/templates)
+		this.DEFAULT_CANVAS_WIDTH = 1540;
+		this.DEFAULT_CANVAS_HEIGHT = 2475;
 	}
 	
 	initialize() {
+		this.setCanvasSize(this.DEFAULT_CANVAS_WIDTH, this.DEFAULT_CANVAS_HEIGHT); // Set initial size
 		this.initializeRulers();
 		this.initializeDroppable();
 		this.initializeZoomPan();
 		this.centerCanvas();
-		this.setZoom(this.currentZoom, false); // Apply initial zoom without saving state
+		this.setZoom(this.currentZoom, true); // Apply initial zoom and trigger UI update
+		this.zoom(1);
+		
 	}
 	
+	setCanvasSize(width, height) {
+		this.currentCanvasWidth = parseFloat(width) || this.DEFAULT_CANVAS_WIDTH;
+		this.currentCanvasHeight = parseFloat(height) || this.DEFAULT_CANVAS_HEIGHT;
+		
+		this.$canvas.css({
+			width: this.currentCanvasWidth + 'px',
+			height: this.currentCanvasHeight + 'px'
+		});
+		
+		// Update wrapper size immediately based on *current* zoom
+		this.updateWrapperSize();
+		// Recenter after size change
+		this.centerCanvas();
+		// Update rulers if they exist
+		if (this.rulers) {
+			this.rulers.updateRulers();
+		}
+	}
+	
+	updateWrapperSize() {
+		// Adjust the wrapper's size to reflect the scaled canvas size
+		this.$canvasWrapper.css({
+			width: this.currentCanvasWidth * this.currentZoom + 'px',
+			height: this.currentCanvasHeight * this.currentZoom + 'px'
+		});
+	}
+	
+	
 	initializeRulers() {
+		// Ensure rulers are initialized *after* the wrapper structure is set up
 		if (this.canvasAreaDiv && typeof DivRulers !== 'undefined') {
+			// Destroy existing rulers if any
+			if (this.rulers) {
+				this.rulers.destroy();
+			}
+			// Pass the canvas-area div as the target for rulers
 			this.rulers = new DivRulers(this.canvasAreaDiv, {
 				rulerSize: 25,
-				tickMajor: 50,
-				tickMinor: 10,
-				tickMicro: 5,
+				tickMajor: 100, // Based on unzoomed canvas pixels
+				tickMinor: 50,
+				tickMicro: 10,
 				indicatorColor: 'rgba(0, 100, 255, 0.8)',
 				arrowStyle: 'line',
-				showLabel: true
+				showLabel: true,
+				labelColor: '#333',
+				tickColor: '#888',
+				rulerBgColor: 'rgba(240, 240, 240, 0.95)'
 			});
+			// Set initial zoom for rulers
+			this.rulers.setZoom(this.currentZoom);
 		} else {
 			console.error("Canvas area element not found or DivRulers class not loaded.");
 		}
@@ -46,194 +93,280 @@ class CanvasManager {
 	
 	initializeDroppable() {
 		this.$canvas.droppable({
-			accept: '.layout-thumbnail, .cover-thumbnail, .element-thumbnail',
+			// Accept items from sidebar: templates, covers, elements
+			accept: '.template-thumbnail, .cover-thumbnail, .element-thumbnail',
+			tolerance: 'pointer', // Drop when pointer overlaps canvas
 			drop: (event, ui) => {
 				const $draggedItem = $(ui.draggable);
-				const dropPosition = this._calculateDropPosition(event, ui);
+				const dropPosition = this._calculateDropPosition(event, ui); // Calculate drop coords relative to canvas 0,0
 				
-				if ($draggedItem.hasClass('layout-thumbnail')) {
-					const layoutData = $draggedItem.data('layoutData');
-					layoutData.forEach(layerData => {
-						// Adjust position relative to drop point? Or just add at defined coords?
-						// Adding at defined coords for now:
-						this.layerManager.addLayer(layerData.type, layerData);
-					});
+				if ($draggedItem.hasClass('template-thumbnail')) {
+					const jsonPath = $draggedItem.data('templateJsonPath');
+					if (jsonPath) {
+						this.loadDesign(jsonPath, true); // Load from path, indicate it's a template
+					}
 				} else if ($draggedItem.hasClass('cover-thumbnail')) {
 					const imgSrc = $draggedItem.data('coverSrc');
-					const imgWidth = 200; const imgHeight = 300;
-					const newLayer = this.layerManager.addLayer('image', {
-						content: imgSrc,
-						x: dropPosition.x - (imgWidth / 2),
-						y: dropPosition.y - (imgHeight / 2),
-						width: imgWidth, height: imgHeight
-					});
-					if (newLayer) {
-						this.layerManager.moveLayer(newLayer.id, 'back'); // Send background images back
-					}
+					if (!imgSrc) return;
+					
+					// Add image as a layer, centered roughly at drop point
+					const img = new Image();
+					img.onload = () => {
+						// Scale image to fit reasonably, maintain aspect ratio
+						const maxDim = Math.min(this.currentCanvasWidth * 0.6, this.currentCanvasHeight * 0.6);
+						const scale = Math.min(1, maxDim / img.width, maxDim / img.height);
+						const imgWidth = img.width * scale;
+						const imgHeight = img.height * scale;
+						
+						const newLayer = this.layerManager.addLayer('image', {
+							content: imgSrc,
+							x: dropPosition.x - (imgWidth / 2),
+							y: dropPosition.y - (imgHeight / 2),
+							width: imgWidth,
+							height: imgHeight
+						});
+						if (newLayer) {
+							// Send background images to the back by default
+							this.layerManager.moveLayer(newLayer.id, 'back');
+							this.historyManager.saveState(); // Save state after adding and moving
+						}
+					};
+					img.onerror = () => console.error("Failed to load cover image for dropping:", imgSrc);
+					img.src = imgSrc;
+					
 				} else if ($draggedItem.hasClass('element-thumbnail')) {
 					const imgSrc = $draggedItem.data('elementSrc');
-					const elemWidth = 100; const elemHeight = 100;
-					this.layerManager.addLayer('image', {
-						content: imgSrc,
-						x: dropPosition.x - (elemWidth / 2),
-						y: dropPosition.y - (elemHeight / 2),
-						width: elemWidth, height: elemHeight
-					});
+					if (!imgSrc) return;
+					
+					// Add element image, centered at drop point
+					const img = new Image();
+					img.onload = () => {
+						// Default size for elements, maybe smaller
+						const elemWidth = Math.min(img.width, 100); // Use actual width up to 100px
+						const elemHeight = (img.height / img.width) * elemWidth; // Maintain aspect ratio
+						
+						this.layerManager.addLayer('image', {
+							content: imgSrc,
+							x: dropPosition.x - (elemWidth / 2),
+							y: dropPosition.y - (elemHeight / 2),
+							width: elemWidth,
+							height: elemHeight
+						});
+						this.historyManager.saveState(); // Save state after adding element
+					};
+					img.onerror = () => console.error("Failed to load element image for dropping:", imgSrc);
+					img.src = imgSrc;
 				}
-				// LayerManager.addLayer calls updateList, but we need to save state
-				this.historyManager.saveState();
 			}
 		});
 	}
 	
 	_calculateDropPosition(event, ui) {
-		// Calculate drop position relative to the UNZOOMED canvas origin
-		const canvasOffset = this.$canvasWrapper.offset(); // Use wrapper offset relative to document
-		const areaScrollLeft = this.$canvasArea.scrollLeft();
-		const areaScrollTop = this.$canvasArea.scrollTop();
+		// Calculate drop position relative to the UNZOOMED canvas origin (0,0)
 		
-		// Use event.clientX/Y for drop coords relative to viewport
+		// 1. Get mouse coordinates relative to the viewport
+		const mouseXViewport = event.clientX;
+		const mouseYViewport = event.clientY;
+		
+		// 2. Get the bounding box of the scrollable canvas area
 		const areaRect = this.canvasAreaDiv.getBoundingClientRect();
-		const mouseXInArea = event.clientX - areaRect.left;
-		const mouseYInArea = event.clientY - areaRect.top;
 		
-		// Position relative to the scrolled content of canvas-area
-		const scrolledAreaX = mouseXInArea + areaScrollLeft;
-		const scrolledAreaY = mouseYInArea + areaScrollTop;
+		// 3. Calculate mouse position relative to the canvas area's top-left corner
+		const mouseXInArea = mouseXViewport - areaRect.left;
+		const mouseYInArea = mouseYViewport - areaRect.top;
 		
-		// Position relative to the canvas wrapper's origin (which might be offset within canvas-area)
-		const wrapperPos = this.$canvasWrapper.position(); // Position relative to canvas-area
-		const relativeToWrapperX = scrolledAreaX - wrapperPos.left;
-		const relativeToWrapperY = scrolledAreaY - wrapperPos.top;
+		// 4. Account for the canvas area's scroll position
+		const scrollLeft = this.$canvasArea.scrollLeft();
+		const scrollTop = this.$canvasArea.scrollTop();
+		const mouseXInScrollContent = mouseXInArea + scrollLeft;
+		const mouseYInScrollContent = mouseYInArea + scrollTop;
 		
-		// Account for zoom to get coordinates relative to the unscaled canvas (0,0)
+		// 5. Get the position of the canvas WRAPPER relative to the scrolled content of canvas area
+		//    We use the wrapper because it's the element being positioned/centered.
+		const wrapperPos = this.$canvasWrapper.position(); // { top: ..., left: ... } relative to offset parent (canvas-area)
+		
+		// 6. Calculate mouse position relative to the wrapper's top-left corner
+		const relativeToWrapperX = mouseXInScrollContent - wrapperPos.left;
+		const relativeToWrapperY = mouseYInScrollContent - wrapperPos.top;
+		
+		// 7. Account for the current zoom level to get coordinates relative to the unscaled canvas (0,0)
 		const dropX = relativeToWrapperX / this.currentZoom;
 		const dropY = relativeToWrapperY / this.currentZoom;
 		
-		return { x: dropX, y: dropY };
+		// console.log(`Drop Coords: CanvasX=${dropX.toFixed(2)}, CanvasY=${dropY.toFixed(2)}`);
+		return {x: dropX, y: dropY};
 	}
 	
+	
 	initializeZoomPan() {
-		// Panning
+		// --- Panning ---
 		this.$canvasArea.on('mousedown', (e) => {
-			if (e.target === this.$canvasArea[0]) { // Click on background
+			// Only pan if clicking directly on the background of canvas-area
+			// Or use middle mouse button? (e.which === 2)
+			if (e.target === this.$canvasArea[0] || e.target === this.$canvasWrapper[0]) {
 				this.isPanning = true;
 				this.lastPanX = e.clientX;
 				this.lastPanY = e.clientY;
 				this.$canvasArea.addClass('panning');
-				e.preventDefault();
-				this.layerManager.selectLayer(null); // Deselect on background click
-			} else if (e.target === this.$canvasWrapper[0]) { // Click on wrapper (between canvas and area edge)
-				this.layerManager.selectLayer(null);
+				e.preventDefault(); // Prevent text selection during pan
+				
+				// Deselect layer if clicking background
+				if (this.layerManager.getSelectedLayer()) {
+					this.layerManager.selectLayer(null);
+				}
 			}
 		});
 		
-		$(document).on('mousemove', (e) => {
+		$(document).on('mousemove.canvasManager', (e) => { // Add namespace for easy removal
 			if (!this.isPanning) return;
+			
 			const deltaX = e.clientX - this.lastPanX;
 			const deltaY = e.clientY - this.lastPanY;
+			
+			// Scroll the canvas area
 			this.$canvasArea.scrollLeft(this.$canvasArea.scrollLeft() - deltaX);
 			this.$canvasArea.scrollTop(this.$canvasArea.scrollTop() - deltaY);
+			
+			// Update last position for next movement
 			this.lastPanX = e.clientX;
 			this.lastPanY = e.clientY;
-			// Rulers update via their own scroll handler
+			
+			// Rulers update automatically via their own scroll handler
 		});
 		
-		$(document).on('mouseup', (e) => {
+		$(document).on('mouseup.canvasManager mouseleave.canvasManager', (e) => { // Add namespace
 			if (this.isPanning) {
 				this.isPanning = false;
 				this.$canvasArea.removeClass('panning');
 			}
 		});
 		
-		// Zooming (Wheel)
+		// --- Zooming (Mouse Wheel) ---
 		this.$canvasArea.on('wheel', (e) => {
-			e.preventDefault();
-			const delta = e.originalEvent.deltaY;
-			const zoomFactor = delta < 0 ? 1.1 : 0.9;
+			e.preventDefault(); // Prevent page scroll
 			
+			const delta = e.originalEvent.deltaY;
+			const zoomFactor = delta < 0 ? 1.1 : (1 / 1.1); // Consistent zoom steps
+			
+			// Calculate mouse position relative to the canvas content (like in drop)
 			const areaRect = this.canvasAreaDiv.getBoundingClientRect();
 			const mouseX = e.clientX - areaRect.left;
 			const mouseY = e.clientY - areaRect.top;
-			const mouseXInContent = this.$canvasArea.scrollLeft() + mouseX;
-			const mouseYInContent = this.$canvasArea.scrollTop() + mouseY;
+			const scrollLeft = this.$canvasArea.scrollLeft();
+			const scrollTop = this.$canvasArea.scrollTop();
 			const wrapperPos = this.$canvasWrapper.position();
-			const mouseRelativeToWrapperX = mouseXInContent - wrapperPos.left;
-			const mouseRelativeToWrapperY = mouseYInContent - wrapperPos.top;
-			const mouseOnCanvasX = mouseRelativeToWrapperX / this.currentZoom;
-			const mouseOnCanvasY = mouseRelativeToWrapperY / this.currentZoom;
 			
-			const oldZoom = this.currentZoom;
+			// Mouse position relative to the unscaled canvas origin
+			const mouseOnCanvasX = (scrollLeft + mouseX - wrapperPos.left) / this.currentZoom;
+			const mouseOnCanvasY = (scrollTop + mouseY - wrapperPos.top) / this.currentZoom;
+			
+			// Calculate new zoom level
 			const newZoom = this.currentZoom * zoomFactor;
 			const clampedZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, newZoom));
 			
-			if (clampedZoom !== oldZoom) {
-				this.setZoom(clampedZoom, false); // Apply zoom first
+			if (clampedZoom !== this.currentZoom) {
+				const oldZoom = this.currentZoom;
+				this.currentZoom = clampedZoom; // Update internal zoom state
 				
-				// Recalculate scroll to keep mouse point stationary
-				const newMouseRelativeToWrapperX = mouseOnCanvasX * this.currentZoom;
-				const newMouseRelativeToWrapperY = mouseOnCanvasY * this.currentZoom;
-				// Need the *new* wrapper position if it changed due to zoom (it shouldn't if positioned absolutely)
-				const currentWrapperPos = this.$canvasWrapper.position(); // Get potentially updated pos
+				// Apply scale transform to the canvas itself
+				this.$canvas.css('transform', `scale(${this.currentZoom})`);
+				// Update wrapper size for the new zoom level
+				this.updateWrapperSize();
 				
-				const newScrollLeft = (currentWrapperPos.left + newMouseRelativeToWrapperX) - mouseX;
-				const newScrollTop = (currentWrapperPos.top + newMouseRelativeToWrapperY) - mouseY;
+				// Calculate the new scroll position to keep the mouse pointer
+				// over the same point on the unscaled canvas.
+				// New position of the mouse point relative to the wrapper's top-left
+				const newWrapperOffsetX = mouseOnCanvasX * this.currentZoom;
+				const newWrapperOffsetY = mouseOnCanvasY * this.currentZoom;
 				
+				// Get the potentially updated wrapper position (it might shift slightly if centering logic runs)
+				const currentWrapperPos = this.$canvasWrapper.position();
+				
+				// Calculate required scroll offset
+				const newScrollLeft = (currentWrapperPos.left + newWrapperOffsetX) - mouseX;
+				const newScrollTop = (currentWrapperPos.top + newWrapperOffsetY) - mouseY;
+				
+				// Apply the new scroll position
 				this.$canvasArea.scrollLeft(newScrollLeft);
 				this.$canvasArea.scrollTop(newScrollTop);
+				
+				// Update rulers and UI
+				if (this.rulers) {
+					this.rulers.setZoom(this.currentZoom);
+					this.rulers.updateRulers(); // Force redraw after scroll/zoom
+				}
+				this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
 			}
 		});
 		
-		// Zoom Buttons
-		$('#zoom-in').on('click', () => this.zoom(1.25));
-		$('#zoom-out').on('click', () => this.zoom(0.8));
+		// --- Zoom Buttons ---
+		$('#zoom-in').on('click', () => this.zoom(1.25)); // Zoom in by 25%
+		$('#zoom-out').on('click', () => this.zoom(0.8)); // Zoom out (1 / 1.25)
 	}
 	
+	// Zooms towards the center of the visible area
 	zoom(factor) {
-		this.setZoom(this.currentZoom * factor);
+		// Calculate center point of the visible canvas area
+		const areaWidth = this.$canvasArea.innerWidth();
+		const areaHeight = this.$canvasArea.innerHeight();
+		const centerX = areaWidth / 2;
+		const centerY = areaHeight / 2;
+		
+		// Simulate a wheel event at the center
+		const fakeEvent = {
+			preventDefault: () => {
+			},
+			originalEvent: {deltaY: factor > 1 ? -1 : 1}, // Negative delta for zoom in
+			clientX: this.$canvasArea.offset().left + centerX,
+			clientY: this.$canvasArea.offset().top + centerY
+		};
+		this.$canvasArea.trigger($.Event('wheel', fakeEvent));
 	}
 	
+	// Sets zoom level directly (used internally and potentially externally)
 	setZoom(newZoom, triggerCallbacks = true) {
 		const clampedZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, newZoom));
 		if (clampedZoom === this.currentZoom) return;
 		
 		this.currentZoom = clampedZoom;
 		
-		// Apply scale transform to the canvas itself
+		// Apply scale transform to the canvas
 		this.$canvas.css('transform', `scale(${this.currentZoom})`);
+		// Adjust the wrapper's size
+		this.updateWrapperSize();
 		
-		// Adjust the wrapper's size to reflect the scaled canvas size
-		const originalCanvasWidth = parseFloat(this.$canvas.css('width'));
-		const originalCanvasHeight = parseFloat(this.$canvas.css('height'));
-		this.$canvasWrapper.css({
-			width: originalCanvasWidth * this.currentZoom + 'px',
-			height: originalCanvasHeight * this.currentZoom + 'px'
-		});
-		
-		// Inform the rulers
-		if (this.rulers) {
-			this.rulers.setZoom(this.currentZoom);
-		}
+		// Recenter canvas within the view after zoom might have shifted wrapper
+		this.centerCanvas(); // This also updates rulers
 		
 		// Update UI (via callback)
-		if(triggerCallbacks) {
+		if (triggerCallbacks) {
 			this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
+		}
+		// Update rulers zoom factor
+		if (this.rulers) {
+			this.rulers.setZoom(this.currentZoom);
 		}
 	}
 	
 	centerCanvas() {
-		// Wait for potential layout shifts after zoom/load
+		// Use requestAnimationFrame to ensure layout calculations are up-to-date
 		requestAnimationFrame(() => {
-			const areaWidth = this.$canvasArea.width();
-			const areaHeight = this.$canvasArea.height();
-			const wrapperWidth = this.$canvasWrapper.outerWidth();
+			const areaWidth = this.$canvasArea.innerWidth(); // Use innerWidth for visible area
+			const areaHeight = this.$canvasArea.innerHeight();
+			const wrapperWidth = this.$canvasWrapper.outerWidth(); // Use outerWidth including padding/border
 			const wrapperHeight = this.$canvasWrapper.outerHeight();
 			
-			const scrollLeft = (wrapperWidth - areaWidth) / 2;
-			const scrollTop = (wrapperHeight - areaHeight) / 2;
+			// Calculate desired scroll position to center the wrapper
+			let scrollLeft = (wrapperWidth - areaWidth) / 2;
+			let scrollTop = (wrapperHeight - areaHeight) / 2;
 			
-			this.$canvasArea.scrollLeft(scrollLeft > 0 ? scrollLeft : 0);
-			this.$canvasArea.scrollTop(scrollTop > 0 ? scrollTop : 0);
+			// Ensure scroll position isn't negative
+			scrollLeft = Math.max(0, scrollLeft);
+			scrollTop = Math.max(0, scrollTop);
+			
+			// Apply the scroll position
+			this.$canvasArea.scrollLeft(scrollLeft);
+			this.$canvasArea.scrollTop(scrollTop);
 			
 			// Rulers need update after scroll changes
 			if (this.rulers) {
@@ -253,128 +386,212 @@ class CanvasManager {
 		const originalScrollLeft = this.$canvasArea.scrollLeft();
 		const originalScrollTop = this.$canvasArea.scrollTop();
 		
-		// Temporarily reset zoom and scroll
+		// Temporarily reset zoom and scroll for accurate capture
 		this.$canvas.css('transform', 'scale(1.0)');
-		const canvasWidth = this.$canvas.css('width');
-		const canvasHeight = this.$canvas.css('height');
-		this.$canvasWrapper.css({ width: canvasWidth, height: canvasHeight });
+		this.$canvasWrapper.css({
+			width: this.currentCanvasWidth + 'px', // Use stored unscaled width
+			height: this.currentCanvasHeight + 'px' // Use stored unscaled height
+		});
 		
 		// Scroll canvas-area so the top-left of the canvas is visible
-		const wrapperPos = this.$canvasWrapper.position();
+		// Need position relative to document or viewport? Let's try relative to area.
+		const wrapperPos = this.$canvasWrapper.position(); // Position relative to canvas-area
 		this.$canvasArea.scrollLeft(wrapperPos.left);
 		this.$canvasArea.scrollTop(wrapperPos.top);
 		
-		// Temporarily make all layers visible
+		// Temporarily make all layers visible for export
 		const hiddenLayerIds = this.layerManager.getLayers().filter(l => !l.visible).map(l => l.id);
-		hiddenLayerIds.forEach(id => $(`#${id}`).show());
+		hiddenLayerIds.forEach(id => $(`#${id}`).show()); // Simple show for export
 		
 		const canvasElement = this.$canvas[0];
 		const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-		const quality = format === 'jpeg' ? 0.9 : 1.0;
-		const filename = `book-cover.${format}`;
+		const quality = format === 'jpeg' ? 0.92 : 1.0; // Standard JPEG quality
+		const filename = `book-cover-export.${format}`;
 		
+		// Use setTimeout to allow the browser to re-render after style changes
 		setTimeout(() => {
 			html2canvas(canvasElement, {
-				useCORS: true,
-				allowTaint: true,
-				logging: false,
-				scale: 1, // Use native resolution
-				x: 0, y: 0,
-				width: this.$canvas.width(),
-				height: this.$canvas.height(),
-				scrollX: 0, scrollY: 0,
+				useCORS: true,      // Attempt to load cross-origin images
+				allowTaint: true,   // Allows tainting canvas for cross-origin images (may prevent toDataURL) - useCORS is better
+				logging: false,     // Disable console logging from html2canvas
+				scale: 1,           // Export at native resolution (canvas size)
+				width: this.currentCanvasWidth, // Explicitly set width
+				height: this.currentCanvasHeight, // Explicitly set height
+				x: 0,               // Capture from top-left of the element
+				y: 0,
+				scrollX: 0,         // Ignore internal scroll of the element itself
+				scrollY: 0,
+				backgroundColor: '#ffffff', // Ensure background is white if canvas is transparent
 				onclone: (clonedDoc) => {
-					// Ensure elements are truly visible in the clone
-					hiddenLayerIds.forEach(id => {
-						const el = clonedDoc.getElementById(id);
-						if (el) el.style.display = 'block';
-					});
-					// Ensure the canvas itself has no transform in the clone
+					// --- Modifications to the cloned document before rendering ---
 					const clonedCanvas = clonedDoc.getElementById('canvas');
 					if (clonedCanvas) {
+						// Ensure no transform on the cloned canvas
 						clonedCanvas.style.transform = 'scale(1.0)';
+						// Remove selection borders from the clone
+						const selectedElements = clonedCanvas.querySelectorAll('.canvas-element.selected');
+						selectedElements.forEach(el => el.classList.remove('selected'));
+						// Ensure hidden layers are visible in the clone
+						hiddenLayerIds.forEach(id => {
+							const el = clonedCanvas.querySelector(`#${id}`);
+							if (el) el.style.display = 'block'; // Or appropriate display type
+						});
+						// Remove jQuery UI resizable handles from the clone
+						const handles = clonedCanvas.querySelectorAll('.ui-resizable-handle');
+						handles.forEach(h => h.style.display = 'none');
 					}
 				}
 			}).then(canvas => {
+				// Convert the rendered canvas to a data URL
 				const image = canvas.toDataURL(mimeType, quality);
+				
+				// Trigger download
 				const a = document.createElement('a');
 				a.href = image;
 				a.download = filename;
 				document.body.appendChild(a);
 				a.click();
 				document.body.removeChild(a);
+				
 			}).catch(err => {
 				console.error("Error exporting canvas:", err);
-				alert("Error exporting canvas. Check console for details.");
+				alert("Error exporting canvas. Check console for details. Cross-origin images might be the cause if not hosted locally.");
 			}).finally(() => {
-				// Restore original state
-				hiddenLayerIds.forEach(id => $(`#${id}`).hide());
+				// --- Restore original state ---
+				hiddenLayerIds.forEach(id => {
+					const layer = this.layerManager.getLayerById(id);
+					if (layer && !layer.visible) $(`#${id}`).hide(); // Hide again if originally hidden
+				});
 				this.$canvas.css('transform', originalTransform);
-				this.$canvasWrapper.css({ width: originalWrapperWidth, height: originalWrapperHeight });
+				this.$canvasWrapper.css({
+					width: originalWrapperWidth,
+					height: originalWrapperHeight
+				});
 				this.$canvasArea.scrollLeft(originalScrollLeft);
 				this.$canvasArea.scrollTop(originalScrollTop);
+				// Re-apply selection border if needed
+				if (this.layerManager.getSelectedLayer()) {
+					$(`#${this.layerManager.getSelectedLayer().id}`).addClass('selected');
+				}
 			});
-		}, 150); // Delay for rendering
+		}, 250); // Increased delay slightly for complex rendering
 	}
 	
 	// --- Save / Load Design ---
+	
+	// Saves the current design (canvas size and layers) to a JSON file
 	saveDesign() {
 		const designData = {
-			version: "1.0",
-			layers: this.layerManager.getLayers(),
+			version: "1.1", // Update version if format changes
 			canvas: {
-				width: parseFloat(this.$canvas.css('width')),
-				height: parseFloat(this.$canvas.css('height'))
-			}
+				width: this.currentCanvasWidth,
+				height: this.currentCanvasHeight
+			},
+			layers: this.layerManager.getLayers() // Get layers in the correct format
 		};
-		const jsonData = JSON.stringify(designData, null, 2);
+		
+		const jsonData = JSON.stringify(designData, null, 2); // Pretty print JSON
 		const blob = new Blob([jsonData], {type: 'application/json'});
 		const url = URL.createObjectURL(blob);
+		
 		const a = document.createElement('a');
 		a.href = url;
 		a.download = 'book-cover-design.json';
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
+		URL.revokeObjectURL(url); // Clean up blob URL
 	}
 	
-	loadDesign(file) {
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = (e) => {
+	// Loads a design from a file object or a URL path
+	loadDesign(source, isTemplate = false) {
+		if (!source) return;
+		
+		const handleLoad = (designData) => {
 			try {
-				const designData = JSON.parse(e.target.result);
-				if (designData && designData.layers) {
-					// Clear current state via LayerManager and HistoryManager
-					this.historyManager.clear(); // Reset history
-					
-					// Optional: Adjust canvas size if saved
-					if (designData.canvas) {
-						const originalCanvasWidth = designData.canvas.width;
-						const originalCanvasHeight = designData.canvas.height;
-						this.$canvas.css({ width: originalCanvasWidth + 'px', height: originalCanvasHeight + 'px' });
-						// Trigger zoom update to resize wrapper correctly
-						this.setZoom(this.currentZoom, true);
+				if (designData && designData.layers && designData.canvas) {
+					if (!isTemplate) {
+						// --- Clear current state ---
+						this.historyManager.clear(); // Reset history
+						
+						// --- Set Canvas Size ---
+						this.setCanvasSize(designData.canvas.width, designData.canvas.height);
 					}
 					
-					// Load layers using LayerManager
-					this.layerManager.setLayers(designData.layers); // This handles clearing canvas, rendering, updating list
+					// --- Load Layers ---
+					// LayerManager.setLayers handles clearing canvas, rendering, updating list
+					this.layerManager.setLayers(designData.layers, isTemplate);
 					
+					// --- Finalize ---
 					this.historyManager.saveState(); // Save the loaded state as the initial history point
-					this.centerCanvas();
-					alert('Design loaded successfully!');
+					if (!isTemplate) {
+						this.setZoom(1.0); // Reset zoom to 100%
+						this.centerCanvas(); // Center the newly loaded canvas
+					}
+					// alert(`Design ${isTemplate ? 'template' : ''} loaded successfully!`);
+					
 				} else {
-					alert('Invalid design file format.');
+					console.error("Invalid design data structure:", designData);
+					alert('Invalid design file format. Check console for details.');
 				}
 			} catch (error) {
-				console.error("Error loading design:", error);
-				alert('Error reading or parsing the design file.');
+				console.error("Error processing loaded design:", error);
+				alert('Error applying the design data.');
 			}
 		};
-		reader.onerror = () => {
-			alert('Error reading file.');
+		
+		const handleError = (error) => {
+			console.error("Error loading design:", error);
+			alert('Error reading or fetching the design file.');
 		};
-		reader.readAsText(file);
+		
+		// Check if source is a File object (from input) or a string (path for template)
+		if (source instanceof File) {
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				try {
+					const designData = JSON.parse(e.target.result);
+					handleLoad(designData);
+				} catch (parseError) {
+					handleError(parseError);
+				}
+			};
+			reader.onerror = () => handleError(reader.error);
+			reader.readAsText(source);
+		} else if (typeof source === 'string') {
+			// Assume source is a URL/path (for templates)
+			$.getJSON(source)
+				.done(handleLoad)
+				.fail(handleError);
+		} else {
+			alert('Invalid source type for loading design.');
+		}
 	}
-}
+	
+	// --- Cleanup ---
+	destroy() {
+		// Remove event listeners
+		this.$canvasArea.off('mousedown wheel');
+		$(document).off('.canvasManager'); // Remove namespaced listeners
+		$('#zoom-in').off('click');
+		$('#zoom-out').off('click');
+		if (this.$canvas.hasClass('ui-droppable')) {
+			this.$canvas.droppable('destroy');
+		}
+		
+		// Destroy rulers
+		if (this.rulers) {
+			this.rulers.destroy();
+			this.rulers = null;
+		}
+		
+		// Nullify references
+		this.$canvasArea = null;
+		this.$canvasWrapper = null;
+		this.$canvas = null;
+		this.canvasAreaDiv = null;
+		this.layerManager = null;
+		this.historyManager = null;
+	}
+	
+} // End of CanvasManager class

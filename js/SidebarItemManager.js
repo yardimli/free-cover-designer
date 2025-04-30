@@ -1,7 +1,7 @@
 class SidebarItemManager {
 	constructor(options) {
 		// Selectors from options
-		this.$layoutList = $(options.layoutListSelector);
+		this.$templateList = $(options.templateListSelector); // Changed selector name
 		this.$coverList = $(options.coverListSelector);
 		this.$coverSearch = $(options.coverSearchSelector);
 		this.$elementList = $(options.elementListSelector);
@@ -9,13 +9,14 @@ class SidebarItemManager {
 		this.$uploadInput = $(options.uploadInputSelector);
 		this.$addImageBtn = $(options.addImageBtnSelector);
 		
-		// Data URLs from options
-		this.layoutsUrl = options.layoutsUrl;
+		// Data URLs from options (Covers and Elements remain)
+		// this.layoutsUrl = options.layoutsUrl; // Removed
 		this.coversUrl = options.coversUrl;
 		this.elementsUrl = options.elementsUrl;
 		
 		// Callbacks
-		this.addLayer = options.addLayer; // Function to add layer to canvas
+		this.applyTemplate = options.applyTemplate; // New callback for applying template
+		this.addLayer = options.addLayer; // Function to add layer to canvas (for uploads/elements)
 		this.saveState = options.saveState;
 		
 		this.uploadedFile = null;
@@ -23,30 +24,50 @@ class SidebarItemManager {
 	}
 	
 	loadAll() {
-		this.loadLayouts();
+		this.loadTemplates(); // Changed method name
 		this.loadCovers();
 		this.loadElements();
 		this.initializeUpload();
 	}
 	
-	// --- Layouts ---
-	loadLayouts() {
-		$.getJSON(this.layoutsUrl)
-			.done(data => {
-				this.$layoutList.empty();
-				data.forEach(layout => {
-					const $thumb = $(`
-                        <div class="item-thumbnail layout-thumbnail" title="${layout.name}">
-                            <img src="${layout.thumbnail || 'img/placeholder_layout.png'}" alt="${layout.name}">
-                            <span>${layout.name}</span>
-                        </div>
-                    `);
-					$thumb.data('layoutData', layout.layers); // Store layer data
-					this.$layoutList.append($thumb);
-				});
-				this._makeDraggable(this.$layoutList.find('.layout-thumbnail'), { width: '100px', height: 'auto' });
-			})
-			.fail(() => this.$layoutList.html('<p class="text-danger">Error loading layouts.</p>'));
+	// --- Templates (Previously Layouts) ---
+	loadTemplates() {
+		try {
+			const templateDataElement = document.getElementById('templateData');
+			const templates = JSON.parse(templateDataElement.textContent || '[]');
+			
+			this.$templateList.empty();
+			if (templates.length === 0) {
+				this.$templateList.html('<p class="text-muted">No templates found.</p>');
+				return;
+			}
+			
+			templates.forEach(template => {
+				const $thumb = $(`
+                    <div class="item-thumbnail template-thumbnail" title="${template.name}">
+                        <img src="${template.thumbnailPath}" alt="${template.name}">
+                        <span>${template.name}</span>
+                    </div>
+                `);
+				$thumb.data('templateJsonPath', template.jsonPath); // Store path to JSON
+				this.$templateList.append($thumb);
+			});
+			
+			// Make draggable - Dropping handled by CanvasManager
+			this._makeDraggable(this.$templateList.find('.template-thumbnail'), { width: '100px', height: 'auto' });
+			
+			// Optional: Add click handler to apply template directly
+			this.$templateList.find('.template-thumbnail').on('click', (e) => {
+				const jsonPath = $(e.currentTarget).data('templateJsonPath');
+				if (jsonPath) {
+					this.applyTemplate(jsonPath, true); // Use the callback
+				}
+			});
+			
+		} catch (error) {
+			console.error("Error loading templates:", error);
+			this.$templateList.html('<p class="text-danger">Error loading templates.</p>');
+		}
 	}
 	
 	// --- Covers ---
@@ -55,7 +76,6 @@ class SidebarItemManager {
 			.done(data => {
 				this.allCoversData = data; // Store for searching
 				this.renderCovers(this.allCoversData); // Initial render
-				
 				// Search functionality
 				this.$coverSearch.on('input', () => {
 					const searchTerm = this.$coverSearch.val().toLowerCase();
@@ -112,11 +132,20 @@ class SidebarItemManager {
 	_makeDraggable($items, helperSize) {
 		$items.draggable({
 			helper: 'clone',
-			appendTo: 'body',
+			appendTo: 'body', // Append to body to avoid sidebar scroll issues
 			zIndex: 1100,
 			revert: 'invalid',
+			cursor: 'grabbing',
 			start: function(event, ui) {
-				$(ui.helper).css({'width': helperSize.width, 'height': helperSize.height, 'opacity': 0.7});
+				$(ui.helper).css({
+					'width': helperSize.width,
+					'height': helperSize.height,
+					'opacity': 0.7,
+					'background': '#fff', // Add background for visibility
+					'border': '1px dashed #ccc',
+					'padding': '5px',
+					'text-align': 'center'
+				}).find('span').css({'font-size': '0.7rem'});
 			}
 		});
 	}
@@ -129,7 +158,7 @@ class SidebarItemManager {
 				this.uploadedFile = file;
 				const reader = new FileReader();
 				reader.onload = (e) => {
-					this.$uploadPreview.html(`<img src="${e.target.result}" alt="Upload Preview" style="max-width: 100%; max-height: 150px;">`);
+					this.$uploadPreview.html(`<img src="${e.target.result}" alt="Upload Preview" style="max-width: 100%; max-height: 150px; object-fit: contain;">`); // Added object-fit
 					this.$addImageBtn.prop('disabled', false);
 				}
 				reader.readAsDataURL(file);
@@ -146,12 +175,20 @@ class SidebarItemManager {
 				const reader = new FileReader();
 				reader.onload = (e) => {
 					// Use the callback to add the layer
-					this.addLayer('image', {
-						content: e.target.result, // Base64 data URL
-						x: 20, y: 20,
-						width: 200, height: 'auto'
-					});
-					this.saveState(); // Save state after adding uploaded image
+					const img = new Image();
+					img.onload = () => {
+						// Add layer with initial size based on image, capped
+						const MAX_WIDTH = this.$templateList.width() * 0.8; // Example max width
+						this.addLayer('image', {
+							content: e.target.result, // Base64 data URL
+							x: 20,
+							y: 20,
+							width: img.width,
+							height: img.height
+						});
+						this.saveState(); // Save state after adding uploaded image
+					};
+					img.src = e.target.result;
 					
 					// Optionally clear preview after adding
 					// this.uploadedFile = null;

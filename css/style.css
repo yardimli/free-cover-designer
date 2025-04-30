@@ -1,5 +1,8 @@
+/* Keep existing styles, add/modify the following */
+
 body {
     overflow: hidden; /* Prevent body scroll */
+    font-family: sans-serif; /* Basic font */
 }
 
 .app-container {
@@ -8,24 +11,36 @@ body {
 
 .top-toolbar {
     flex-shrink: 0; /* Prevent toolbar from shrinking */
+    z-index: 1070; /* Ensure above sidebar and canvas area */
 }
 
 #textToolbar {
     flex-shrink: 0;
-    position: sticky; /* Keep it visible when scrolling sidebar */
-    top: 0; /* Adjust if top-toolbar height changes */
-    z-index: 1050; /* Above canvas elements */
+    /* Removed position: sticky; - Let it be part of the navbar flow */
+    /* top: 0; */
+    z-index: 1071; /* Above main toolbar content */
+    border-radius: 4px; /* Optional rounding */
+    margin-left: 1rem; /* Space from brand */
+}
+/* Ensure text toolbar controls are vertically aligned */
+#textToolbar .d-flex > * {
+    margin-bottom: 0.25rem; /* Spacing for wrapping */
 }
 
+
 .main-content {
-    height: calc(100vh - 56px); /* Adjust based on top-toolbar height */
+    /* Calculate height based on actual top-toolbar height if it's dynamic,
+       otherwise use a fixed value or rely on flex-grow */
+    height: calc(100vh - 56px); /* Adjust 56px if toolbar height changes */
+    /* Or simply rely on flex-grow-1 and overflow:hidden on parent */
 }
 
 /* --- Left Sidebar --- */
 .left-sidebar {
     width: 280px; /* Fixed width for the sidebar */
     flex-shrink: 0;
-    /* Removed d-flex flex-column from here, handled in HTML */
+    /* d-flex is already on the element in HTML */
+    height: 100%; /* Ensure it takes full height of main-content */
 }
 
 .sidebar-nav {
@@ -39,24 +54,31 @@ body {
     color: #6c757d;
     padding: 0.8rem 0;
     border-radius: 0;
+    cursor: pointer;
 }
 
 .sidebar-nav .nav-link.active {
     background-color: #f8f9fa; /* Match sidebar content bg */
     color: #0d6efd;
 }
+.sidebar-nav .nav-link:hover:not(.active) {
+    background-color: #dee2e6;
+}
+
 
 .sidebar-content {
     width: calc(280px - 60px); /* Remaining width */
     background-color: #f8f9fa;
-    overflow-y: auto;
+    overflow-y: auto; /* Enable vertical scroll */
     flex-grow: 1; /* Ensure it takes up the available space */
+    height: 100%; /* Fill the sidebar height */
 }
 
 .item-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* Slightly wider items */
     gap: 10px;
+    padding: 5px; /* Padding around the grid */
 }
 
 .item-grid .item-thumbnail {
@@ -65,180 +87,252 @@ body {
     cursor: grab;
     text-align: center;
     background-color: #fff;
-    transition: transform 0.1s ease-in-out;
+    transition: transform 0.1s ease-in-out, border-color 0.1s ease-in-out;
     overflow: hidden; /* Ensure content fits */
-    height: 80px; /* Fixed height */
+    height: 160px; /* Increased height */
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: center; /* Center content vertically */
     align-items: center;
+    border-radius: 4px; /* Slight rounding */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
+
 .item-grid .item-thumbnail:hover {
     border-color: #0d6efd;
+    transform: translateY(-2px); /* Slight lift on hover */
 }
+
 .item-grid .item-thumbnail:active {
     cursor: grabbing;
     transform: scale(0.95);
+    border-color: #0a58ca;
 }
 
 .item-grid .item-thumbnail img {
     max-width: 100%;
-    max-height: 50px; /* Adjust as needed */
-    object-fit: contain;
+    max-height: 120px; /* Adjust max height for image */
+    object-fit: contain; /* Show whole image */
+    margin-bottom: 5px; /* Space between image and text */
 }
+
 .item-grid .item-thumbnail span {
-    font-size: 0.7rem;
-    margin-top: 4px;
+    font-size: 0.75rem; /* Slightly larger text */
+    margin-top: auto; /* Push text towards bottom */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+    color: #495057;
 }
 
 /* --- Canvas Area --- */
 #canvas-area {
     background-color: #6c757d; /* Darker background */
-    position: relative;
-    overflow: auto;
-    cursor: grab;
+    position: relative; /* Needed for rulers */
+    overflow: auto; /* Handles scrolling */
+    cursor: grab; /* Default cursor for panning */
+    flex-grow: 1; /* Take remaining space */
+    /* d-flex justify-content-center align-items-center handled in HTML */
 }
 
 #canvas-area.panning {
     cursor: grabbing; /* Change cursor during panning */
 }
 
+/* Canvas Wrapper - Positioned by flexbox in canvas-area */
 #canvas-wrapper {
-    margin: 0; /* Reset margins */
-    padding: 0; /* Reset padding */
-    position: absolute; /* Position relative to canvas-area */
+    margin: 20px; /* Add some margin around the wrapper */
+    padding: 0;
+    position: relative; /* Crucial for absolute positioning of canvas elements inside */
+    /* Width and height are set dynamically by JS based on canvas size and zoom */
+    /* transform-origin: top left; */ /* Might be useful if scaling wrapper */
 }
 
+/* The actual design canvas */
 #canvas {
-    /* Standard US Trade Paperback Size Ratio (6x9 inches) */
-    width: 600px;
-    height: 900px;
-    /* Or A5 Ratio (148 x 210 mm) */
-    /* width: 595px; */
-    /* height: 842px; */
+    /* width/height set by JS */
     overflow: hidden; /* Clip elements outside the bounds */
-    position: relative; /* Crucial for absolute positioning of layers */
-    transform-origin: center center; /* For potential zooming */
-    border: 1px solid #ccc; /* Visual boundary */
-
+    position: relative; /* Context for absolute positioned layers */
+    transform-origin: top left; /* Zoom scales from top-left */
+    border: none; /* Remove default border, shadow provides boundary */
     margin: 0;
     display: block;
-
     background-color: #fff; /* Ensure background is white */
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2); /* Add shadow */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); /* More pronounced shadow */
+    /* transform: scale(1.0); set by JS */
 }
 
 /* --- Canvas Elements --- */
 .canvas-element {
     position: absolute;
     cursor: grab;
-    border: 1px dashed transparent; /* Hidden border */
-    pointer-events: auto;
+    border: 1px dashed transparent; /* Hidden border, shown on selection */
+    box-sizing: border-box; /* Include border in width/height */
+    /* pointer-events: auto; */ /* Default */
 }
 
 .canvas-element.ui-draggable-dragging,
 .canvas-element.ui-resizable-resizing {
     cursor: grabbing;
-    z-index: 1001 !important; /* Ensure dragging element is on top */
+    z-index: 1001 !important; /* Ensure dragging/resizing element is visually on top */
+    opacity: 0.7; /* Make it slightly transparent while moving */
 }
 
 .canvas-element.selected {
     border: 1px dashed #0d6efd;
-    z-index: 1000 !important; /* Bring selected to front */
+    /* z-index: 1000 !important; */ /* Don't force z-index on select, rely on layer order */
 }
 
-.canvas-element.locked .ui-resizable-handle {
-    display: none; /* Hide resize handles when locked */
-}
 .canvas-element.locked {
     cursor: default; /* Change cursor when locked */
 }
+/* Style for cursor when interactions are disabled */
+.canvas-element.interactions-disabled {
+    cursor: default !important; /* Override grab cursor */
+}
 
 
+/* Hide resize handles when locked */
+.canvas-element.locked .ui-resizable-handle {
+    display: none;
+}
+
+/* Resize Handle Styling */
 .canvas-element .ui-resizable-handle {
     background: #0d6efd;
     border: 1px solid #fff;
     width: 10px;
     height: 10px;
     z-index: 1002; /* Above element border */
+    box-sizing: border-box;
+    border-radius: 50%; /* Circle handles */
 }
+/* Specific handle positions (optional visual tweaks) */
+.canvas-element .ui-resizable-n { top: -5px; left: 50%; margin-left: -5px; cursor: n-resize; }
+.canvas-element .ui-resizable-s { bottom: -5px; left: 50%; margin-left: -5px; cursor: s-resize; }
+.canvas-element .ui-resizable-e { right: -5px; top: 50%; margin-top: -5px; cursor: e-resize; }
+.canvas-element .ui-resizable-w { left: -5px; top: 50%; margin-top: -5px; cursor: w-resize; }
+.canvas-element .ui-resizable-se { right: -5px; bottom: -5px; cursor: se-resize; }
+.canvas-element .ui-resizable-sw { left: -5px; bottom: -5px; cursor: sw-resize; }
+.canvas-element .ui-resizable-ne { right: -5px; top: -5px; cursor: ne-resize; }
+.canvas-element .ui-resizable-nw { left: -5px; top: -5px; cursor: nw-resize; }
+
 
 .canvas-element img {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Or contain, depending on desired behavior */
+    object-fit: cover; /* Default for images, can be overridden by layer style */
     display: block; /* Remove extra space below image */
     user-select: none; /* Prevent image selection during drag */
     -webkit-user-drag: none; /* Prevent native image drag */
+    pointer-events: none; /* Prevent img intercepting clicks meant for the parent div */
 }
 
 .canvas-element .text-content {
     width: 100%;
-    height: 100%;
-    overflow: hidden; /* Prevent text overflow */
-    padding: 5px; /* Basic padding */
+    height: 100%; /* Takes height of parent unless parent is auto */
+    overflow: hidden; /* Prevent text overflow visually (can still overflow box) */
+    /* padding: 5px; */ /* Padding set by layerData.backgroundPadding */
     user-select: none; /* Prevent text selection unless editing */
     white-space: pre-wrap; /* Respect newlines and spaces */
     word-wrap: break-word; /* Break long words */
-    display: flex; /* For vertical alignment if needed */
-    align-items: center; /* Example: Center vertically */
-    justify-content: center; /* Example: Center horizontally (overridden by text-align) */
+    cursor: text; /* Indicate text is editable on hover */
+    box-sizing: border-box; /* Include padding in width/height */
+    /* display, align-items, justify-content are handled by text-align and line-height */
 }
+/* Allow text selection when editing (future enhancement) */
+/* .canvas-element.editing .text-content { user-select: text; } */
 
 
 /* --- Layers Panel --- */
 #layerList .list-group-item {
-    display: flex;
-    align-items: center;
+    /* display: flex; align-items: center; */ /* Replaced with inner div for better control */
     padding: 0.5rem 0.75rem;
     cursor: pointer;
     user-select: none;
+    background-color: #fff; /* Ensure white background */
+    border-bottom: 1px solid #eee; /* Separator */
+    transition: background-color 0.15s ease-in-out;
 }
-#layerList .list-group-item:hover {
+#layerList .list-group-item:first-child {
+    border-top: 1px solid #eee;
+}
+
+
+#layerList .list-group-item:hover:not(.active) {
     background-color: #e9ecef;
 }
+
 #layerList .list-group-item.active {
     background-color: #cfe2ff;
     border-color: #b6d4fe;
     font-weight: bold;
+    color: #000;
 }
 
 #layerList .layer-icon {
-    margin-right: 8px;
+    /* margin-right: 8px; */ /* Using me-2 utility class */
     width: 16px;
     text-align: center;
+    color: #6c757d;
 }
+#layerList .list-group-item.active .layer-icon {
+    color: #0d6efd;
+}
+
+
 #layerList .layer-name {
-    flex-grow: 1;
+    /* flex-grow: 1; */ /* Using utility class */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.9em;
+    line-height: 1.2; /* Adjust line height */
 }
+
 #layerList .layer-controls button {
-    padding: 0.1rem 0.4rem;
+    /* padding: 0.1rem 0.4rem; */ /* Using p-1 utility class */
     font-size: 0.8em;
     line-height: 1;
-    margin-left: 4px;
+    /* margin-left: 4px; */ /* Using me-1 utility class */
+    color: #6c757d; /* Default icon color */
 }
+#layerList .layer-controls button:hover {
+    color: #000;
+    background-color: #dee2e6;
+}
+
 #layerList .layer-controls .lock-icon.locked {
     color: #dc3545; /* Red when locked */
 }
+#layerList .list-group-item.active .layer-controls button {
+    color: #0d6efd; /* Match active color */
+}
+#layerList .list-group-item.active .layer-controls button:hover {
+    color: #0a58ca;
+    background-color: #b6d4fe;
+}
+#layerList .list-group-item.active .layer-controls .lock-icon.locked {
+    color: #dc3545; /* Keep lock red even when active */
+}
+
 
 /* jQuery UI Sortable Placeholder */
 .ui-sortable-placeholder {
-    border: 1px dashed #ccc;
-    background-color: #f8f9fa;
-    height: 40px; /* Match approximate item height */
+    border: 1px dashed #ccc !important; /* Use !important to override default list-group-item border */
+    background-color: #f0f0f0 !important;
+    height: 45px; /* Match approximate item height */
     visibility: visible !important;
+    margin-bottom: 1px; /* Match item separation */
 }
+
+/* jQuery UI Sortable Helper (the item being dragged) */
 .ui-sortable-helper {
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     background-color: #fff;
+    opacity: 0.9;
+    border: 1px solid #ccc;
 }
 
 /* Utility */
@@ -246,33 +340,132 @@ body {
     display: none !important;
 }
 
+/* Class added to canvas elements when hidden via layer panel */
 .canvas-element.layer-hidden {
     display: none !important; /* Use !important to override inline styles if necessary */
+    /* Alternatively, could use visibility: hidden; pointer-events: none; */
 }
 
-/* Optional: Style for layer list item when layer is hidden */
+/* Style for layer list item when its corresponding layer is hidden */
+#layerList .list-group-item.layer-item-hidden {
+    opacity: 0.6; /* Dim the whole item */
+}
 #layerList .list-group-item.layer-item-hidden .layer-name {
-    color: #adb5bd; /* Lighter text */
+    /* color: #adb5bd; */ /* Lighter text - already handled by opacity */
     font-style: italic;
 }
 #layerList .list-group-item.layer-item-hidden .layer-icon {
-    opacity: 0.6;
+    /* opacity: 0.6; */ /* Already handled by parent opacity */
 }
+#layerList .list-group-item.layer-item-hidden .layer-controls .fa-eye-slash {
+    color: #dc3545; /* Make the slash icon more prominent when hidden */
+}
+
 
 /* --- Zoom Controls --- */
 #zoom-controls {
-    background-color: rgba(40, 40, 40, 0.8); /* Dark semi-transparent background */
-    z-index: 1060; /* Above canvas elements and rulers */
-    display: flex;
-    align-items: center;
+    /* background-color: rgba(40, 40, 40, 0.8); */ /* Using bg-dark utility */
+    /* z-index: 1060; */ /* Set inline */
+    /* display: flex; align-items: center; */ /* Handled by Bootstrap btn-group or flex */
+    /* padding: 0.5rem; */ /* Using p-1 utility */
+    border-radius: 0.25rem; /* Using rounded utility */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Using shadow-sm utility */
 }
 
 #zoom-controls .btn {
     line-height: 1;
+    /* color: #fff; */ /* Set by btn-light */
+    /* background-color: #495057; */ /* Set by btn-light */
+    /* border-color: #343a40; */ /* Set by btn-light */
+}
+#zoom-controls .btn:hover {
+    /* background-color: #343a40; */
+}
+#zoom-controls .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 #zoom-percentage {
-    min-width: 50px; /* Ensure space for percentage */
+    min-width: 55px; /* Ensure space for percentage */
     font-size: 0.9em;
     padding: 0.4em 0.6em;
+    /* background-color: #212529; */ /* Using bg-dark utility */
+    /* color: #fff; */ /* Using text-light utility */
+    vertical-align: middle; /* Align with buttons */
+    display: inline-block; /* Needed for min-width */
+    text-align: center;
+}
+
+/* --- Rulers CSS (from rulers.js, ensure it doesn't conflict) --- */
+/* Basic styles applied by rulers.js, this is just for reference/override */
+.div-rulers-wrapper { /* The wrapper created by rulers.js */
+    position: relative;
+    overflow: hidden;
+    /* width/height set by JS */
+}
+.div-rulers-ruler-h, .div-rulers-ruler-v, .div-rulers-corner {
+    position: absolute;
+    background-color: rgba(240, 240, 240, 0.95); /* Match JS options */
+    box-sizing: border-box;
+    z-index: 1055; /* Below zoom controls, above canvas area content */
+    border-color: #888; /* Match JS options */
+}
+.div-rulers-ruler-h { border-bottom: 1px solid #888; }
+.div-rulers-ruler-v { border-right: 1px solid #888; }
+.div-rulers-corner { border-right: 1px solid #888; border-bottom: 1px solid #888; }
+
+.div-rulers-ruler-h canvas, .div-rulers-ruler-v canvas {
+    position: absolute;
+}
+
+.div-rulers-indicator-h, .div-rulers-indicator-v {
+    position: absolute;
+    background-color: rgba(0, 100, 255, 0.8); /* Match JS options */
+    z-index: 1056; /* Above rulers */
+    pointer-events: none;
+    display: none; /* Shown by JS */
+}
+.div-rulers-indicator-h { width: 1px; /* height set by JS */ }
+.div-rulers-indicator-v { height: 1px; /* width set by JS */ }
+
+/* Ensure target area (canvas-area) has correct padding for rulers */
+/* This is handled by rulers.js adjusting the target's style */
+
+
+/* --- Upload Preview --- */
+#uploadPreview img {
+    max-width: 100%;
+    max-height: 150px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    padding: 2px;
+    background-color: #fff;
+}
+
+/* --- Final Overrides / Adjustments --- */
+/* Ensure dropdown menus appear above everything */
+.dropdown-menu {
+    z-index: 1080 !important;
+}
+
+/* jQuery UI helper clone styling */
+.ui-draggable-helper {
+    border: 1px dashed #ccc;
+    padding: 5px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+    text-align: center;
+    z-index: 1100 !important; /* Ensure helper is on top */
+}
+.ui-draggable-helper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+.ui-draggable-helper span {
+    font-size: 0.7rem;
+    display: block;
+    margin-top: 2px;
+    color: #333;
 }
