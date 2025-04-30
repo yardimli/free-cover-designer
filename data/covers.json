@@ -1,0 +1,40 @@
+[
+  {
+    "title": "Vintage Portrait",
+    "keywords": [
+      "vintage",
+      "man",
+      "hat"
+    ],
+    "image": "img/cover_man_hat.jpg"
+  },
+  {
+    "title": "Woman in Silk",
+    "keywords": [
+      "vintage",
+      "woman",
+      "elegant"
+    ],
+    "image": "img/cover_woman_silk.jpg"
+  },
+  {
+    "title": "Golden Eagle",
+    "keywords": [
+      "symbol",
+      "gold",
+      "eagle",
+      "emblem"
+    ],
+    "image": "img/cover_eagle.png"
+  },
+  {
+    "title": "Stormy Sea",
+    "keywords": [
+      "sea",
+      "ocean",
+      "storm",
+      "figure"
+    ],
+    "image": "img/cover_stormy_sea.jpg"
+  }
+]

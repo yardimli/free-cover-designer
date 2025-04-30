@@ -1,0 +1,14 @@
+create a web application using latest bootstrap 5 and jQuery and other jQuery libraries for a book cover design tool. Make it look like the images provided. The left bar has options for cover elements. the right area is the canvas, the top toolbar is for editing layers.
+
+1) the first option on the left toolbar is layout. The user will be able to drag full text layout templates. Each template is a JSON structure containing text, bounding rectangle, alignment, font, effects and color. The app should render it using a DIV with small scale so it will look like a thumbnail.
+2) the second option is covers. This is a JSON result with title, keywords and image. It should open with a call that will output the latest from a JSON file, but the user can use search to filter the images.
+3) the third option should be Elements where the user can drag shapes(png files) into the canvas. The elements list is also a JSON file with image (png) filenames.
+4) the fourth option is upload, user can upload their image to the canvas
+5) the fifth option layers. The user will see a list of layers on the canvas (text and image layers) and can drag them up or down to rearrange the drawing order or click on them, and they will be selected on the canvas.
+6) when selecting a text layer on the canvas, have a toolbar to let the user customize the font, size, alignment, style and effects.
+7) all layers can be locked. Locked layers can't be moved or resized.
+8) user can save the layout. It should download as a JSON with all the layers and other information when they hit save.
+9) user can upload an existing JSON file to the canvas which will be redrawn.
+10) all canvas layers can be resized and moved around.
+11) keep track of all changes in a history file. This history file should also be saved and loaded.
+12) Allow user to undo/redo using the history file.

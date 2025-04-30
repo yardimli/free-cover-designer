@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Square",
+    "image": "img/square.png"
+  },
+  {
+    "name": "Circle",
+    "image": "img/circle.png"
+  },
+  {
+    "name": "Star",
+    "image": "img/star.png"
+  }
+]
