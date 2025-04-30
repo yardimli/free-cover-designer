@@ -4,12 +4,14 @@ $(document).ready(function () {
 	const $textToolbar = $('#textToolbar');
 	const $canvasArea = $('#canvas-area'); // <<< Get canvas area
 	const $canvasWrapper = $('#canvas-wrapper'); // <<< Get canvas wrapper
+	const canvasAreaDiv = document.getElementById('canvas-area');
 	
 	let layers = []; // Array to hold layer data objects
 	let selectedLayer = null;
 	let history = [];
 	let historyIndex = -1;
 	let uniqueIdCounter = 0;
+	let rulers = null; // Placeholder for the ruler object
 	
 	// --- Zoom & Ruler State ---
 	let currentZoom = 1.0; // 1.0 = 100%
@@ -750,8 +752,7 @@ $(document).ready(function () {
 	// --- Zoom & Ruler ---
 	
 	function initializeZoomPanAndRulers() {
-		const myDiv = document.getElementById('canvas-area');
-		const rulers = new DivRulers(myDiv, {
+		rulers = new DivRulers(canvasAreaDiv, {
 			tickMajor: 50,
 			tickMinor: 10,
 			tickMicro: 5,
@@ -883,7 +884,7 @@ $(document).ready(function () {
 		// Update percentage display
 		$('#zoom-percentage').text(`${Math.round(currentZoom * 100)}%`);
 		
-		$canvasArea.ruler.options = rulerOptions; // Update options if needed
+		// Update options if needed
 		
 		// Update button states
 		$('#zoom-in').prop('disabled', currentZoom >= MAX_ZOOM);

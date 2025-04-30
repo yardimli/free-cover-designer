@@ -291,109 +291,112 @@ class DivRulers {
 	}
 	
 	updateRulers() {
-		if (!this.ctxH || !this.ctxV) return; // Not initialized yet
+		if (!this.ctxH || !this.ctxV || !this.target) return; // Not initialized or destroyed
 		
+		// Use clientWidth/Height for visible area size, scrollWidth/Height for total content size
 		const scrollWidth = this.target.scrollWidth;
 		const scrollHeight = this.target.scrollHeight;
-		const clientWidth = this.target.clientWidth; // Visible width
-		const clientHeight = this.target.clientHeight; // Visible height
 		const scrollLeft = this.target.scrollLeft;
 		const scrollTop = this.target.scrollTop;
 		const rs = this.options.rulerSize;
 		
 		// --- Update Horizontal Ruler ---
-		// Set canvas dimensions (use devicePixelRatio for sharpness)
 		const dpr = window.devicePixelRatio || 1;
-		this.canvasH.width = scrollWidth * dpr;
+		// Ensure minimum canvas width matches the visible width if scrollWidth is smaller
+		const canvasWidthH = Math.max(scrollWidth, this.target.clientWidth);
+		this.canvasH.width = canvasWidthH * dpr;
 		this.canvasH.height = rs * dpr;
-		this.canvasH.style.width = scrollWidth + 'px';
+		this.canvasH.style.width = canvasWidthH + 'px';
 		this.canvasH.style.height = rs + 'px';
 		this.ctxH.scale(dpr, dpr);
 		
-		// Position canvas based on scroll
-		this.canvasH.style.left = -scrollLeft + 'px';
+		// Position canvas based on scroll - Use transform for potentially better performance
+		// this.canvasH.style.left = -scrollLeft + 'px'; // Old way
+		this.canvasH.style.transform = `translateX(${-scrollLeft}px)`;
 		
-		// Clear and redraw
-		this.ctxH.clearRect(0, 0, this.canvasH.width / dpr, this.canvasH.height / dpr);
-		this.ctxH.fillStyle = this.options.rulerBgColor; // Ensure background is cleared if transparent
-		this.ctxH.fillRect(0, 0, this.canvasH.width / dpr, this.canvasH.height / dpr);
+		
+		// Clear and redraw H
+		this.ctxH.clearRect(0, 0, canvasWidthH, rs); // Use scaled dimensions for clearing
+		// Redraw background explicitly if needed (e.g., if ruler BG is transparent)
+		// this.ctxH.fillStyle = this.options.rulerBgColor;
+		// this.ctxH.fillRect(0, 0, canvasWidthH, rs);
 		this.ctxH.strokeStyle = this.options.tickColor;
 		this.ctxH.fillStyle = this.options.labelColor;
 		this.ctxH.font = '10px sans-serif';
 		this.ctxH.textBaseline = 'bottom';
-		this.ctxH.lineWidth = 1;
+		this.ctxH.lineWidth = 0.5; // Thinner lines often look better
 		
-		for (let i = 0; i <= scrollWidth; i++) {
-			this.ctxH.beginPath();
+		for (let i = 0; i <= canvasWidthH; i++) { // Iterate based on canvas width
+			let tickY = 0; // Top position for major ticks
 			if (i % this.options.tickMajor === 0) {
-				this.ctxH.moveTo(i + 0.5, 0); // +0.5 for sharp lines
-				this.ctxH.lineTo(i + 0.5, rs);
+				tickY = 0;
 				if (this.options.showLabel && i > 0) {
 					this.ctxH.fillText(`${i}`, i + 2, rs - 2);
 				}
 			} else if (i % this.options.tickMinor === 0) {
-				this.ctxH.moveTo(i + 0.5, rs * 0.4);
-				this.ctxH.lineTo(i + 0.5, rs);
+				tickY = rs * 0.4;
 			} else if (i % this.options.tickMicro === 0) {
-				this.ctxH.moveTo(i + 0.5, rs * 0.7);
-				this.ctxH.lineTo(i + 0.5, rs);
+				tickY = rs * 0.7;
+			} else {
+				continue; // Skip if not a tick position
 			}
+			this.ctxH.beginPath();
+			this.ctxH.moveTo(i + 0.5, tickY); // +0.5 for sharp lines
+			this.ctxH.lineTo(i + 0.5, rs);
 			this.ctxH.stroke();
 		}
 		
 		// --- Update Vertical Ruler ---
+		// Ensure minimum canvas height matches the visible height if scrollHeight is smaller
+		const canvasHeightV = Math.max(scrollHeight, this.target.clientHeight);
 		this.canvasV.width = rs * dpr;
-		this.canvasV.height = scrollHeight * dpr;
+		this.canvasV.height = canvasHeightV * dpr;
 		this.canvasV.style.width = rs + 'px';
-		this.canvasV.style.height = scrollHeight + 'px';
+		this.canvasV.style.height = canvasHeightV + 'px';
 		this.ctxV.scale(dpr, dpr);
 		
-		// Position canvas based on scroll
-		this.canvasV.style.top = -scrollTop + 'px';
+		// Position canvas based on scroll - Use transform
+		// this.canvasV.style.top = -scrollTop + 'px'; // Old way
+		this.canvasV.style.transform = `translateY(${-scrollTop}px)`;
 		
-		// Clear and redraw
-		this.ctxV.clearRect(0, 0, this.canvasV.width / dpr, this.canvasV.height / dpr);
-		this.ctxV.fillStyle = this.options.rulerBgColor;
-		this.ctxV.fillRect(0, 0, this.canvasV.width / dpr, this.canvasV.height / dpr);
+		// Clear and redraw V
+		this.ctxV.clearRect(0, 0, rs, canvasHeightV); // Use scaled dimensions
+		// Redraw background explicitly if needed
+		// this.ctxV.fillStyle = this.options.rulerBgColor;
+		// this.ctxV.fillRect(0, 0, rs, canvasHeightV);
 		this.ctxV.strokeStyle = this.options.tickColor;
 		this.ctxV.fillStyle = this.options.labelColor;
 		this.ctxV.font = '10px sans-serif';
-		this.ctxV.textAlign = 'right';
-		this.ctxV.textBaseline = 'middle';
-		this.ctxV.lineWidth = 1;
+		// No rotation needed if drawing lines horizontally then rotating text
+		this.ctxV.lineWidth = 0.5; // Thinner lines
 		
-		// Save context state for rotation
-		this.ctxV.save();
-		// Translate and rotate for vertical text
-		this.ctxV.translate(rs - 2, 0); // Move origin to right edge for text
-		this.ctxV.rotate(Math.PI / 2); // Rotate 90 degrees clockwise
-		
-		for (let i = 0; i <= scrollHeight; i++) {
-			this.ctxV.beginPath();
-			// Draw horizontal lines relative to the *rotated* canvas
+		for (let i = 0; i <= canvasHeightV; i++) { // Iterate based on canvas height
+			let tickX = 0; // Left position for major ticks
 			if (i % this.options.tickMajor === 0) {
-				this.ctxV.moveTo(i + 0.5, 0); // Draw from top edge (which is now left)
-				this.ctxV.lineTo(i + 0.5, -rs); // Draw towards bottom edge (which is now right)
+				tickX = 0;
 				if (this.options.showLabel && i > 0) {
-					// Adjust text position due to rotation
-					this.ctxV.textAlign = 'center'; // Center text on the tick
-					this.ctxV.fillText(`${i}`, i, -rs / 2 - 1); // Draw text vertically centered
+					// Draw text vertically
+					this.ctxV.save(); // Save context state
+					this.ctxV.translate(rs - 2, i + 0.5); // Move origin for rotation (right edge, centered on tick)
+					this.ctxV.rotate(-Math.PI / 2); // Rotate counter-clockwise
+					this.ctxV.textAlign = 'center'; // Center text horizontally after rotation
+					this.ctxV.textBaseline = 'middle'; // Center text vertically after rotation
+					this.ctxV.fillText(`${i}`, 0, 0); // Draw text at the rotated origin
+					this.ctxV.restore(); // Restore context state
 				}
 			} else if (i % this.options.tickMinor === 0) {
-				this.ctxV.moveTo(i + 0.5, -rs * 0.4);
-				this.ctxV.lineTo(i + 0.5, -rs);
+				tickX = rs * 0.4;
 			} else if (i % this.options.tickMicro === 0) {
-				this.ctxV.moveTo(i + 0.5, -rs * 0.7);
-				this.ctxV.lineTo(i + 0.5, -rs);
+				tickX = rs * 0.7;
+			} else {
+				continue; // Skip if not a tick position
 			}
+			this.ctxV.beginPath();
+			this.ctxV.moveTo(tickX, i + 0.5); // Draw horizontal line from tickX to right edge
+			this.ctxV.lineTo(rs, i + 0.5);
 			this.ctxV.stroke();
 		}
-		// Restore context state (removes rotation/translation)
-		this.ctxV.restore();
-		
-		
 	}
-	
 	destroy() {
 		// 1. Remove Listeners
 		this.detachListeners();
