@@ -17,7 +17,7 @@
 <div class="app-container d-flex flex-column vh-100">
 	<!-- Top Toolbar -->
 	<nav class="navbar navbar-expand-sm navbar-dark bg-dark top-toolbar">
-		<div class="container-fluid">
+		<div class="container-fluid" style="min-height:55px;">
 			<span class="navbar-brand mb-0 h1">Designer</span>
 			<!-- Text Editing Toolbar (Initially Hidden) -->
 			<div id="textToolbar" class="bg-dark text-light p-2 d-none">
@@ -54,7 +54,7 @@
 					<button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="fileMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
 						<i class="fas fa-file"></i> File
 					</button>
-					<ul class="dropdown-menu" aria-labelledby="fileMenuButton">
+					<ul class="dropdown-menu" style="z-index:9999" aria-labelledby="fileMenuButton">
 						<li><a class="dropdown-item" href="#" id="loadDesign"><i class="fas fa-folder-open fa-fw me-2"></i>Load Design (.json)</a></li>
 						<li><a class="dropdown-item" href="#" id="saveDesign"><i class="fas fa-save fa-fw me-2"></i>Save Design (.json)</a></li>
 						<li><hr class="dropdown-divider"></li>
@@ -172,8 +172,18 @@
 <script src="vendors/jquery-ui-1.14.1/jquery-ui.min.js"></script>
 <!-- html2canvas (for exporting) -->
 <script src="vendors/html2canvas.min.js"></script>
+<!-- New Class Files -->
+<script src="js/LayerManager.js"></script>
+<script src="js/HistoryManager.js"></script>
+<script src="js/CanvasManager.js"></script>
+<script src="js/TextToolbar.js"></script>
+<script src="js/SidebarItemManager.js"></script>
+
+<!-- Main Application Logic -->
+<script src="js/App.js"></script>
+
 <!-- Custom JS -->
-<script src="js/script.js"></script>
 <script src="js/rulers.js"></script>
+
 </body>
 </html>
