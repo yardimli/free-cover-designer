@@ -1,4 +1,5 @@
 <?php
+	// --- Template Scanning ---
 	$template_dir = 'text-templates';
 	$templates = [];
 	if (is_dir($template_dir)) {
@@ -19,8 +20,39 @@
 			}
 		}
 	}
-	// Encode the template data for JavaScript
 	$templates_json = json_encode($templates);
+
+	// --- Cover Scanning ---
+	$covers_dir = 'covers'; // Define the directory for covers
+	$covers_data = [];
+	if (is_dir($covers_dir)) {
+		$files = scandir($covers_dir);
+		foreach ($files as $file) {
+			// Check if the file ends with -preview.jpg
+			if (str_ends_with(strtolower($file), '-preview.jpg')) {
+				// Extract base name (remove -preview.jpg)
+				$base_name = substr($file, 0, -12); // Length of '-preview.jpg' is 12
+				// Construct paths
+				$preview_path = $covers_dir . '/' . $file;
+				$target_png_path = $covers_dir . '/' . $base_name . '.jpg';
+
+				// Check if the corresponding .png file exists
+				if (file_exists($target_png_path)) {
+					$covers_data[] = [
+						'name' => ucwords(str_replace(['-', '_'], ' ', $base_name)), // Make name prettier
+						'thumbnailPath' => $preview_path, // Path to the preview JPG
+						'imagePath' => $target_png_path   // Path to the target PNG
+					];
+				}
+			}
+		}
+	}
+	// Sort covers alphabetically by name (optional)
+	usort($covers_data, function($a, $b) {
+		return strcmp($a['name'], $b['name']);
+	});
+	$covers_json = json_encode($covers_data);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -40,7 +72,6 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Bentham&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
-
 </head>
 <body>
 <div class="app-container d-flex flex-column vh-100">
@@ -48,7 +79,6 @@
 	<nav class="navbar navbar-expand-sm navbar-dark bg-dark top-toolbar">
 		<div class="container-fluid" style="min-height:55px;">
 			<span class="navbar-brand mb-0 h1">Designer</span>
-
 			<!-- Text Editing Toolbar (Initially Hidden) -->
 			<div id="textToolbar" class="bg-dark text-light p-2 d-none">
 				<div class="d-flex flex-wrap align-items-center">
@@ -63,7 +93,8 @@
 						<option>monospace</option>
 						<option>'Playfair Display', serif</option>
 						<option>'Lato', sans-serif</option>
-						<option>'Bentham', serif</option> <!-- Add fonts from templates -->
+						<option>'Bentham', serif</option>
+						<!-- Add fonts from templates -->
 						<option>'Helvetica Neue', sans-serif</option>
 					</select>
 					<input type="number" id="fontSizeInput" class="form-control form-control-sm me-2" value="16" min="1" max="500" style="width: 70px;">
@@ -81,7 +112,6 @@
 					<button id="textEffectsBtn" class="btn btn-outline-light btn-sm me-1" title="Text Effects (Coming Soon)"><i class="fas fa-magic"></i></button>
 				</div>
 			</div>
-
 			<div class="ms-auto d-flex align-items-center">
 				<div class="dropdown me-2">
 					<button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="fileMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
@@ -96,14 +126,11 @@
 					</ul>
 				</div>
 				<input type="file" id="loadDesignInput" accept=".json" style="display: none;">
-
 				<button class="btn btn-outline-secondary btn-sm me-2" id="undoBtn" title="Undo"><i class="fas fa-undo"></i></button>
 				<button class="btn btn-outline-secondary btn-sm me-2" id="redoBtn" title="Redo"><i class="fas fa-redo"></i></button>
-
 				<!-- Layer Order Buttons -->
 				<button class="btn btn-outline-secondary btn-sm me-1" id="sendToBackBtn" title="Send to Back"><i class="fas fa-angle-double-down"></i></button>
 				<button class="btn btn-outline-secondary btn-sm me-2" id="bringToFrontBtn" title="Bring to Front"><i class="fas fa-angle-double-up"></i></button>
-
 				<button class="btn btn-outline-danger btn-sm me-2" id="deleteBtn" title="Delete Selected"><i class="fas fa-trash"></i></button>
 				<button class="btn btn-outline-secondary btn-sm me-2" id="lockBtn" title="Lock/Unlock Selected"><i class="fas fa-lock"></i></button>
 				<button class="btn btn-primary btn-sm" id="downloadBtn" title="Download Image"><i class="fas fa-download"></i> Download</button>
@@ -174,7 +201,7 @@
 		</div>
 
 		<!-- Canvas Area -->
-		<div id="canvas-area" class="flex-grow-1 d-flex justify-content-center align-items-center bg-secondary overflow-auto position-relative">
+		<div id="canvas-area" class="text-center align-items-center bg-secondary overflow-auto position-relative">
 			<!-- Canvas Wrapper (for positioning canvas relative to rulers) -->
 			<div id="canvas-wrapper" class="position-relative"> <!-- Removed absolute, let flexbox center -->
 				<div id="canvas" class="bg-white shadow position-relative"> <!-- Changed to relative -->
@@ -195,6 +222,10 @@
 <script id="templateData" type="application/json">
         <?php echo $templates_json; ?>
     </script>
+<!-- Embed cover data for JavaScript -->
+<script id="coverData" type="application/json">
+        <?php echo $covers_json; ?>
+    </script>
 
 <!-- Bootstrap Bundle with Popper -->
 <script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script>
@@ -204,19 +235,15 @@
 <script src="vendors/jquery-ui-1.14.1/jquery-ui.min.js"></script>
 <!-- html2canvas (for exporting) -->
 <script src="vendors/html2canvas.min.js"></script>
-
 <!-- Rulers Script -->
 <script src="js/rulers.js"></script> <!-- Moved before App.js -->
-
 <!-- New Class Files -->
 <script src="js/LayerManager.js"></script>
 <script src="js/HistoryManager.js"></script>
 <script src="js/CanvasManager.js"></script>
 <script src="js/TextToolbar.js"></script>
 <script src="js/SidebarItemManager.js"></script>
-
 <!-- Main Application Logic -->
 <script src="js/App.js"></script>
-
 </body>
 </html>

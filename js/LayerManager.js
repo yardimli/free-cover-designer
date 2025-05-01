@@ -11,6 +11,12 @@ class LayerManager {
 		});
 		this.saveState = options.saveState || (() => {
 		}); // Callback to trigger history save
+		this.canvasManager = options.canvasManager; // <-- Store CanvasManager
+		
+		if (!this.canvasManager) {
+			console.error("LayerManager requires an instance of CanvasManager!");
+			// Handle error appropriately, maybe throw an exception
+		}
 	}
 	
 	// --- Core Layer Management ---
@@ -258,6 +264,7 @@ class LayerManager {
 		const sortedLayers = [...layersData].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		
 		sortedLayers.forEach(layerData => {
+			layerData.id = layerData.id + this._generateId() || this._generateId(); // Ensure unique ID
 			// Use addLayer without triggering saveState internally
 			const addedLayer = this.addLayer(layerData.type, layerData);
 			// Ensure the original zIndex is respected if provided
@@ -473,76 +480,149 @@ class LayerManager {
 	
 	_makeElementInteractive($element, layerData) {
 		const layerId = layerData.id;
+		const self = this; // Reference LayerManager instance for callbacks
+		
+		// --- Variables to store drag start state ---
+		let startMouseX, startMouseY, startElementX, startElementY;
 		
 		// --- Draggable ---
 		$element.draggable({
-			// containment: this.$canvas, // Containment can be tricky with zoom/pan
-			containment: 'parent', // Contain within the canvas div
+			containment: 'parent', // Keep containment as the canvas
 			start: (event, ui) => {
-				const layer = this.getLayerById(layerId);
-				if (!layer || layer.locked) return false; // Prevent dragging if locked
-				this.selectLayer(layerId); // Select on drag start
-				$(event.target).addClass('ui-draggable-dragging'); // Add class for potential styling
+				const layer = self.getLayerById(layerId); // Use self
+				if (!layer || layer.locked) return false; // Check lock status
+				self.selectLayer(layerId); // Select on drag start
+				$(event.target).addClass('ui-draggable-dragging'); // Visual feedback
+				
+				// Store initial mouse position (relative to page)
+				startMouseX = event.pageX;
+				startMouseY = event.pageY;
+				
+				// Store initial element position (from layer data - unscaled coords)
+				startElementX = layer.x;
+				startElementY = layer.y;
+				
+				// Prevent default browser drag behavior if needed (usually handled by jQuery UI)
+				// event.preventDefault();
+			},
+			drag: (event, ui) => {
+				const layer = self.getLayerById(layerId); // Use self
+				if (!layer || layer.locked) return false; // Still check lock during drag
+				const zoom = self.canvasManager.currentZoom; // Get current zoom from CanvasManager
+				
+				// Calculate total mouse movement delta since drag start
+				const mouseDx = event.pageX - startMouseX;
+				const mouseDy = event.pageY - startMouseY;
+				
+				// Scale the mouse delta based on the zoom level to get the
+				// corresponding delta in the unscaled canvas coordinate system.
+				const elementDx = mouseDx / zoom;
+				const elementDy = mouseDy / zoom;
+				
+				// Calculate the new target position in the unscaled coordinate system
+				const newX = startElementX + elementDx;
+				const newY = startElementY + elementDy;
+				
+				// Update the ui.position object. jQuery UI uses this to set the
+				// element's actual CSS 'left' and 'top' properties. Since the element
+				// lives inside the unscaled canvas coordinate space (even though the
+				// canvas itself is visually scaled), these CSS properties should
+				// directly correspond to our calculated newX and newY.
+				ui.position.left = newX;
+				ui.position.top = newY;
+				
+				// --- Optional console logging for debugging ---
+				// console.log(`Zoom: ${zoom.toFixed(2)} | Mouse dY: ${mouseDy.toFixed(0)} | Element dY: ${elementDy.toFixed(2)} | Start Y: ${startElementY.toFixed(2)} | New Y: ${newY.toFixed(2)} | ui.top: ${ui.position.top.toFixed(2)}`);
+				
 			},
 			stop: (event, ui) => {
-				const layer = this.getLayerById(layerId);
-				if (!layer || layer.locked) return;
-				// Update layer data with new position (relative to canvas)
-				this.updateLayerData(layerId, {
-					x: ui.position.left,
-					y: ui.position.top
-				});
-				$(event.target).removeClass('ui-draggable-dragging');
-				this.saveState(); // Save state after drag completes
+				const layer = self.getLayerById(layerId); // Use self
+				if (!layer || layer.locked) return; // Check lock on stop
+				
+				// On stop, ui.position contains the final calculated position (newX, newY)
+				// from the last 'drag' event. Update the layer data with these final values.
+				self.updateLayerData(layerId, { x: ui.position.left, y: ui.position.top });
+				
+				$(event.target).removeClass('ui-draggable-dragging'); // Remove visual feedback
+				self.saveState(); // Save history state
 			}
 		});
 		
 		// --- Resizable ---
+		// Keep the existing resizable logic for now, assuming it works correctly.
+		// If resizing also shows issues, it might need a similar adjustment,
+		// although it's more complex due to different handles affecting size/position.
 		$element.resizable({
 			handles: 'n, e, s, w, ne, se, sw, nw',
-			// containment: 'parent', // Usually desired
+			// containment: 'parent', // Containment can be tricky with zoom/resize
 			start: (event, ui) => {
-				const layer = this.getLayerById(layerId);
-				if (!layer || layer.locked) return false; // Prevent resizing if locked
-				this.selectLayer(layerId);
+				const layer = self.getLayerById(layerId); // Use self
+				if (!layer || layer.locked) return false;
+				self.selectLayer(layerId); // Use self
 				$(event.target).addClass('ui-resizable-resizing');
 			},
+			resize: (event, ui) => {
+				const layer = self.getLayerById(layerId); // Use self
+				if (!layer || layer.locked) return false;
+				const zoom = self.canvasManager.currentZoom; // Use self
+				
+				// --- Using the original resize compensation logic ---
+				if (zoom === 1) return;
+				
+				const dWidth = ui.size.width - ui.originalSize.width;
+				const dHeight = ui.size.height - ui.originalSize.height;
+				const dLeft = ui.position.left - ui.originalPosition.left;
+				const dTop = ui.position.top - ui.originalPosition.top;
+				
+				const scaledDWidth = dWidth / zoom;
+				const scaledDHeight = dHeight / zoom;
+				const scaledDLeft = dLeft / zoom;
+				const scaledDTop = dTop / zoom;
+				
+				ui.size.width = ui.originalSize.width + scaledDWidth;
+				ui.size.height = ui.originalSize.height + scaledDHeight;
+				ui.position.left = ui.originalPosition.left + scaledDLeft;
+				ui.position.top = ui.originalPosition.top + scaledDTop;
+			},
 			stop: (event, ui) => {
-				const layer = this.getLayerById(layerId);
+				const layer = self.getLayerById(layerId); // Use self
 				if (!layer || layer.locked) return;
-				// Update layer data with new size
+				
+				const newX = ui.position.left;
+				const newY = ui.position.top;
 				const newWidth = ui.size.width;
-				// Keep height 'auto' for text unless explicitly set otherwise
 				const newHeight = (layer.type === 'text' && layer.height === 'auto') ? 'auto' : ui.size.height;
 				
-				this.updateLayerData(layerId, {
-					width: newWidth,
-					height: newHeight
-				});
+				self.updateLayerData(layerId, { x: newX, y: newY, width: newWidth, height: newHeight }); // Use self
 				
-				// If text layer and height is auto, re-apply styles to potentially reflow text
+				const $element = $(event.target);
 				if (layer.type === 'text' && newHeight === 'auto') {
-					this._applyTextStyles($element.find('.text-content'), layer);
-					$element.css('height', 'auto'); // Ensure element height adjusts
+					$element.css('width', newWidth + 'px');
+					const updatedLayer = self.getLayerById(layerId); // Use self
+					if (updatedLayer) {
+						self._applyTextStyles($element.find('.text-content'), updatedLayer); // Use self
+					}
+					$element.css('height', 'auto');
 				} else {
-					// Ensure element height matches data if not auto
-					$element.css('height', newHeight + 'px');
+					const finalHeightCSS = (typeof newHeight === 'number') ? newHeight + 'px' : 'auto';
+					$element.css({ width: newWidth + 'px', height: finalHeightCSS });
 				}
 				
-				$(event.target).removeClass('ui-resizable-resizing');
-				this.saveState(); // Save state after resize completes
+				$element.removeClass('ui-resizable-resizing');
+				self.saveState(); // Use self
 			}
 		});
 		
 		// --- Click to Select ---
 		$element.on('click', (e) => {
-			e.stopPropagation(); // Prevent click from bubbling to canvas background
-			this.selectLayer(layerId);
+			e.stopPropagation();
+			self.selectLayer(layerId); // Use self
 		});
 		
 		// --- Initial Interactivity State ---
-		this._updateElementInteractivity($element, layerData);
+		self._updateElementInteractivity($element, layerData); // Use self
 	}
+	
 	
 	// Enable/disable jQuery UI interactions based on lock state
 	_updateElementInteractivity($element, layerData) {

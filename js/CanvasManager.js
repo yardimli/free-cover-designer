@@ -109,22 +109,29 @@ class CanvasManager {
 					const imgSrc = $draggedItem.data('coverSrc');
 					if (!imgSrc) return;
 					
-					// Add image as a layer, centered roughly at drop point
+					// Add image as a layer, positioned at (0,0)
 					const img = new Image();
 					img.onload = () => {
-						// Scale image to fit reasonably, maintain aspect ratio
+						// Scale image to fit reasonably, maintain aspect ratio (optional, keep for now)
 						const maxDim = Math.min(this.currentCanvasWidth * 0.6, this.currentCanvasHeight * 0.6);
 						const scale = Math.min(1, maxDim / img.width, maxDim / img.height);
 						const imgWidth = img.width * scale;
 						const imgHeight = img.height * scale;
 						
+						// --- MODIFICATION START ---
+						// Set position to 0, 0 instead of centering at drop point
 						const newLayer = this.layerManager.addLayer('image', {
 							content: imgSrc,
-							x: dropPosition.x - (imgWidth / 2),
-							y: dropPosition.y - (imgHeight / 2),
-							width: imgWidth,
-							height: imgHeight
+							x: 0, // Set X to 0
+							y: 0, // Set Y to 0
+							width: imgWidth, // Keep scaled width for now
+							height: imgHeight // Keep scaled height for now
+							// Consider setting width/height to canvas dimensions if it should fill
+							// width: this.currentCanvasWidth,
+							// height: this.currentCanvasHeight
 						});
+						// --- MODIFICATION END ---
+						
 						if (newLayer) {
 							// Send background images to the back by default
 							this.layerManager.moveLayer(newLayer.id, 'back');
@@ -138,7 +145,7 @@ class CanvasManager {
 					const imgSrc = $draggedItem.data('elementSrc');
 					if (!imgSrc) return;
 					
-					// Add element image, centered at drop point
+					// Add element image, centered at drop point (Keep this behavior for elements)
 					const img = new Image();
 					img.onload = () => {
 						// Default size for elements, maybe smaller
@@ -147,8 +154,8 @@ class CanvasManager {
 						
 						this.layerManager.addLayer('image', {
 							content: imgSrc,
-							x: dropPosition.x - (elemWidth / 2),
-							y: dropPosition.y - (elemHeight / 2),
+							x: dropPosition.x - (elemWidth / 2), // Center X
+							y: dropPosition.y - (elemHeight / 2), // Center Y
 							width: elemWidth,
 							height: elemHeight
 						});
@@ -336,7 +343,7 @@ class CanvasManager {
 		this.updateWrapperSize();
 		
 		// Recenter canvas within the view after zoom might have shifted wrapper
-		this.centerCanvas(); // This also updates rulers
+		//this.centerCanvas(); // This also updates rulers
 		
 		// Update UI (via callback)
 		if (triggerCallbacks) {

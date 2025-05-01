@@ -7,74 +7,75 @@ $(document).ready(function () {
 	const $loadDesignInput = $('#loadDesignInput');
 	
 	// --- Instantiate Managers ---
-	const layerManager = new LayerManager($canvas, $layerList, {
-		onLayerSelect: handleLayerSelectionChange, // Pass callback for UI updates
-		saveState: () => historyManager.saveState() // Pass callback to trigger save
-	});
 	
-	const historyManager = new HistoryManager(layerManager, {
-		onUpdate: updateActionButtons // Pass callback to update buttons on history change
-	});
-	
+	// Instantiate CanvasManager FIRST as LayerManager needs it
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
-		layerManager: layerManager,
-		historyManager: historyManager,
+		// layerManager will be set later if needed, or passed differently
+		// historyManager will be set later if needed
 		onZoomChange: handleZoomChange // Pass callback for UI updates
 	});
 	
+	const layerManager = new LayerManager($canvas, $layerList, {
+		onLayerSelect: handleLayerSelectionChange,
+		saveState: () => historyManager.saveState(),
+		canvasManager: canvasManager // <-- Inject CanvasManager
+	});
+	
+	const historyManager = new HistoryManager(layerManager, {
+		onUpdate: updateActionButtons
+	});
+	
+	// Now set dependencies for CanvasManager if they weren't passed initially
+	// (Alternatively, pass them all in the constructor if order allows)
+	canvasManager.layerManager = layerManager;
+	canvasManager.historyManager = historyManager;
+	
+	
 	const textToolbar = new TextToolbar({
 		getSelectedLayer: () => layerManager.getSelectedLayer(),
-		// Pass LayerManager's method directly
 		updateLayerStyle: (id, prop, val) => layerManager.updateLayerStyle(id, prop, val),
 		saveState: () => historyManager.saveState()
 	});
 	
 	const sidebarManager = new SidebarItemManager({
-		templateListSelector: '#templateList', // Updated selector
+		templateListSelector: '#templateList',
 		coverListSelector: '#coverList',
 		coverSearchSelector: '#coverSearch',
 		elementListSelector: '#elementList',
 		uploadPreviewSelector: '#uploadPreview',
 		uploadInputSelector: '#imageUploadInput',
 		addImageBtnSelector: '#addImageFromUpload',
-		// layoutsUrl: 'data/layouts.json', // Removed layoutsUrl
 		coversUrl: 'data/covers.json',
 		elementsUrl: 'data/elements.json',
-		// New callback for applying templates via CanvasManager
 		applyTemplate: (jsonPath) => canvasManager.loadDesign(jsonPath, true),
-		// Pass LayerManager's addLayer for uploads/elements
 		addLayer: (type, props) => layerManager.addLayer(type, props),
 		saveState: () => historyManager.saveState()
 	});
 	
 	// --- Initialization ---
-	sidebarManager.loadAll(); // Loads templates, covers, elements
-	layerManager.initializeList(); // Init sortable layer list
+	sidebarManager.loadAll();
+	layerManager.initializeList();
 	canvasManager.initialize(); // Init zoom, pan, rulers, droppable
-	// textToolbar is initialized in its constructor
 	
 	// --- Global Action Listeners (Top Toolbar) ---
 	initializeGlobalActions();
 	
 	// --- Initial State ---
-	historyManager.saveState(); // Save the initial empty state
-	updateActionButtons(); // Set initial button states
+	historyManager.saveState();
+	updateActionButtons();
 	
 	// --- UI Update Callbacks ---
 	function handleLayerSelectionChange(selectedLayer) {
-		// Update Text Toolbar visibility and content
 		textToolbar.populate(selectedLayer);
-		// Update Global Action Buttons based on selection and lock state
 		updateActionButtons();
 	}
 	
 	function handleZoomChange(currentZoom, minZoom, maxZoom) {
-		// Update zoom percentage display
 		$('#zoom-percentage').text(`${Math.round(currentZoom * 100)}%`);
-		// Enable/disable zoom buttons at limits
 		$('#zoom-in').prop('disabled', currentZoom >= maxZoom);
 		$('#zoom-out').prop('disabled', currentZoom <= minZoom);
 	}
+	
 	
 	// --- Global Action Button Setup & Updates ---
 	function initializeGlobalActions() {
