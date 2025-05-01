@@ -1,3 +1,4 @@
+/* free-cover-designer/css/style.css */
 
 body {
     overflow: hidden;
@@ -24,14 +25,14 @@ body {
     margin-bottom: 0.25rem;
 }
 
-
 .main-content {
     height: calc(100vh - 56px);
 }
 
 /* --- Left Sidebar --- */
 .left-sidebar {
-    width: 280px;
+    /* UPDATED: Increased total width */
+    width: 400px;
     flex-shrink: 0;
     height: 100%;
 }
@@ -59,37 +60,73 @@ body {
     background-color: #dee2e6;
 }
 
-
 .sidebar-content {
-    width: calc(280px - 60px);
+    /* UPDATED: Adjusted width based on new sidebar width */
+    width: calc(400px - 60px);
     background-color: #f8f9fa;
     overflow-y: auto;
     flex-grow: 1;
     height: 100%;
 }
 
+/* --- Item Grids (General) --- */
 .item-grid {
     display: grid;
+    /* Default grid, can be overridden */
     grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 10px;
+    /* UPDATED: Reduced gap */
+    gap: 5px;
     padding: 5px;
 }
 
+/* --- Template and Cover Specific Grid --- */
+#templateList.item-grid,
+#coverList.item-grid {
+    /* UPDATED: Force 2 columns */
+    grid-template-columns: repeat(2, 1fr);
+    /* Center items horizontally if grid columns are wider than items */
+    justify-items: center;
+}
+
+
+/* --- Item Thumbnails (General) --- */
 .item-grid .item-thumbnail {
     border: 1px solid #ddd;
-    padding: 5px;
+    /* UPDATED: Reduced padding */
+    padding: 3px;
     cursor: grab;
     text-align: center;
     background-color: #fff;
     transition: transform 0.1s ease-in-out, border-color 0.1s ease-in-out;
     overflow: hidden;
-    height: 160px;
+    /* REMOVED fixed height, will be auto based on content */
+    /* height: 160px; */
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    /* UPDATED: Align items to the start (top) */
+    justify-content: flex-start;
     align-items: center;
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Template and Cover Specific Thumbnail Sizing --- */
+#templateList .item-thumbnail,
+#coverList .item-thumbnail {
+    /* UPDATED: Fixed width */
+    width: 155px;
+}
+
+/* --- Template Thumbnail Specific Background --- */
+#templateList .item-thumbnail {
+    background-color: #fff; /* Base color */
+    /* Checkered pattern */
+    background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
+    linear-gradient(-45deg, #eee 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #eee 75%),
+    linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-size: 16px 16px; /* Size of the squares */
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
 .item-grid .item-thumbnail:hover {
@@ -104,21 +141,29 @@ body {
 }
 
 .item-grid .item-thumbnail img {
-    max-width: 100%;
-    max-height: 120px;
+    /* UPDATED: Make image fill container width, height auto */
+    width: 100%;
+    height: auto;
+    /* REMOVED max-width/max-height constraints */
+    /* max-width: 100%; */
+    /* max-height: 120px; */
     object-fit: contain;
-    margin-bottom: 5px;
+    /* UPDATED: Reduced bottom margin */
+    margin-bottom: 3px;
+    display: block; /* Prevents potential extra space below */
 }
 
 .item-grid .item-thumbnail span {
     font-size: 0.75rem;
-    margin-top: auto;
+    /* UPDATED: Reduced top margin */
+    margin-top: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%;
+    width: 100%; /* Ensure it respects container width for ellipsis */
     color: #495057;
 }
+
 
 /* --- Canvas Area --- */
 #canvas-area {
@@ -260,7 +305,6 @@ body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-
     user-select: none;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -270,7 +314,6 @@ body {
 
 /* Allow text selection when editing (future enhancement) */
 /* .canvas-element.editing .text-content { user-select: text; } */
-
 
 /* --- Layers Panel --- */
 #layerList .list-group-item {
@@ -286,7 +329,6 @@ body {
     border-top: 1px solid #eee;
 }
 
-
 #layerList .list-group-item:hover:not(.active) {
     background-color: #e9ecef;
 }
@@ -298,7 +340,6 @@ body {
 }
 
 #layerList .layer-icon {
-
     width: 16px;
     min-width: 16px;
     vertical-align: middle;
@@ -343,7 +384,6 @@ body {
 }
 
 #layerList .layer-controls button {
-
     font-size: 0.8em;
     line-height: 1;
     vertical-align: middle;
@@ -403,12 +443,10 @@ body {
 }
 
 #layerList .list-group-item.layer-item-hidden .layer-name {
-
     font-style: italic;
 }
 
 #layerList .list-group-item.layer-item-hidden .layer-icon {
-
 }
 
 #layerList .list-group-item.layer-item-hidden .layer-controls .fa-eye-slash {
@@ -424,54 +462,51 @@ body {
 
 #zoom-controls .btn {
     line-height: 1;
-    color: #f8f9fa; /* Light text */
+    color: #f8f9fa;
     background-color: transparent;
-    border: none; /* Remove border */
-    padding: 0.4rem 0.6rem; /* Consistent padding */
-    font-size: 1em; /* Adjust icon size if needed */
+    border: none;
+    padding: 0.4rem 0.6rem;
+    font-size: 1em;
 }
+
 #zoom-controls .btn:hover {
     background-color: rgba(255, 255, 255, 0.2);
 }
+
 #zoom-controls .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-/* Style for the percentage toggle button */
 #zoom-percentage-toggle {
-    min-width: 55px; /* Match original span width */
+    min-width: 55px;
     font-size: 0.9em;
-    padding: 0.4em 0.6em; /* Match original span padding */
+    padding: 0.4em 0.6em;
     vertical-align: middle;
     text-align: center;
-    color: #f8f9fa; /* Light text */
-    background-color: transparent; /* Match background */
-    border: none; /* No border */
-    /* Keep Bootstrap's dropdown arrow */
-}
-#zoom-percentage-toggle:hover,
-#zoom-percentage-toggle:focus,
-#zoom-percentage-toggle.show { /* Style when dropdown is open */
-    background-color: rgba(255, 255, 255, 0.1); /* Subtle hover/active */
     color: #f8f9fa;
-    box-shadow: none; /* Remove focus shadow */
+    background-color: transparent;
+    border: none;
 }
 
-/* Style for the dropdown menu */
+#zoom-percentage-toggle:hover, #zoom-percentage-toggle:focus, #zoom-percentage-toggle.show {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f8f9fa;
+    box-shadow: none;
+}
+
 #zoom-options-menu {
-    min-width: auto; /* Allow it to be narrow */
-    font-size: 0.9em; /* Match other controls */
-    /* Dropup positioning handled by Bootstrap */
-    /* Dark theme handled by dropdown-menu-dark */
-    /* Add margin if needed to separate from toggle */
-    margin-bottom: 0.25rem !important; /* Push it up slightly */
+    min-width: auto;
+    font-size: 0.9em;
+    margin-bottom: 0.25rem !important;
 }
+
 #zoom-options-menu .dropdown-item {
-    padding: 0.3rem 0.8rem; /* Adjust padding */
+    padding: 0.3rem 0.8rem;
 }
+
 #zoom-options-menu .dropdown-item:active {
-    background-color: #0d6efd; /* Highlight selection */
+    background-color: #0d6efd;
     color: #fff;
 }
 
