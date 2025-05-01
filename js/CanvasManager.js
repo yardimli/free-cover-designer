@@ -225,29 +225,19 @@ class CanvasManager {
 	initializePan() {
 		// --- Panning ---
 		this.$canvasArea.on('mousedown', (e) => {
-			// Only pan if clicking directly on the background of canvas-area
-			// or the canvas wrapper itself. Exclude clicks starting on the canvas/elements.
-			// Middle mouse button (e.which === 2) can also trigger pan anywhere.
 			if (e.target === this.$canvasArea[0] || e.target === this.$canvasWrapper[0] || e.which === 2) {
-				// Prevent panning if clicking on a layer element directly (unless middle mouse)
-				// Use closest to check if the click originated within #canvas
-				if ($(e.target).closest('#canvas .canvas-element').length > 0 && e.which !== 2) {
-					return;
-				}
-				// Prevent panning if click started on a ruler
-				if ($(e.target).closest('.ruler').length > 0) {
-					return;
-				}
+				if ($(e.target).closest('#canvas .canvas-element').length > 0 && e.which !== 2) { return; }
+				if ($(e.target).closest('.ruler').length > 0) { return; }
 				
 				this.isPanning = true;
 				this.lastPanX = e.clientX;
 				this.lastPanY = e.clientY;
 				this.$canvasArea.addClass('panning');
-				e.preventDefault(); // Prevent text selection or other default drag actions
+				e.preventDefault();
 				
-				// Deselect layer if clicking background (and not middle mouse)
+				// Deselect layer AND hide inspector if clicking background (not middle mouse)
 				if (e.which !== 2 && this.layerManager.getSelectedLayer()) {
-					this.layerManager.selectLayer(null);
+					this.layerManager.selectLayer(null); // Triggers inspector hide via App.js callback
 				}
 			}
 		});
@@ -416,7 +406,7 @@ class CanvasManager {
 	exportCanvas(format = 'png') {
 		this.layerManager.selectLayer(null); // Deselect elements
 		
-		// Store original state
+		// Store original state (transform, wrapper size, scroll)
 		const originalTransform = this.$canvas.css('transform');
 		const originalWrapperWidth = this.$canvasWrapper.css('width');
 		const originalWrapperHeight = this.$canvasWrapper.css('height');
@@ -426,71 +416,61 @@ class CanvasManager {
 		// Temporarily reset zoom and scroll for accurate capture
 		this.$canvas.css('transform', 'scale(1.0)');
 		this.$canvasWrapper.css({
-			width: this.currentCanvasWidth + 'px', // Use stored unscaled width
-			height: this.currentCanvasHeight + 'px' // Use stored unscaled height
+			width: this.currentCanvasWidth + 'px',
+			height: this.currentCanvasHeight + 'px'
 		});
-		
-		// Scroll canvas-area so the top-left of the canvas wrapper is visible
-		const wrapperPos = this.$canvasWrapper.position(); // Position relative to canvas-area
+		const wrapperPos = this.$canvasWrapper.position();
 		this.$canvasArea.scrollLeft(wrapperPos.left);
 		this.$canvasArea.scrollTop(wrapperPos.top);
 		
 		// Temporarily make all layers visible for export
 		const hiddenLayerIds = this.layerManager.getLayers().filter(l => !l.visible).map(l => l.id);
-		hiddenLayerIds.forEach(id => $(`#${id}`).show()); // Simple show for export
+		hiddenLayerIds.forEach(id => $(`#${id}`).show());
 		
 		const canvasElement = this.$canvas[0];
 		const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-		const quality = format === 'jpeg' ? 0.92 : 1.0; // Standard JPEG quality
+		const quality = format === 'jpeg' ? 0.92 : 1.0;
 		const filename = `book-cover-export.${format}`;
 		
-		// Use setTimeout to allow the browser to re-render after style changes
-		setTimeout(() => {
+		setTimeout(() => { // Allow browser re-render
 			html2canvas(canvasElement, {
-				useCORS: true, // Attempt to load cross-origin images
-				allowTaint: true, // Allows tainting canvas for cross-origin images (may prevent toDataURL) - useCORS is better
-				logging: false, // Disable console logging from html2canvas
-				scale: 1, // Export at native resolution (canvas size)
-				width: this.currentCanvasWidth, // Explicitly set width
-				height: this.currentCanvasHeight, // Explicitly set height
-				x: 0, // Capture from top-left of the element
+				useCORS: true,
+				allowTaint: true, // Use with caution if CORS isn't fully working
+				logging: false,
+				scale: 1,
+				width: this.currentCanvasWidth,
+				height: this.currentCanvasHeight,
+				x: 0,
 				y: 0,
-				scrollX: 0, // Ignore internal scroll of the element itself
+				scrollX: 0,
 				scrollY: 0,
-				backgroundColor: '#ffffff', // Ensure background is white if canvas is transparent
+				backgroundColor: '#ffffff', // Or null for transparency if PNG
 				onclone: (clonedDoc) => {
-					// --- Modifications to the cloned document before rendering ---
 					const clonedCanvas = clonedDoc.getElementById('canvas');
 					if (clonedCanvas) {
-						// Ensure no transform on the cloned canvas
-						clonedCanvas.style.transform = 'scale(1.0)';
-						
-						// Remove selection borders from the clone
-						const selectedElements = clonedCanvas.querySelectorAll('.canvas-element.selected');
-						selectedElements.forEach(el => el.classList.remove('selected'));
-						
-						// Ensure hidden layers are visible in the clone
+						clonedCanvas.style.transform = 'scale(1.0)'; // Ensure no transform
+						// Remove selection borders
+						clonedCanvas.querySelectorAll('.canvas-element.selected').forEach(el => el.classList.remove('selected'));
+						// Ensure originally hidden layers are visible in clone
 						hiddenLayerIds.forEach(id => {
 							const el = clonedCanvas.querySelector(`#${id}`);
-							if (el) el.style.display = 'block'; // Or appropriate display type
+							if (el) el.style.display = 'block';
 						});
+						// Remove resize handles
+						clonedCanvas.querySelectorAll('.ui-resizable-handle').forEach(h => h.style.display = 'none');
+						// Remove lock class if visual lock shouldn't be exported
+						// clonedCanvas.querySelectorAll('.canvas-element.locked').forEach(el => el.classList.remove('locked'));
 						
-						// Remove jQuery UI resizable handles from the clone
-						const handles = clonedCanvas.querySelectorAll('.ui-resizable-handle');
-						handles.forEach(h => h.style.display = 'none');
-						
-						// Remove lock icon/styles if necessary (though visual lock might be desired in export?)
-						const lockedElements = clonedCanvas.querySelectorAll('.canvas-element.locked');
-						lockedElements.forEach(el => {
-							// Decide if you want the 'locked' class removed for export appearance
-							// el.classList.remove('locked');
-						});
+						// *** NEW: Ensure Text Styles are Applied Correctly in Clone ***
+						// Re-apply styles using LayerManager's logic on the *cloned* elements
+						// This helps if html2canvas doesn't perfectly capture CSS text-stroke etc.
+						// Note: This relies on accessing LayerManager's data, which might be tricky in onclone.
+						// A simpler approach is to trust html2canvas as much as possible first.
+						// If text stroke/shadow isn't exporting well, more complex cloning logic might be needed.
 					}
 				}
 			}).then(canvas => {
-				// Convert the rendered canvas to a data URL
 				const image = canvas.toDataURL(mimeType, quality);
-				// Trigger download
 				const a = document.createElement('a');
 				a.href = image;
 				a.download = filename;
@@ -499,50 +479,44 @@ class CanvasManager {
 				document.body.removeChild(a);
 			}).catch(err => {
 				console.error("Error exporting canvas:", err);
-				alert("Error exporting canvas. Check console for details. Cross-origin images might be the cause if not hosted locally.");
+				alert("Error exporting canvas. Check console. Cross-origin images or complex CSS might be the cause.");
 			}).finally(() => {
 				// --- Restore original state ---
-				// Restore visibility state based on original data
 				hiddenLayerIds.forEach(id => {
-					const layer = this.layerManager.getLayerById(id); // Check the actual data
+					const layer = this.layerManager.getLayerById(id);
 					if (layer && !layer.visible) {
-						$(`#${id}`).hide(); // Hide again if originally hidden
+						$(`#${id}`).hide();
 					}
 				});
-				
-				// Restore transform, size, and scroll
 				this.$canvas.css('transform', originalTransform);
-				this.$canvasWrapper.css({
-					width: originalWrapperWidth,
-					height: originalWrapperHeight
-				});
+				this.$canvasWrapper.css({ width: originalWrapperWidth, height: originalWrapperHeight });
 				this.$canvasArea.scrollLeft(originalScrollLeft);
 				this.$canvasArea.scrollTop(originalScrollTop);
-				
-				// Re-apply selection border if needed
 				if (this.layerManager.getSelectedLayer()) {
 					$(`#${this.layerManager.getSelectedLayer().id}`).addClass('selected');
 				}
 			});
-		}, 250); // Delay allows DOM updates before capture
+		}, 250); // Delay
 	}
 	
 	
-	// --- Save / Load Design ---
-	// Saves the current design (canvas size and layers) to a JSON file
 	saveDesign() {
-		// Ensure layers are sorted by zIndex before saving
+		// Ensure layers are sorted by zIndex
 		const sortedLayers = [...this.layerManager.getLayers()].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-		
 		const designData = {
-			version: "1.1", // Update version if format changes
+			version: "1.2", // Increment version for new properties
 			canvas: {
 				width: this.currentCanvasWidth,
 				height: this.currentCanvasHeight
 			},
-			layers: sortedLayers // Save the sorted layers
+			// Filter out temporary internal properties before saving
+			layers: sortedLayers.map(layer => {
+				const { shadowOffsetInternal, shadowAngleInternal, ...layerToSave } = layer;
+				return layerToSave;
+			})
 		};
-		const jsonData = JSON.stringify(designData, null, 2); // Pretty print JSON
+		// ... (rest of save logic: JSON.stringify, Blob, download) ...
+		const jsonData = JSON.stringify(designData, null, 2);
 		const blob = new Blob([jsonData], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -551,7 +525,7 @@ class CanvasManager {
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
-		URL.revokeObjectURL(url); // Clean up blob URL
+		URL.revokeObjectURL(url);
 	}
 	
 	// Loads a design from a file object or a URL path
@@ -562,11 +536,9 @@ class CanvasManager {
 			try {
 				if (designData && designData.layers && designData.canvas) {
 					
-					// --- Clear current state ONLY if NOT a template ---
 					if (!isTemplate) {
 						console.log("Loading full design: Clearing history and setting canvas size.");
-						this.historyManager.clear(); // Reset history for a full load
-						// --- Set Canvas Size ---
+						this.historyManager.clear();
 						this.setCanvasSize(designData.canvas.width, designData.canvas.height);
 					} else {
 						console.log("Applying template: Keeping existing canvas size and non-text layers.");
@@ -574,11 +546,6 @@ class CanvasManager {
 						// We just need to add the template layers.
 					}
 					
-					
-					// --- Load Layers ---
-					// LayerManager.setLayers handles clearing canvas (if !isTemplate), rendering, updating list
-					// Pass `isTemplate` to `setLayers` - if true, it should *add* to existing layers (handled via logic now)
-					// If false, it replaces all layers.
 					this.layerManager.setLayers(designData.layers, isTemplate); // Use isTemplate flag directly
 					
 					// --- Finalize ---
@@ -586,12 +553,9 @@ class CanvasManager {
 					this.historyManager.saveState();
 					
 					if (!isTemplate) {
-						// Reset zoom/view only for full design loads
 						this.setZoom(1.0); // Reset zoom to 100%
 						this.centerCanvas(); // Center the newly loaded canvas
 					}
-					// For templates, keep current zoom/pan but maybe center if needed?
-					// For now, just adding layers doesn't trigger recenter/rezoom.
 					
 					// Deselect any previously selected layer after load/template apply
 					this.layerManager.selectLayer(null);

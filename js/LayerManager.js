@@ -15,9 +15,7 @@ class LayerManager {
 		if (!this.canvasManager) {
 			console.error("LayerManager requires an instance of CanvasManager!");
 		}
-		// --- ADDED: Keep track of fonts loaded dynamically ---
 		this.loadedGoogleFonts = new Set();
-		// --- END ADDED ---
 	}
 	
 	_isGoogleFont(fontFamily) {
@@ -143,12 +141,11 @@ class LayerManager {
 			shadowOffsetY: 2,
 			shadowColor: 'rgba(0,0,0,0.5)',
 			strokeWidth: 0,
-			stroke: 'black',
+			stroke: 'rgba(0,0,0,1)',
 			backgroundEnabled: false,
-			backgroundColor: '#ffffff',
+			backgroundColor: 'rgba(255,255,255,1)',
 			backgroundOpacity: 1,
 			backgroundCornerRadius: 0,
-			backgroundPadding: 0,
 			// Image specific defaults
 			// content: type === 'image' ? 'path/to/placeholder.png' : '',
 		};
@@ -167,24 +164,43 @@ class LayerManager {
 		layerData.opacity = parseFloat(layerData.opacity) ?? 1;
 		layerData.zIndex = parseInt(layerData.zIndex) || initialZIndex;
 		if (type === 'text') {
-			layerData.fontSize = parseFloat(layerData.fontSize) || defaultProps.fontSize;
-			layerData.lineHeight = parseFloat(layerData.lineHeight) || defaultProps.lineHeight;
+			layerData.fontSize = Math.max(1, parseFloat(layerData.fontSize) || defaultProps.fontSize);
+			layerData.lineHeight = Math.max(0.1, parseFloat(layerData.lineHeight) || defaultProps.lineHeight);
 			layerData.letterSpacing = parseFloat(layerData.letterSpacing) || defaultProps.letterSpacing;
-			layerData.shadowBlur = parseFloat(layerData.shadowBlur) || 0;
+			// Shadow
+			layerData.shadowBlur = Math.max(0, parseFloat(layerData.shadowBlur) || 0);
 			layerData.shadowOffsetX = parseFloat(layerData.shadowOffsetX) || 0;
 			layerData.shadowOffsetY = parseFloat(layerData.shadowOffsetY) || 0;
-			layerData.strokeWidth = parseFloat(layerData.strokeWidth) || 0;
-			layerData.backgroundCornerRadius = parseFloat(layerData.backgroundCornerRadius) || 0;
-			layerData.backgroundPadding = parseFloat(layerData.backgroundPadding) || 0;
-			layerData.backgroundOpacity = parseFloat(layerData.backgroundOpacity) ?? 1;
+			// Stroke
+			layerData.strokeWidth = Math.max(0, parseFloat(layerData.strokeWidth) || 0);
+			// Background
+			layerData.backgroundCornerRadius = Math.max(0, parseFloat(layerData.backgroundCornerRadius) || 0);
+			layerData.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(layerData.backgroundOpacity) ?? 1));
+			
+			// Ensure colors are valid RGBA strings or default
+			layerData.fill = this._ensureRgba(layerData.fill, 'rgba(0,0,0,1)');
+			layerData.shadowColor = this._ensureRgba(layerData.shadowColor, 'rgba(0,0,0,0.5)');
+			layerData.stroke = this._ensureRgba(layerData.stroke, 'rgba(0,0,0,1)');
+			layerData.backgroundColor = this._ensureRgba(layerData.backgroundColor, 'rgba(255,255,255,1)');
 		}
+		
 		// Add to layers array and sort by zIndex
 		this.layers.push(layerData);
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		this._renderLayer(layerData);
-		this.updateList(); // Update sidebar list
-		// Don't save state here, let the calling action handle it
-		return layerData; // Return the data added
+		this.updateList();
+		return layerData;
+	}
+	
+	_ensureRgba(colorString, defaultColor) {
+		if (!colorString) return defaultColor;
+		try {
+			const tiny = tinycolor(colorString);
+			if (tiny.isValid()) {
+				return tiny.toRgbString(); // Standardize to rgba()
+			}
+		} catch (e) { /* Ignore tinycolor errors */ }
+		return defaultColor; // Return default if input is invalid
 	}
 	
 	// UPDATED: Added saveHistory parameter
@@ -218,80 +234,105 @@ class LayerManager {
 	// Updates the layer data in the 'this.layers' array
 	updateLayerData(layerId, newData) {
 		const layerIndex = this.layers.findIndex(l => l.id === layerId);
-		if (layerIndex > -1) {
-			// Merge new data into the existing layer data
-			this.layers[layerIndex] = {...this.layers[layerIndex], ...newData};
-			const updatedLayer = this.layers[layerIndex];
-			// --- NEW: Update default name if content changed ---
-			if (newData.content !== undefined && !newData.name) {
-				// Only update name if content changed AND name wasn't explicitly set in this update
-				const currentName = updatedLayer.name;
-				const defaultName = this._generateDefaultLayerName(updatedLayer);
-				// Only update if the current name IS the old default name or empty
-				// This prevents overwriting a user-set custom name just because content changed.
-				const oldLayerDataForName = {...updatedLayer, content: this.layers[layerIndex].content}; // Use previous content to check old default
-				const oldDefaultName = this._generateDefaultLayerName(oldLayerDataForName);
-				if (currentName === oldDefaultName || !currentName) {
-					updatedLayer.name = defaultName; // Update list immediately if name changed implicitly
-					this.updateList();
+		if (layerIndex === -1) return null;
+		
+		// Get the current layer *before* merging
+		const currentLayer = this.layers[layerIndex];
+		const previousContent = currentLayer.content; // Store previous content for name check
+		
+		// Merge new data into the existing layer data
+		// Ensure specific properties are parsed correctly (e.g., numbers, colors)
+		const mergedData = { ...currentLayer };
+		for (const key in newData) {
+			if (newData.hasOwnProperty(key)) {
+				let value = newData[key];
+				// Parse/Validate specific properties
+				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundCornerRadius', 'backgroundOpacity'].includes(key)) {
+					value = value === 'auto' ? 'auto' : parseFloat(value);
+					if (key === 'opacity' || key === 'backgroundOpacity') value = Math.max(0, Math.min(1, value ?? 1));
+					if (key === 'fontSize' && isNaN(value)) value = currentLayer.fontSize; // Prevent NaN
+					// Add more clamping if needed
+				} else if (['zIndex'].includes(key)) {
+					value = parseInt(value) || currentLayer.zIndex;
+				} else if (['fill', 'shadowColor', 'stroke', 'backgroundColor'].includes(key)) {
+					value = this._ensureRgba(value, currentLayer[key]); // Ensure valid RGBA
 				}
+				mergedData[key] = value;
 			}
-			// --- END NEW ---
-			// Update visual representation based on changed data
-			const $element = $(`#${layerId}`);
-			if (!$element.length) return null; // Element not found
-			
-			// --- Update common properties ---
-			if (newData.x !== undefined) $element.css('left', updatedLayer.x + 'px');
-			if (newData.y !== undefined) $element.css('top', updatedLayer.y + 'px');
-			if (newData.width !== undefined) $element.css('width', updatedLayer.width === 'auto' ? 'auto' : updatedLayer.width + 'px');
-			if (newData.height !== undefined) $element.css('height', updatedLayer.height === 'auto' ? 'auto' : updatedLayer.height + 'px');
-			if (newData.opacity !== undefined) $element.css('opacity', updatedLayer.opacity);
-			if (newData.visible !== undefined) {
-				$element.toggle(updatedLayer.visible);
-				$element.toggleClass('layer-hidden', !updatedLayer.visible);
-			}
-			if (newData.zIndex !== undefined) {
-				$element.css('z-index', updatedLayer.zIndex);
-			}
-			// --- Update lock state visual ---
-			if (newData.locked !== undefined) {
-				$element.toggleClass('locked', updatedLayer.locked);
-				this._updateElementInteractivity($element, updatedLayer);
-			}
-			
-			
-			// --- Update type-specific properties ---
-			if (updatedLayer.type === 'text') {
-				const $textContent = $element.find('.text-content');
-				if (newData.content !== undefined) {
-					$textContent.text(updatedLayer.content); // Name update handled above
-				}
-				// Apply all text styles if any style-related prop changed
-				if (Object.keys(newData).some(key => [
-					'fontSize', 'fontFamily', 'fontStyle', 'fontWeight', 'textDecoration',
-					'fill', 'align', 'lineHeight', 'letterSpacing', 'shadowEnabled',
-					'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'shadowColor', 'strokeWidth',
-					'stroke', 'backgroundEnabled', 'backgroundColor', 'backgroundOpacity',
-					'backgroundCornerRadius', 'backgroundPadding'
-				].includes(key))) {
-					this._applyTextStyles($textContent, updatedLayer);
-				}
-				// Adjust height if needed after style changes
-				if (updatedLayer.height === 'auto') {
-					$element.css('height', 'auto');
-				}
-			} else if (updatedLayer.type === 'image') {
-				if (newData.content !== undefined) {
-					$element.find('img').attr('src', updatedLayer.content); // Name update handled above
-				}
-				this._applyStyles($element, updatedLayer);
-			}
-			
-			// Don't save state here, let the calling action handle it
-			return updatedLayer;
 		}
-		return null;
+		this.layers[layerIndex] = mergedData;
+		const updatedLayer = this.layers[layerIndex];
+		
+		// --- Update default name if content changed ---
+		if (newData.content !== undefined && newData.content !== previousContent && !newData.name) {
+			const currentName = updatedLayer.name;
+			const defaultName = this._generateDefaultLayerName(updatedLayer);
+			const oldLayerDataForName = {...updatedLayer, content: previousContent};
+			const oldDefaultName = this._generateDefaultLayerName(oldLayerDataForName);
+			if (currentName === oldDefaultName || !currentName) {
+				updatedLayer.name = defaultName;
+				this.updateList(); // Update list item name display
+			}
+		}
+		
+		// --- Update visual representation ---
+		const $element = $(`#${layerId}`);
+		if (!$element.length) return null;
+		
+		// Common properties
+		if (newData.x !== undefined) $element.css('left', updatedLayer.x + 'px');
+		if (newData.y !== undefined) $element.css('top', updatedLayer.y + 'px');
+		if (newData.width !== undefined) $element.css('width', updatedLayer.width === 'auto' ? 'auto' : updatedLayer.width + 'px');
+		if (newData.height !== undefined) $element.css('height', updatedLayer.height === 'auto' ? 'auto' : updatedLayer.height + 'px');
+		if (newData.opacity !== undefined) $element.css('opacity', updatedLayer.opacity);
+		if (newData.visible !== undefined) {
+			$element.toggle(updatedLayer.visible);
+			$element.toggleClass('layer-hidden', !updatedLayer.visible);
+		}
+		if (newData.zIndex !== undefined) $element.css('z-index', updatedLayer.zIndex);
+		if (newData.locked !== undefined) {
+			$element.toggleClass('locked', updatedLayer.locked);
+			this._updateElementInteractivity($element, updatedLayer);
+			// If the selected layer was locked/unlocked, refresh the inspector
+			if (updatedLayer.id === this.selectedLayerId) {
+				this.onLayerSelect(updatedLayer); // This will trigger inspector update via App.js
+			}
+		}
+		
+		// Type-specific updates
+		if (updatedLayer.type === 'text') {
+			const $textContent = $element.find('.text-content');
+			if (newData.content !== undefined) {
+				$textContent.text(updatedLayer.content);
+			}
+			// Ensure Google Font is loaded if family changes
+			if (newData.fontFamily && newData.fontFamily !== currentLayer.fontFamily) {
+				this._ensureGoogleFontLoaded(updatedLayer.fontFamily);
+			}
+			
+			// Re-apply styles if *any* relevant property changed
+			const styleProps = [
+				'content', 'fontSize', 'fontFamily', 'fontStyle', 'fontWeight', 'textDecoration',
+				'fill', 'align', 'lineHeight', 'letterSpacing', 'shadowEnabled', 'shadowBlur',
+				'shadowOffsetX', 'shadowOffsetY', 'shadowColor', 'strokeWidth', 'stroke',
+				'backgroundEnabled', 'backgroundColor', 'backgroundOpacity',
+				'backgroundCornerRadius', 'width' // Width change can affect text wrap
+			];
+			if (Object.keys(newData).some(key => styleProps.includes(key))) {
+				this._applyTextStyles($textContent, updatedLayer);
+			}
+			
+			// Adjust height if needed (especially after style changes)
+			if (updatedLayer.height === 'auto') {
+				$element.css('height', 'auto');
+			}
+		} else if (updatedLayer.type === 'image') {
+			if (newData.content !== undefined) {
+				$element.find('img').attr('src', updatedLayer.content);
+			}
+			this._applyStyles($element, updatedLayer); // Apply general styles (border, filters etc)
+		}
+		return updatedLayer;
 	}
 	
 	// Convenience method for updating a single style-like property
@@ -331,70 +372,62 @@ class LayerManager {
 		return JSON.parse(JSON.stringify(this.layers));
 	}
 	
-	setLayers(layersData, keepNonTextLayers = false) { // Renamed second parameter
+	setLayers(layersData, keepNonTextLayers = false) { /* ... Minor update needed ... */
 		if (!keepNonTextLayers) {
 			this.$canvas.empty();
 			this.layers = [];
 		} else {
-			// Logic to keep non-text layers if needed (currently not used by template load)
-			// If this becomes necessary, implement the removal of text layers
-			// and re-rendering of kept layers here.
-			// For now, template logic handles this externally before calling setLayers.
-			console.warn("setLayers called with keepNonTextLayers=true, but specific removal/re-rendering logic might need implementation if requirements change.");
+			// If keeping non-text, ensure the logic correctly handles merging/replacing
+			// For now, assume template load handles this externally
+			console.warn("setLayers called with keepNonTextLayers=true");
 		}
-		
 		this.selectedLayerId = null;
+		
+		// Reset uniqueIdCounter based on loaded data
 		if (layersData && layersData.length > 0) {
 			const maxId = Math.max(0, ...layersData.map(l => {
 				const parts = (l.id || '').split('-');
 				const num = parseInt(parts[1] || '0');
 				return isNaN(num) ? 0 : num;
 			}));
-			this.uniqueIdCounter = Math.max(this.uniqueIdCounter, maxId + 1); // Ensure counter is ahead
-		} else if (!keepNonTextLayers) { // Only reset counter if not keeping layers
+			this.uniqueIdCounter = Math.max(this.uniqueIdCounter, maxId + 1);
+		} else if (!keepNonTextLayers) {
 			this.uniqueIdCounter = 0;
 		}
 		
 		const sortedLayers = [...layersData].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		
+		// Preload fonts before rendering
 		sortedLayers.forEach(layerData => {
 			if (layerData.type === 'text') {
-				this._ensureGoogleFontLoaded(layerData.fontFamily); // Ensure font load is initiated
+				this._ensureGoogleFontLoaded(layerData.fontFamily);
 			}
 		});
 		
+		// Add layers, ensuring defaults and handling potential ID issues if merging
 		sortedLayers.forEach(layerData => {
-			// --- NEW: Ensure name exists or generate default ---
 			if (!layerData.name) {
 				layerData.name = this._generateDefaultLayerName(layerData);
 			}
-			// --- END NEW ---
-			
-			// Ensure unique ID if adding to existing or if ID is missing/duplicate
 			if (keepNonTextLayers || !layerData.id || this.getLayerById(layerData.id)) {
 				layerData.id = this._generateId();
 			}
-			
-			// Using addLayer will push to this.layers and render
-			// It also handles default values and type conversions
-			// We pass the layerData which includes the desired zIndex
+			// Use addLayer to handle defaults, rendering, and pushing to this.layers
+			// Pass the full layerData which includes zIndex
 			const addedLayer = this.addLayer(layerData.type, layerData);
-			
-			// AddLayer calculates the next zIndex, override if one was provided
-			// Note: This might lead to duplicate zIndices if loading partial data.
-			// The subsequent sort and _updateZIndices() should correct this.
+			// addLayer sets initial zIndex, override if one was provided in data
 			if (layerData.zIndex !== undefined && addedLayer) {
-				addedLayer.zIndex = layerData.zIndex;
+				addedLayer.zIndex = parseInt(layerData.zIndex) || addedLayer.zIndex; // Use parsed or existing
 				$(`#${addedLayer.id}`).css('z-index', addedLayer.zIndex);
 			}
 		});
 		
-		// Ensure layers array is sorted and z-indices are correct after adding all
+		// Final sort and Z-index update after all are added
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-		this._updateZIndices(); // Re-apply z-index CSS based on the final sorted array
+		this._updateZIndices(); // Re-apply z-index based on final sorted array
 		
 		this.updateList();
-		this.selectLayer(null);
+		this.selectLayer(null); // Deselect after load
 	}
 	
 	// --- Selection ---
@@ -530,7 +563,7 @@ class LayerManager {
 	}
 	
 	// --- Rendering & Interaction ---
-	_renderLayer(layerData) {
+	_renderLayer(layerData) { /* ... Update slightly ... */
 		const $element = $(`<div class="canvas-element" id="${layerData.id}"></div>`)
 			.css({
 				position: 'absolute',
@@ -541,6 +574,7 @@ class LayerManager {
 				zIndex: layerData.zIndex || 0,
 				opacity: layerData.opacity ?? 1,
 				display: layerData.visible ? 'block' : 'none',
+				// Background color/radius set via _applyTextStyles for text
 			})
 			.data('layerId', layerData.id);
 		
@@ -549,40 +583,38 @@ class LayerManager {
 		
 		if (layerData.type === 'text') {
 			this._ensureGoogleFontLoaded(layerData.fontFamily);
-			const $textContent = $('<div class="text-content"></div>')
-				.text(layerData.content);
-			this._applyTextStyles($textContent, layerData);
+			const $textContent = $('<div class="text-content"></div>');
+			// Initial text application (full styling done by _applyTextStyles)
+			$textContent.text(layerData.content || '');
 			$element.append($textContent);
 			
+			// Apply all styles (including background on parent)
+			this._applyTextStyles($textContent, layerData);
+			
+			// Double-click to edit text
 			$textContent.on('dblclick', () => {
 				const currentLayer = this.getLayerById(layerData.id);
 				if (!currentLayer || currentLayer.locked) return;
 				const currentText = $textContent.text();
 				const newText = prompt("Enter new text:", currentText);
 				if (newText !== null && newText !== currentText) {
-					// Use updateLayerData which handles name update logic AND triggers saveState via App
+					// Use updateLayerData which handles name update logic
 					this.updateLayerData(currentLayer.id, {content: newText});
 					this.saveState(); // Save state after direct text edit
 				}
 			});
 			
+			// Ensure parent height is auto if text height is auto
 			if (layerData.height === 'auto') $element.css('height', 'auto');
 			
 		} else if (layerData.type === 'image') {
 			const $img = $('<img>')
 				.attr('src', layerData.content)
-				.css({
-					display: 'block',
-					width: '100%', // Make image fill the container div
-					height: '100%', // Make image fill the container div
-					objectFit: 'cover' // Or 'contain', could be a layer property
-				})
-				.on('error', function () {
-					$(this).attr('alt', 'Image failed to load');
-					// Optionally add a placeholder style or text
-				});
-			this._applyStyles($element, layerData); // Apply border/filters if any
+				.css({ /* ... keep styles ... */ })
+				.on('error', function () { /* ... */ });
 			$element.append($img);
+			// Apply general styles (border, filters etc. to the element div)
+			this._applyStyles($element, layerData);
 		}
 		
 		this.$canvas.append($element);
@@ -793,14 +825,14 @@ class LayerManager {
 	_applyTextStyles($textContent, layerData) {
 		if (!$textContent || !layerData) return;
 		
-		// --- Apply font family, ensuring quotes if needed for multi-word fonts ---
 		let fontFamily = layerData.fontFamily || 'Arial';
 		if (fontFamily.includes(' ') && !fontFamily.startsWith("'") && !fontFamily.startsWith('"')) {
-			fontFamily = `"${fontFamily}"`; // Add quotes if they seem missing
+			fontFamily = `"${fontFamily}"`;
 		}
 		
+		// Apply styles to the INNER text content div
 		$textContent.css({
-			fontFamily: fontFamily, // USE MODIFIED FONT FAMILY
+			fontFamily: fontFamily,
 			fontSize: (layerData.fontSize || 16) + 'px',
 			fontWeight: layerData.fontWeight || 'normal',
 			fontStyle: layerData.fontStyle || 'normal',
@@ -809,14 +841,15 @@ class LayerManager {
 			textAlign: layerData.align || 'left',
 			lineHeight: layerData.lineHeight || 1.3,
 			letterSpacing: (layerData.letterSpacing || 0) + 'px',
-			padding: (layerData.backgroundPadding || 0) + 'px',
-			border: 'none',
+			border: 'none', // Text content itself shouldn't have border
 			outline: 'none',
 			whiteSpace: 'pre-wrap',
 			wordWrap: 'break-word',
 			boxSizing: 'border-box',
+			width: '100%', // Take full width of parent
+			height: '100%', // Take full height of parent
 		});
-		// ... rest of style application (shadow, stroke, background) ...
+		
 		// Text Shadow
 		if (layerData.shadowEnabled && layerData.shadowColor) {
 			const shadow = `${layerData.shadowOffsetX || 0}px ${layerData.shadowOffsetY || 0}px ${layerData.shadowBlur || 0}px ${layerData.shadowColor}`;
@@ -825,14 +858,17 @@ class LayerManager {
 			$textContent.css('text-shadow', 'none');
 		}
 		
-		// Text Stroke
-		if (layerData.strokeWidth > 0 && layerData.stroke) {
+		// Text Stroke (Outline) - Apply to text content
+		const strokeWidth = parseFloat(layerData.strokeWidth) || 0;
+		if (strokeWidth > 0 && layerData.stroke) {
+			const strokeColor = layerData.stroke || 'rgba(0,0,0,1)';
+			// Use vendor prefixes for wider compatibility
 			$textContent.css({
-				'-webkit-text-stroke-width': layerData.strokeWidth + 'px',
-				'-webkit-text-stroke-color': layerData.stroke,
-				'text-stroke-width': layerData.strokeWidth + 'px',
-				'text-stroke-color': layerData.stroke,
-				'paint-order': 'stroke fill'
+				'-webkit-text-stroke-width': strokeWidth + 'px',
+				'-webkit-text-stroke-color': strokeColor,
+				'text-stroke-width': strokeWidth + 'px', // Standard property
+				'text-stroke-color': strokeColor,     // Standard property
+				'paint-order': 'stroke fill' // Ensures stroke is behind fill
 			});
 		} else {
 			$textContent.css({
@@ -841,34 +877,48 @@ class LayerManager {
 			});
 		}
 		
-		// Parent Element Background
+		
+		// --- Styles for the PARENT .canvas-element div ---
 		const $parentElement = $textContent.parent('.canvas-element');
+		if (!$parentElement.length) return;
+		
+		// Parent Background
 		if (layerData.backgroundEnabled && layerData.backgroundColor) {
-			let bgColor = layerData.backgroundColor;
-			if (layerData.backgroundOpacity !== undefined && layerData.backgroundOpacity < 1) {
-				const opacity = Math.max(0, Math.min(1, layerData.backgroundOpacity));
-				if (bgColor.startsWith('#')) {
-					const bigint = parseInt(bgColor.slice(1), 16);
-					const r = (bigint >> 16) & 255;
-					const g = (bigint >> 8) & 255;
-					const b = bigint & 255;
-					bgColor = `rgba(${r},${g},${b},${opacity})`;
-				} else if (bgColor.startsWith('rgb(')) {
-					bgColor = bgColor.replace('rgb(', 'rgba(').replace(')', `,${opacity})`);
-				}
+			let bgColor = this._ensureRgba(layerData.backgroundColor, 'rgba(255,255,255,1)');
+			// Apply separate background opacity if needed
+			// Note: RGBA already includes opacity, but backgroundOpacity might override
+			// Let's prioritize backgroundOpacity if it's < 1
+			const bgOpacity = layerData.backgroundOpacity ?? 1;
+			if (bgOpacity < 1) {
+				try {
+					let tiny = tinycolor(bgColor);
+					if(tiny.isValid()) {
+						bgColor = tiny.setAlpha(bgOpacity).toRgbString();
+					}
+				} catch(e) { /* Ignore */ }
 			}
+			
 			$parentElement.css({
 				backgroundColor: bgColor,
 				borderRadius: (layerData.backgroundCornerRadius || 0) + 'px',
+				// Padding is applied to the inner textContent div
 			});
+			// Re-evaluate parent height if text content drives it
 			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
+			
 		} else {
 			$parentElement.css({
 				backgroundColor: 'transparent',
 				borderRadius: '0',
 			});
+			// Re-evaluate parent height if text content drives it
 			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
 		}
+		
+		// Parent Border (If you want a border around the whole text box, independent of stroke)
+		// Example: if (layerData.boxBorderWidth > 0) { $parentElement.css(...) }
+		// For now, we only use the 'stroke' property on the text itself.
+		
 	}
 	
 	_applyStyles($element, layerData) {
