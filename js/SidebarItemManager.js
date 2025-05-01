@@ -50,12 +50,6 @@ class SidebarItemManager {
 			});
 			// Pass a descriptive object, though it won't be directly used for sizing anymore
 			this._makeDraggable(this.$templateList.find('.template-thumbnail'), { type: 'template' });
-			this.$templateList.find('.template-thumbnail').on('click', (e) => {
-				const jsonPath = $(e.currentTarget).data('templateJsonPath');
-				if (jsonPath) {
-					this.applyTemplate(jsonPath, true);
-				}
-			});
 		} catch (error) {
 			console.error("Error loading templates:", error);
 			this.$templateList.html('<p class="text-danger">Error loading templates.</p>');

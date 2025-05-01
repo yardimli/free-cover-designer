@@ -1,117 +1,151 @@
 class TextToolbar {
 	constructor(options) {
 		this.$toolbar = $('#textToolbar');
-		this.$fontFamilySelect = $('#fontFamilySelect');
+		// this.$fontFamilySelect = $('#fontFamilySelect'); // REMOVED
+		this.$fontPickerInput = $('#fontPickerInput'); // ADDED
 		this.$fontSizeInput = $('#fontSizeInput');
-		this.$fontColorInput = $('#fontColorInput'); // Input for 'fill' property
+		this.$fontColorInput = $('#fontColorInput');
 		this.$boldBtn = $('#boldBtn');
 		this.$italicBtn = $('#italicBtn');
 		this.$underlineBtn = $('#underlineBtn');
 		this.$alignBtns = this.$toolbar.find('.btn-group button[data-align]');
 		
-		// Callbacks provided by the App/LayerManager
 		this.getSelectedLayer = options.getSelectedLayer;
-		// Expects (layerId, property, value) - LayerManager handles applying it
 		this.updateLayerStyle = options.updateLayerStyle;
-		this.saveState = options.saveState; // Callback to HistoryManager
+		this.saveState = options.saveState;
+		
+		// Retrieve pre-loaded Google Fonts from PHP
+		try {
+			this.googleFontsList = JSON.parse($('#googleFontsData').text() || '[]');
+		} catch (e) {
+			console.error("Error parsing Google Fonts data", e);
+			this.googleFontsList = ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Playfair Display']; // Fallback
+		}
 		
 		this.init();
 	}
 	
 	init() {
+		// --- Initialize jsFontPicker ---
+		this.$fontPickerInput.fontpicker({
+				lang: 'en',
+				variants: false,
+				lazyLoad: true,
+				showClear: true,
+				nrRecents: 3,
+			// default: 'Arial', // Default font
+			// googleFonts: this.googleFontsList, // Use list from PHP
+			// localFonts: { // Define standard web-safe fonts
+			// 	"Arial": { "category": "sans-serif", "variants": "400,400i,700,700i" },
+			// 	"Verdana": { "category": "sans-serif", "variants": "400,400i,700,700i" },
+			// 	"Times New Roman": { "category": "serif", "variants": "400,400i,700,700i" },
+			// 	"Georgia": { "category": "serif", "variants": "400,400i,700,700i" },
+			// 	"Courier New": { "category": "monospace", "variants": "400,400i,700,700i" },
+			// 	"serif": { "category": "serif", "variants": "400" },
+			// 	"sans-serif": { "category": "sans-serif", "variants": "400" },
+			// 	"monospace": { "category": "monospace", "variants": "400" },
+			// 	"'Helvetica Neue', sans-serif": { "category": "sans-serif", "variants": "400" } // Keep existing ones
+				// Add other web-safe fonts if desired
+			
+			// Callback when a font is selected from the picker
+			onSelect: (font) => {
+					console.log(font);
+				// const cleanFontFamily = fontFamily.replace(/^['"]|['"]$/g, '');
+				// console.log("Font selected:", cleanFontFamily);
+				this.handleStyleChange('fontFamily', font.fontFamily);
+			},
+		});
+		
+
+		
 		// --- Event Listeners ---
-		this.$fontFamilySelect.on('change', () => this.handleStyleChange('fontFamily', this.$fontFamilySelect.val()));
-		this.$fontSizeInput.on('input', () => this.handleStyleChange('fontSize', this.$fontSizeInput.val())); // Pass raw value, LayerManager adds 'px' if needed
-		this.$fontColorInput.on('input', () => this.handleStyleChange('fill', this.$fontColorInput.val())); // Update 'fill' property
+		// this.$fontFamilySelect.on('change', ...); // REMOVED
+		
+		this.$fontSizeInput.on('input', () => this.handleStyleChange('fontSize', this.$fontSizeInput.val()));
+		this.$fontColorInput.on('input', () => this.handleStyleChange('fill', this.$fontColorInput.val()));
 		this.$boldBtn.on('click', () => this.toggleStyle('fontWeight', 'bold', 'normal'));
 		this.$italicBtn.on('click', () => this.toggleStyle('fontStyle', 'italic', 'normal'));
 		this.$underlineBtn.on('click', () => this.toggleStyle('textDecoration', 'underline', 'none'));
-		
 		this.$alignBtns.on('click', (e) => {
 			const align = $(e.currentTarget).data('align');
-			this.handleStyleChange('align', align); // Update 'align' property
+			this.handleStyleChange('align', align);
 		});
 		
-		// Add listeners for future controls (lineHeight, letterSpacing, shadow etc.) here
-		// Example:
-		// $('#lineHeightInput').on('input', () => this.handleStyleChange('lineHeight', $('#lineHeightInput').val()));
-		// $('#letterSpacingInput').on('input', () => this.handleStyleChange('letterSpacing', $('#letterSpacingInput').val()));
-		// $('#shadowEnableCheckbox').on('change', () => this.handleStyleChange('shadowEnabled', $('#shadowEnableCheckbox').prop('checked')));
-		// $('#shadowColorInput').on('input', () => this.handleStyleChange('shadowColor', $('#shadowColorInput').val()));
-		// ... etc ...
+		// Add listeners for future controls
 	}
 	
-	// Handles simple property changes
 	handleStyleChange(property, value) {
 		const layer = this.getSelectedLayer();
-		// Ensure layer exists, is text, and is not locked
 		if (layer && layer.type === 'text' && !layer.locked) {
-			// Use the callback to update the layer data and visuals
 			this.updateLayerStyle(layer.id, property, value);
-			// Re-populate toolbar to reflect the change immediately (e.g., button states)
-			this.populate(this.getSelectedLayer()); // Get potentially updated layer data
-			// Use the callback to save history state
+			// If the font family changed via external means (e.g., undo/redo),
+			// we might need to update the picker input value here as well.
+			// However, the callback handles picker selections, and populate handles layer selections.
+			this.populate(this.getSelectedLayer()); // Refresh toolbar state
 			this.saveState();
 		}
 	}
 	
-	// Handles toggling styles like bold, italic, underline
 	toggleStyle(property, activeValue, inactiveValue) {
 		const layer = this.getSelectedLayer();
 		if (layer && layer.type === 'text' && !layer.locked) {
-			const currentValue = layer[property]; // Access property directly from layer data
+			const currentValue = layer[property];
 			const newValue = (currentValue === activeValue) ? inactiveValue : activeValue;
+			// Update layer data directly first
+			layer[property] = newValue;
+			// Then call handleStyleChange to apply visually and save state
 			this.handleStyleChange(property, newValue);
-			// handleStyleChange takes care of populate and saveState
 		}
 	}
 	
-	// Populates the toolbar controls based on the selected layer's data
 	populate(layerData) {
-		// Hide toolbar if no layer selected, or if selected layer is not text
 		if (!layerData || layerData.type !== 'text') {
 			this.hide();
 			return;
 		}
-		this.show(); // Show the toolbar
+		this.show();
+		
+		const isDisabled = layerData.locked;
 		
 		// --- Populate Controls ---
-		this.$fontFamilySelect.val(layerData.fontFamily || 'Arial');
+		const currentFont = layerData.fontFamily || 'Arial';
+		this.$fontPickerInput.val(currentFont); // Set the input's value
+		// Note: This doesn't update the picker's internal "selected" state visually in the dropdown,
+		// but shows the correct font in the input box. This is usually sufficient.
+		// If you need the dropdown to highlight the font, you might need to trigger
+		// an event or use a jsFontPicker API if available.
+		
 		this.$fontSizeInput.val(parseInt(layerData.fontSize) || 16);
 		
-		// Handle color input - it expects hex, but data might be rgba
 		let fillColor = layerData.fill || '#000000';
+		// ... (keep color conversion logic) ...
 		if (fillColor.startsWith('rgba')) {
-			// Basic conversion attempt (loses alpha for the input)
 			try {
 				const parts = fillColor.match(/[\d.]+/g);
 				if (parts && parts.length >= 3) {
 					fillColor = `#${(+parts[0]).toString(16).padStart(2, '0')}${(+parts[1]).toString(16).padStart(2, '0')}${(+parts[2]).toString(16).padStart(2, '0')}`;
 				} else {
-					fillColor = '#000000'; // Fallback
+					fillColor = '#000000';
 				}
-			} catch (e) { fillColor = '#000000'; }
+			} catch (e) {
+				fillColor = '#000000';
+			}
 		}
 		this.$fontColorInput.val(fillColor);
 		
-		// Update button active states
 		this.$boldBtn.toggleClass('active', layerData.fontWeight === 'bold');
 		this.$italicBtn.toggleClass('active', layerData.fontStyle === 'italic');
-		this.$underlineBtn.toggleClass('active', layerData.textDecoration === 'underline');
+		this.$underlineBtn.toggleClass('active', layerData.textDecoration === 'underline'); // Check 'underline', not contains
 		
-		// Update alignment button active states
 		this.$alignBtns.removeClass('active');
 		this.$toolbar.find(`.btn-group button[data-align="${layerData.align || 'left'}"]`).addClass('active');
 		
-		// Populate future controls here
-		// $('#lineHeightInput').val(layerData.lineHeight || 1.3);
-		// $('#letterSpacingInput').val(layerData.letterSpacing || 0);
-		// $('#shadowEnableCheckbox').prop('checked', layerData.shadowEnabled || false);
-		// ... etc ...
-		
-		// Disable controls if the layer is locked
-		const isDisabled = layerData.locked;
+		// Disable controls if locked
 		this.$toolbar.find('input, select, button').prop('disabled', isDisabled);
+		// Specifically disable/enable the font picker input AND its button
+		this.$fontPickerInput.prop('disabled', isDisabled);
+		// jsFontPicker usually adds a button next to the input
+		this.$fontPickerInput.next('.fp-button').prop('disabled', isDisabled); // Adjust selector '.fp-button' if needed
 	}
 	
 	show() {
@@ -120,7 +154,8 @@ class TextToolbar {
 	
 	hide() {
 		this.$toolbar.addClass('d-none');
-		// Optionally disable all controls when hidden
 		this.$toolbar.find('input, select, button').prop('disabled', true);
+		// Also disable fontpicker button if it exists
+		this.$fontPickerInput.next('.fp-button').prop('disabled', true);
 	}
 }

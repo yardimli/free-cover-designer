@@ -4,18 +4,65 @@ class LayerManager {
 	constructor($canvas, $layerList, options) {
 		this.$canvas = $canvas;
 		this.$layerList = $layerList;
-		this.layers = []; // Stores layer data in the NEW JSON format
+		this.layers = [];
 		this.selectedLayerId = null;
 		this.uniqueIdCounter = 0;
-		// Callbacks provided by the App
 		this.onLayerSelect = options.onLayerSelect || (() => {
 		});
 		this.saveState = options.saveState || (() => {
-		}); // Callback to trigger history save
-		this.canvasManager = options.canvasManager; // <-- Store CanvasManager
+		});
+		this.canvasManager = options.canvasManager;
 		if (!this.canvasManager) {
-			console.error("LayerManager requires an instance of CanvasManager!"); // Handle error appropriately, maybe throw an exception
+			console.error("LayerManager requires an instance of CanvasManager!");
 		}
+		// --- ADDED: Keep track of fonts loaded dynamically ---
+		this.loadedGoogleFonts = new Set();
+		// --- END ADDED ---
+	}
+	
+	_isGoogleFont(fontFamily) {
+		if (!fontFamily) return false;
+		// Basic check: not a generic family and not one of the known local fonts
+		const knownLocal = ['arial', 'verdana', 'times new roman', 'georgia', 'courier new', 'serif', 'sans-serif', 'monospace', 'helvetica neue'];
+		const lowerFont = fontFamily.toLowerCase().replace(/['"]/g, ''); // Normalize
+		return !knownLocal.includes(lowerFont) && /^[a-z0-9\s]+$/i.test(lowerFont); // Check if it looks like a font name
+	}
+	
+	_ensureGoogleFontLoaded(fontFamily) {
+		const cleanedFontFamily = (fontFamily || '').replace(/^['"]|['"]$/g, ''); // Remove quotes for checks/URL
+		
+		// Check if it looks like a Google font and hasn't been attempted yet
+		if (!cleanedFontFamily || !this._isGoogleFont(cleanedFontFamily) || this.loadedGoogleFonts.has(cleanedFontFamily)) {
+			return; // Don't load if already attempted, empty, or likely not a Google Font
+		}
+		
+		console.log(`Dynamically ensuring Google Font: ${cleanedFontFamily}`);
+		this.loadedGoogleFonts.add(cleanedFontFamily); // Add optimistically to prevent multiple attempts
+		
+		// Check if a link tag for this specific font already exists in head
+		const encodedFont = encodeURIComponent(cleanedFontFamily);
+		if (document.querySelector(`link[href*="family=${encodedFont}"]`)) {
+			console.log(`Font link for ${cleanedFontFamily} already exists.`);
+			return; // Already present, no need to add another
+		}
+		
+		// Create and append the link tag dynamically
+		const fontUrlParam = encodedFont + ':ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900'; // Load common weights/styles
+		const fontUrl = `https://fonts.googleapis.com/css?family=${fontUrlParam}&display=swap`;
+		
+		const link = document.createElement('link');
+		link.rel = 'stylesheet';
+		link.href = fontUrl;
+		link.onload = () => {
+			console.log(`Dynamically loaded Google Font: ${cleanedFontFamily}`);
+			// Optional: Trigger reflow if needed, usually not necessary
+		};
+		link.onerror = () => {
+			console.warn(`Failed to dynamically load Google Font: ${cleanedFontFamily}`);
+			this.loadedGoogleFonts.delete(cleanedFontFamily); // Remove from set if failed
+		};
+		
+		document.head.appendChild(link);
 	}
 	
 	// --- Core Layer Management ---
@@ -311,6 +358,12 @@ class LayerManager {
 		const sortedLayers = [...layersData].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		
 		sortedLayers.forEach(layerData => {
+			if (layerData.type === 'text') {
+				this._ensureGoogleFontLoaded(layerData.fontFamily); // Ensure font load is initiated
+			}
+		});
+		
+		sortedLayers.forEach(layerData => {
 			// --- NEW: Ensure name exists or generate default ---
 			if (!layerData.name) {
 				layerData.name = this._generateDefaultLayerName(layerData);
@@ -495,6 +548,7 @@ class LayerManager {
 		if (layerData.locked) $element.addClass('locked');
 		
 		if (layerData.type === 'text') {
+			this._ensureGoogleFontLoaded(layerData.fontFamily);
 			const $textContent = $('<div class="text-content"></div>')
 				.text(layerData.content);
 			this._applyTextStyles($textContent, layerData);
@@ -738,8 +792,15 @@ class LayerManager {
 	
 	_applyTextStyles($textContent, layerData) {
 		if (!$textContent || !layerData) return;
+		
+		// --- Apply font family, ensuring quotes if needed for multi-word fonts ---
+		let fontFamily = layerData.fontFamily || 'Arial';
+		if (fontFamily.includes(' ') && !fontFamily.startsWith("'") && !fontFamily.startsWith('"')) {
+			fontFamily = `"${fontFamily}"`; // Add quotes if they seem missing
+		}
+		
 		$textContent.css({
-			fontFamily: layerData.fontFamily || 'Arial',
+			fontFamily: fontFamily, // USE MODIFIED FONT FAMILY
 			fontSize: (layerData.fontSize || 16) + 'px',
 			fontWeight: layerData.fontWeight || 'normal',
 			fontStyle: layerData.fontStyle || 'normal',
@@ -749,13 +810,13 @@ class LayerManager {
 			lineHeight: layerData.lineHeight || 1.3,
 			letterSpacing: (layerData.letterSpacing || 0) + 'px',
 			padding: (layerData.backgroundPadding || 0) + 'px',
-			border: 'none', // Text content itself shouldn't have border
+			border: 'none',
 			outline: 'none',
-			whiteSpace: 'pre-wrap', // Preserve whitespace and wrap
-			wordWrap: 'break-word', // Break long words
-			boxSizing: 'border-box', // Include padding in width/height calculation
+			whiteSpace: 'pre-wrap',
+			wordWrap: 'break-word',
+			boxSizing: 'border-box',
 		});
-		
+		// ... rest of style application (shadow, stroke, background) ...
 		// Text Shadow
 		if (layerData.shadowEnabled && layerData.shadowColor) {
 			const shadow = `${layerData.shadowOffsetX || 0}px ${layerData.shadowOffsetY || 0}px ${layerData.shadowBlur || 0}px ${layerData.shadowColor}`;
@@ -764,14 +825,14 @@ class LayerManager {
 			$textContent.css('text-shadow', 'none');
 		}
 		
-		// Text Stroke (using -webkit-text-stroke for wider browser support)
+		// Text Stroke
 		if (layerData.strokeWidth > 0 && layerData.stroke) {
 			$textContent.css({
 				'-webkit-text-stroke-width': layerData.strokeWidth + 'px',
 				'-webkit-text-stroke-color': layerData.stroke,
-				'text-stroke-width': layerData.strokeWidth + 'px', // Standard property
-				'text-stroke-color': layerData.stroke,           // Standard property
-				'paint-order': 'stroke fill' // Ensure stroke doesn't obscure fill too much
+				'text-stroke-width': layerData.strokeWidth + 'px',
+				'text-stroke-color': layerData.stroke,
+				'paint-order': 'stroke fill'
 			});
 		} else {
 			$textContent.css({
@@ -780,14 +841,11 @@ class LayerManager {
 			});
 		}
 		
-		// Parent Element Background (applied to the main .canvas-element div)
+		// Parent Element Background
 		const $parentElement = $textContent.parent('.canvas-element');
 		if (layerData.backgroundEnabled && layerData.backgroundColor) {
-			// Use RGBA for background opacity
 			let bgColor = layerData.backgroundColor;
-			// If backgroundOpacity is set and less than 1, convert color to RGBA
 			if (layerData.backgroundOpacity !== undefined && layerData.backgroundOpacity < 1) {
-				// Basic hex/rgb to rgba conversion (improve if needed)
 				const opacity = Math.max(0, Math.min(1, layerData.backgroundOpacity));
 				if (bgColor.startsWith('#')) {
 					const bigint = parseInt(bgColor.slice(1), 16);
@@ -798,16 +856,12 @@ class LayerManager {
 				} else if (bgColor.startsWith('rgb(')) {
 					bgColor = bgColor.replace('rgb(', 'rgba(').replace(')', `,${opacity})`);
 				}
-				// else assume it's already rgba or another format we don't modify
 			}
-			
 			$parentElement.css({
 				backgroundColor: bgColor,
 				borderRadius: (layerData.backgroundCornerRadius || 0) + 'px',
 			});
-			// Ensure height adjusts if needed after background/padding added
 			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
-			
 		} else {
 			$parentElement.css({
 				backgroundColor: 'transparent',
