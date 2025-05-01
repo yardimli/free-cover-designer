@@ -208,12 +208,37 @@
 					<!-- Design elements go here -->
 				</div>
 			</div>
+
 			<!-- Zoom Controls -->
-			<div id="zoom-controls" class="position-fixed rounded shadow-sm p-1 m-2 bg-dark" style="bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 1060;"> <!-- Adjusted style -->
-				<button id="zoom-out" class="btn btn-light btn-sm me-1" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
-				<span id="zoom-percentage" class="badge bg-dark align-middle text-light">100%</span> <!-- Added text-light -->
-				<button id="zoom-in" class="btn btn-light btn-sm ms-1" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+			<div id="zoom-controls" class="position-fixed rounded shadow-sm p-1 m-2 bg-dark d-flex align-items-center" style="bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 1060;">
+				<button id="zoom-out" class="btn btn-sm me-1" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+
+				<!-- Dropup for Zoom Percentage -->
+				<div class="dropup mx-1">
+					<button class="btn btn-sm dropdown-toggle zoom-percentage-display" type="button" id="zoom-percentage-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+						100% <!-- Initial value, will be updated by JS -->
+					</button>
+					<ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="zoom-percentage-toggle" id="zoom-options-menu">
+						<!-- Zoom Options -->
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="0.1">10%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="0.25">25%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="0.5">50%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="0.75">75%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="1.0">100%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="1.5">150%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="2.0">200%</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="3.0">300%</a></li>
+						<li><hr class="dropdown-divider"></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="fit">Fit</a></li>
+						<li><a class="dropdown-item zoom-option" href="#" data-zoom="1.0">Reset</a></li>
+					</ul>
+				</div>
+				<!-- End Dropup -->
+
+				<button id="zoom-in" class="btn btn-sm ms-1" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+				<!-- Removed separate Fit/100% buttons to match the image -->
 			</div>
+			<!-- End Zoom Controls -->
 		</div>
 	</div>
 </div>

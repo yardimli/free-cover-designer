@@ -5,14 +5,10 @@ class LayerManager {
 		this.layers = []; // Stores layer data in the NEW JSON format
 		this.selectedLayerId = null;
 		this.uniqueIdCounter = 0;
-		
 		// Callbacks provided by the App
-		this.onLayerSelect = options.onLayerSelect || (() => {
-		});
-		this.saveState = options.saveState || (() => {
-		}); // Callback to trigger history save
+		this.onLayerSelect = options.onLayerSelect || (() => { });
+		this.saveState = options.saveState || (() => { }); // Callback to trigger history save
 		this.canvasManager = options.canvasManager; // <-- Store CanvasManager
-		
 		if (!this.canvasManager) {
 			console.error("LayerManager requires an instance of CanvasManager!");
 			// Handle error appropriately, maybe throw an exception
@@ -24,12 +20,42 @@ class LayerManager {
 	// Generates a short, unique ID
 	_generateId() {
 		return `layer-${this.uniqueIdCounter++}`;
-		// Alternative: More robust random ID
-		// return Math.random().toString(36).substring(2, 10);
 	}
 	
+	// --- NEW: Helper to generate default layer name ---
+	_generateDefaultLayerName(layerData) {
+		if (layerData.type === 'text') {
+			const textContent = (layerData.content || '').trim();
+			if (textContent) {
+				return textContent.substring(0, 30) + (textContent.length > 30 ? '...' : '');
+			}
+			return 'Text Layer'; // Default if empty
+		} else if (layerData.type === 'image') {
+			try {
+				// Try to extract filename from URL
+				const url = new URL(layerData.content, window.location.href); // Provide base URL for relative paths
+				const pathParts = url.pathname.split('/');
+				const filename = decodeURIComponent(pathParts[pathParts.length - 1]); // Decode URI component
+				if (filename) {
+					// Remove extension for cleaner name (optional)
+					const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
+					return nameWithoutExt.substring(0, 30) + (nameWithoutExt.length > 30 ? '...' : '');
+				}
+			} catch (e) {
+				// Ignore errors (e.g., base64 data URI)
+			}
+			// Fallback name
+			const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
+			return `Image ${numericIdPart}`;
+		}
+		// Default for other types
+		const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
+		return `Layer ${numericIdPart}`;
+	}
+	// --- END NEW HELPER ---
+	
 	addLayer(type, props = {}) {
-		const layerId = props.id + this._generateId() || this._generateId(); // Use provided ID or generate new
+		const layerId = props.id || this._generateId(); // Use provided ID or generate new
 		// Ensure uniqueIdCounter is ahead of any loaded IDs
 		const numericId = parseInt(layerId.split('-')[1]);
 		if (!isNaN(numericId) && numericId >= this.uniqueIdCounter) {
@@ -42,6 +68,7 @@ class LayerManager {
 		// Define defaults for the NEW structure
 		const defaultProps = {
 			id: layerId,
+			name: '', // Initialize name as empty, will be set below
 			type: type,
 			opacity: 1,
 			visible: true,
@@ -50,7 +77,7 @@ class LayerManager {
 			y: 50,
 			width: type === 'text' ? 200 : 150,
 			height: type === 'text' ? 'auto' : 100,
-			zIndex: initialZIndex, // Use calculated zIndex
+			zIndex: initialZIndex,
 			// Text specific defaults
 			content: type === 'text' ? 'New Text' : '',
 			fontSize: 24,
@@ -74,14 +101,19 @@ class LayerManager {
 			backgroundOpacity: 1,
 			backgroundCornerRadius: 0,
 			backgroundPadding: 0,
-			// Image specific defaults (if any needed beyond width/height/content)
+			// Image specific defaults
 			// content: type === 'image' ? 'path/to/placeholder.png' : '',
 		};
 		
 		// Merge provided props with defaults
-		// Important: Deep merge isn't done automatically with spread syntax for nested objects
-		// We handle styles/properties individually below if needed, or rely on direct property access
-		const layerData = {...defaultProps, ...props};
+		const layerData = { ...defaultProps, ...props };
+		
+		// --- NEW: Generate default name if not provided ---
+		if (!layerData.name) {
+			layerData.name = this._generateDefaultLayerName(layerData);
+		}
+		// --- END NEW ---
+		
 		
 		// Ensure numeric types are numbers
 		layerData.x = parseFloat(layerData.x) || 0;
@@ -89,7 +121,7 @@ class LayerManager {
 		layerData.width = layerData.width === 'auto' ? 'auto' : (parseFloat(layerData.width) || defaultProps.width);
 		layerData.height = layerData.height === 'auto' ? 'auto' : (parseFloat(layerData.height) || defaultProps.height);
 		layerData.opacity = parseFloat(layerData.opacity) ?? 1;
-		layerData.zIndex = parseInt(layerData.zIndex) || initialZIndex; // Ensure zIndex is integer
+		layerData.zIndex = parseInt(layerData.zIndex) || initialZIndex;
 		
 		if (type === 'text') {
 			layerData.fontSize = parseFloat(layerData.fontSize) || defaultProps.fontSize;
@@ -107,7 +139,6 @@ class LayerManager {
 		// Add to layers array and sort by zIndex
 		this.layers.push(layerData);
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-		
 		this._renderLayer(layerData);
 		this.updateList(); // Update sidebar list
 		
@@ -133,10 +164,7 @@ class LayerManager {
 		if (this.selectedLayerId) {
 			const layer = this.getLayerById(this.selectedLayerId);
 			if (layer && !layer.locked) {
-				// Optional: Confirmation dialog
-				// if (confirm(`Are you sure you want to delete the selected layer?`)) {
 				this.deleteLayer(this.selectedLayerId);
-				// }
 			}
 		}
 	}
@@ -146,9 +174,24 @@ class LayerManager {
 		const layerIndex = this.layers.findIndex(l => l.id === layerId);
 		if (layerIndex > -1) {
 			// Merge new data into the existing layer data
-			// This preserves properties not included in newData
-			this.layers[layerIndex] = {...this.layers[layerIndex], ...newData};
+			this.layers[layerIndex] = { ...this.layers[layerIndex], ...newData };
 			const updatedLayer = this.layers[layerIndex];
+			
+			// --- NEW: Update default name if content changed ---
+			if (newData.content !== undefined && !newData.name) { // Only update name if content changed AND name wasn't explicitly set in this update
+				const currentName = updatedLayer.name;
+				const defaultName = this._generateDefaultLayerName(updatedLayer);
+				// Only update if the current name IS the old default name or empty
+				// This prevents overwriting a user-set custom name just because content changed.
+				const oldLayerDataForName = {...updatedLayer, content: this.layers[layerIndex].content}; // Use previous content to check old default
+				const oldDefaultName = this._generateDefaultLayerName(oldLayerDataForName);
+				if (currentName === oldDefaultName || !currentName) {
+					updatedLayer.name = defaultName;
+					// Update list immediately if name changed implicitly
+					this.updateList();
+				}
+			}
+			// --- END NEW ---
 			
 			// Update visual representation based on changed data
 			const $element = $(`#${layerId}`);
@@ -166,7 +209,6 @@ class LayerManager {
 			}
 			if (newData.zIndex !== undefined) {
 				$element.css('z-index', updatedLayer.zIndex);
-				// Note: Need to resort this.layers array if zIndex changes significantly
 			}
 			
 			// --- Update type-specific properties ---
@@ -174,10 +216,9 @@ class LayerManager {
 				const $textContent = $element.find('.text-content');
 				if (newData.content !== undefined) {
 					$textContent.text(updatedLayer.content);
-					this.updateList(); // Update name in list if content changes
+					// Name update handled above
 				}
 				// Apply all text styles if any style-related prop changed
-				// This is simpler than checking each individual style prop
 				if (Object.keys(newData).some(key => [
 					'fontSize', 'fontFamily', 'fontStyle', 'fontWeight', 'textDecoration',
 					'fill', 'align', 'lineHeight', 'letterSpacing', 'shadowEnabled',
@@ -191,12 +232,11 @@ class LayerManager {
 				if (updatedLayer.height === 'auto') {
 					$element.css('height', 'auto');
 				}
-				
 			} else if (updatedLayer.type === 'image') {
 				if (newData.content !== undefined) {
 					$element.find('img').attr('src', updatedLayer.content);
+					// Name update handled above
 				}
-				// Apply general styles if needed (e.g., border, filters in the future)
 				this._applyStyles($element, updatedLayer);
 			}
 			
@@ -210,43 +250,46 @@ class LayerManager {
 	updateLayerStyle(layerId, property, value) {
 		const layer = this.getLayerById(layerId);
 		if (layer) {
-			// Create object with the single property change
-			const update = {[property]: value};
-			
+			const update = { [property]: value };
 			// Handle specific conversions or related properties
-			if (property === 'fill') { // Text color
-				// Ensure value is in rgba format if possible? Or let CSS handle it.
-			} else if (property === 'fontSize') {
-				value = parseFloat(value) || layer.fontSize; // Ensure number
+			if (property === 'fill') { /* ... */ }
+			else if (property === 'fontSize') {
+				value = parseFloat(value) || layer.fontSize;
 				update[property] = value;
 			}
 			// Add more specific handling if needed
-			
-			this.updateLayerData(layerId, update); // Use the main update method
-			// updateLayerData handles the visual update
+			this.updateLayerData(layerId, update);
 		}
 	}
+	
+	// --- NEW: Method to specifically update the layer name ---
+	updateLayerName(layerId, newName) {
+		const layer = this.getLayerById(layerId);
+		if (layer && layer.name !== newName) {
+			layer.name = newName;
+			// Update the name in the list item directly for performance
+			const $listItem = this.$layerList.find(`.list-group-item[data-layer-id="${layerId}"]`);
+			$listItem.find('.layer-name-display').text(newName); // Update display span
+			this.saveState(); // Save history state after name change
+		}
+	}
+	// --- END NEW ---
 	
 	getLayerById(layerId) {
 		return this.layers.find(l => l.id === layerId);
 	}
 	
-	// Returns a deep copy of the layers array in the correct format
 	getLayers() {
-		// Since this.layers already stores data in the target JSON format,
-		// we just need a deep copy to prevent external modification.
 		return JSON.parse(JSON.stringify(this.layers));
 	}
 	
-	// Replaces all current layers with the provided data (for Load, History, Templates)
 	setLayers(layersData, keepExisting = false) {
 		if (!keepExisting) {
-			this.$canvas.empty(); // Clear existing elements from canvas
-			this.layers = []; // Clear internal data array
+			this.$canvas.empty();
+			this.layers = [];
 		}
-		this.selectedLayerId = null; // Deselect
+		this.selectedLayerId = null;
 		
-		// Reset unique ID counter based on loaded data
 		if (layersData && layersData.length > 0) {
 			const maxId = Math.max(0, ...layersData.map(l => {
 				const parts = (l.id || '').split('-');
@@ -258,57 +301,48 @@ class LayerManager {
 			this.uniqueIdCounter = 0;
 		}
 		
-		// Add and render each layer from the provided data
-		// Ensure they are added in an order that respects zIndex if possible,
-		// although sorting after adding handles it too.
 		const sortedLayers = [...layersData].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		
 		sortedLayers.forEach(layerData => {
-			layerData.id = layerData.id + this._generateId() || this._generateId(); // Ensure unique ID
-			// Use addLayer without triggering saveState internally
+			// --- NEW: Ensure name exists or generate default ---
+			if (!layerData.name) {
+				layerData.name = this._generateDefaultLayerName(layerData);
+			}
+			// --- END NEW ---
+			
+			// Ensure unique ID if adding to existing or if ID is missing/duplicate
+			if (keepExisting || !layerData.id || this.getLayerById(layerData.id)) {
+				layerData.id = this._generateId();
+			}
+			
 			const addedLayer = this.addLayer(layerData.type, layerData);
-			// Ensure the original zIndex is respected if provided
 			if (layerData.zIndex !== undefined && addedLayer) {
 				addedLayer.zIndex = layerData.zIndex;
 				$(`#${addedLayer.id}`).css('z-index', addedLayer.zIndex);
 			}
 		});
 		
-		// Final sort of the internal array after all additions
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-		
-		this.updateList(); // Update the sidebar list
-		this.selectLayer(null); // Ensure nothing is selected initially
-		// Don't save state here - let Load/Undo/Redo handle it
+		this.updateList();
+		this.selectLayer(null);
 	}
 	
 	// --- Selection ---
 	selectLayer(layerId) {
 		if (this.selectedLayerId === layerId) {
-			// If clicking the selected layer again, maybe start text edit? (Future enhancement)
 			return;
 		}
-		
-		// Deselect previous
 		if (this.selectedLayerId) {
 			$(`#${this.selectedLayerId}`).removeClass('selected');
 		}
 		this.$layerList.find('.list-group-item.active').removeClass('active');
-		
 		this.selectedLayerId = layerId;
 		const selectedLayer = this.getSelectedLayer();
-		
 		if (selectedLayer) {
 			const $element = $(`#${selectedLayer.id}`);
 			$element.addClass('selected');
-			// Bring selected element visually to front of its z-index group (for handles)
-			// Note: This doesn't change the actual zIndex data
-			//$element.appendTo(this.$canvas); // Re-appending moves it visually last
-			
 			this.$layerList.find(`.list-group-item[data-layer-id="${layerId}"]`).addClass('active');
 		}
-		
-		// Notify App/UI Manager about selection change
 		this.onLayerSelect(selectedLayer);
 	}
 	
@@ -323,8 +357,8 @@ class LayerManager {
 			layer.visible = !layer.visible;
 			const $element = $(`#${layerId}`);
 			$element.toggle(layer.visible);
-			$element.toggleClass('layer-hidden', !layer.visible); // For potential CSS rules
-			this.updateList(); // Update icon in list
+			$element.toggleClass('layer-hidden', !layer.visible);
+			this.updateList();
 			this.saveState();
 		}
 	}
@@ -335,11 +369,10 @@ class LayerManager {
 			layer.locked = !layer.locked;
 			const $element = $(`#${layerId}`);
 			$element.toggleClass('locked', layer.locked);
-			this._updateElementInteractivity($element, layer); // Enable/disable interactions
-			this.updateList(); // Update icon in list
-			// Update global buttons if the selected layer was the one being locked/unlocked
+			this._updateElementInteractivity($element, layer);
+			this.updateList();
 			if (layerId === this.selectedLayerId) {
-				this.onLayerSelect(layer); // Trigger UI update for buttons
+				this.onLayerSelect(layer);
 			}
 			this.saveState();
 		}
@@ -352,36 +385,33 @@ class LayerManager {
 	}
 	
 	// --- Layer Order (Z-Index) ---
-	moveLayer(layerId, direction) { // direction: 'front', 'back', 'up', 'down'
+	moveLayer(layerId, direction) {
 		const layerIndex = this.layers.findIndex(l => l.id === layerId);
 		if (layerIndex === -1) return;
 		
-		const currentLayers = [...this.layers]; // Work with a copy for manipulation
+		const currentLayers = [...this.layers];
 		const layerToMove = currentLayers.splice(layerIndex, 1)[0];
 		
 		if (direction === 'front') {
 			currentLayers.push(layerToMove);
 		} else if (direction === 'back') {
 			currentLayers.unshift(layerToMove);
-		} else if (direction === 'up' && layerIndex < currentLayers.length) { // length is already reduced
+		} else if (direction === 'up' && layerIndex < currentLayers.length) {
 			currentLayers.splice(layerIndex + 1, 0, layerToMove);
 		} else if (direction === 'down' && layerIndex > 0) {
 			currentLayers.splice(layerIndex - 1, 0, layerToMove);
 		} else {
-			// Put it back if direction is invalid or already at edge
 			currentLayers.splice(layerIndex, 0, layerToMove);
-			return; // No change
+			return;
 		}
 		
-		// Reassign zIndex based on the new order
 		currentLayers.forEach((layer, index) => {
 			layer.zIndex = index + 1;
 		});
 		
-		// Update the main layers array and apply CSS
 		this.layers = currentLayers;
-		this._updateZIndices(); // Applies CSS z-index
-		this.updateList(); // Reflect new order in the list
+		this._updateZIndices();
+		this.updateList();
 		this.saveState();
 	}
 	
@@ -394,7 +424,6 @@ class LayerManager {
 		}
 	}
 	
-	// Applies zIndex from data to CSS
 	_updateZIndices() {
 		this.layers.forEach((layer) => {
 			$(`#${layer.id}`).css('z-index', layer.zIndex || 0);
@@ -405,226 +434,197 @@ class LayerManager {
 	_renderLayer(layerData) {
 		const $element = $(`<div class="canvas-element" id="${layerData.id}"></div>`)
 			.css({
-				position: 'absolute', // Ensure position is absolute
+				position: 'absolute',
 				left: layerData.x + 'px',
 				top: layerData.y + 'px',
 				width: layerData.width === 'auto' ? 'auto' : layerData.width + 'px',
 				height: layerData.height === 'auto' ? 'auto' : layerData.height + 'px',
 				zIndex: layerData.zIndex || 0,
 				opacity: layerData.opacity ?? 1,
-				display: layerData.visible ? 'block' : 'none', // Use block or flex as appropriate
-				// Add pointer-events: none; if locked? Handled by draggable/resizable disable
+				display: layerData.visible ? 'block' : 'none',
 			})
-			.data('layerId', layerData.id); // Store ID for easy access
+			.data('layerId', layerData.id);
 		
-		if (!layerData.visible) {
-			$element.addClass('layer-hidden');
-		}
-		if (layerData.locked) {
-			$element.addClass('locked');
-		}
+		if (!layerData.visible) $element.addClass('layer-hidden');
+		if (layerData.locked) $element.addClass('locked');
 		
 		if (layerData.type === 'text') {
 			const $textContent = $('<div class="text-content"></div>')
-				.text(layerData.content); // Set initial text content
-			
-			// Apply all text styles from the layerData
+				.text(layerData.content);
 			this._applyTextStyles($textContent, layerData);
-			
 			$element.append($textContent);
 			
-			// Double-click to edit text
 			$textContent.on('dblclick', () => {
-				const currentLayer = this.getLayerById(layerData.id); // Get fresh data
+				const currentLayer = this.getLayerById(layerData.id);
 				if (!currentLayer || currentLayer.locked) return;
-				
-				// Use a textarea for better editing experience (future enhancement)
-				// For now, use prompt:
 				const currentText = $textContent.text();
 				const newText = prompt("Enter new text:", currentText);
 				if (newText !== null && newText !== currentText) {
-					this.updateLayerData(currentLayer.id, {content: newText});
+					// Use updateLayerData which handles name update logic
+					this.updateLayerData(currentLayer.id, { content: newText });
 					this.saveState();
 				}
 			});
 			
-			// If height is auto, set element height to auto initially
-			if (layerData.height === 'auto') {
-				$element.css('height', 'auto');
-			}
+			if (layerData.height === 'auto') $element.css('height', 'auto');
 			
 		} else if (layerData.type === 'image') {
 			const $img = $('<img>')
 				.attr('src', layerData.content)
 				.css({
-					display: 'block', // Remove extra space below image
-					// width: layerData.width + 'px',
-					// height: layerData.height + 'px',
+					display: 'block',
+					width: '100%', // Make image fill the container div
+					height: '100%', // Make image fill the container div
 					objectFit: 'cover' // Or 'contain', could be a layer property
 				})
 				.on('error', function () {
-					// Handle broken image links
 					$(this).attr('alt', 'Image failed to load');
-					// Optionally replace src with a placeholder
 				});
-			
-			// Apply general styles (like border, filters if added later)
 			this._applyStyles($element, layerData);
 			$element.append($img);
 		}
-		// Add other layer types here (e.g., shape)
 		
 		this.$canvas.append($element);
-		this._makeElementInteractive($element, layerData); // Make it draggable/resizable
+		this._makeElementInteractive($element, layerData);
 	}
 	
 	_makeElementInteractive($element, layerData) {
 		const layerId = layerData.id;
-		const self = this; // Reference LayerManager instance for callbacks
-		
-		// --- Variables to store drag start state ---
+		const self = this;
 		let startMouseX, startMouseY, startElementX, startElementY;
 		
-		// --- Draggable ---
 		$element.draggable({
-			containment: 'parent', // Keep containment as the canvas
+			containment: this.$canvas, // Contain within the canvas div itself
 			start: (event, ui) => {
-				const layer = self.getLayerById(layerId); // Use self
-				if (!layer || layer.locked) return false; // Check lock status
-				self.selectLayer(layerId); // Select on drag start
-				$(event.target).addClass('ui-draggable-dragging'); // Visual feedback
-				
-				// Store initial mouse position (relative to page)
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) return false;
+				self.selectLayer(layerId);
+				$(event.target).addClass('ui-draggable-dragging');
 				startMouseX = event.pageX;
 				startMouseY = event.pageY;
-				
-				// Store initial element position (from layer data - unscaled coords)
 				startElementX = layer.x;
 				startElementY = layer.y;
-				
-				// Prevent default browser drag behavior if needed (usually handled by jQuery UI)
-				// event.preventDefault();
 			},
 			drag: (event, ui) => {
-				const layer = self.getLayerById(layerId); // Use self
-				if (!layer || layer.locked) return false; // Still check lock during drag
-				const zoom = self.canvasManager.currentZoom; // Get current zoom from CanvasManager
-				
-				// Calculate total mouse movement delta since drag start
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) return false;
+				const zoom = self.canvasManager.currentZoom;
 				const mouseDx = event.pageX - startMouseX;
 				const mouseDy = event.pageY - startMouseY;
-				
-				// Scale the mouse delta based on the zoom level to get the
-				// corresponding delta in the unscaled canvas coordinate system.
 				const elementDx = mouseDx / zoom;
 				const elementDy = mouseDy / zoom;
-				
-				// Calculate the new target position in the unscaled coordinate system
 				const newX = startElementX + elementDx;
 				const newY = startElementY + elementDy;
-				
-				// Update the ui.position object. jQuery UI uses this to set the
-				// element's actual CSS 'left' and 'top' properties. Since the element
-				// lives inside the unscaled canvas coordinate space (even though the
-				// canvas itself is visually scaled), these CSS properties should
-				// directly correspond to our calculated newX and newY.
 				ui.position.left = newX;
 				ui.position.top = newY;
-				
-				// --- Optional console logging for debugging ---
-				// console.log(`Zoom: ${zoom.toFixed(2)} | Mouse dY: ${mouseDy.toFixed(0)} | Element dY: ${elementDy.toFixed(2)} | Start Y: ${startElementY.toFixed(2)} | New Y: ${newY.toFixed(2)} | ui.top: ${ui.position.top.toFixed(2)}`);
-				
 			},
 			stop: (event, ui) => {
-				const layer = self.getLayerById(layerId); // Use self
-				if (!layer || layer.locked) return; // Check lock on stop
-				
-				// On stop, ui.position contains the final calculated position (newX, newY)
-				// from the last 'drag' event. Update the layer data with these final values.
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) return;
+				// Use the final position from ui.position
 				self.updateLayerData(layerId, { x: ui.position.left, y: ui.position.top });
-				
-				$(event.target).removeClass('ui-draggable-dragging'); // Remove visual feedback
-				self.saveState(); // Save history state
+				$(event.target).removeClass('ui-draggable-dragging');
+				self.saveState();
 			}
 		});
 		
-		// --- Resizable ---
-		// Keep the existing resizable logic for now, assuming it works correctly.
-		// If resizing also shows issues, it might need a similar adjustment,
-		// although it's more complex due to different handles affecting size/position.
 		$element.resizable({
 			handles: 'n, e, s, w, ne, se, sw, nw',
-			// containment: 'parent', // Containment can be tricky with zoom/resize
+			// containment: this.$canvas, // Resizable containment is often tricky with transforms
 			start: (event, ui) => {
-				const layer = self.getLayerById(layerId); // Use self
+				const layer = self.getLayerById(layerId);
 				if (!layer || layer.locked) return false;
-				self.selectLayer(layerId); // Use self
+				self.selectLayer(layerId);
 				$(event.target).addClass('ui-resizable-resizing');
+				// Store original unscaled size and position for calculations
+				ui.originalPositionUnscaled = { left: layer.x, top: layer.y };
+				ui.originalSizeUnscaled = { width: layer.width === 'auto' ? $element.width() : layer.width, height: layer.height === 'auto' ? $element.height() : layer.height };
 			},
 			resize: (event, ui) => {
-				const layer = self.getLayerById(layerId); // Use self
+				const layer = self.getLayerById(layerId);
 				if (!layer || layer.locked) return false;
-				const zoom = self.canvasManager.currentZoom; // Use self
+				const zoom = self.canvasManager.currentZoom;
 				
-				// --- Using the original resize compensation logic ---
-				if (zoom === 1) return;
+				// Calculate change in scaled dimensions/position provided by jQuery UI
+				const cssWidthChange = ui.size.width - ui.originalSize.width;
+				const cssHeightChange = ui.size.height - ui.originalSize.height;
+				const cssLeftChange = ui.position.left - ui.originalPosition.left;
+				const cssTopChange = ui.position.top - ui.originalPosition.top;
 				
-				const dWidth = ui.size.width - ui.originalSize.width;
-				const dHeight = ui.size.height - ui.originalSize.height;
-				const dLeft = ui.position.left - ui.originalPosition.left;
-				const dTop = ui.position.top - ui.originalPosition.top;
+				// Convert these CSS changes to unscaled changes
+				const unscaledWidthChange = cssWidthChange / zoom;
+				const unscaledHeightChange = cssHeightChange / zoom;
+				const unscaledLeftChange = cssLeftChange / zoom;
+				const unscaledTopChange = cssTopChange / zoom;
 				
-				const scaledDWidth = dWidth / zoom;
-				const scaledDHeight = dHeight / zoom;
-				const scaledDLeft = dLeft / zoom;
-				const scaledDTop = dTop / zoom;
+				// Calculate the new unscaled dimensions and position
+				const newUnscaledWidth = ui.originalSizeUnscaled.width + unscaledWidthChange;
+				const newUnscaledHeight = ui.originalSizeUnscaled.height + unscaledHeightChange;
+				const newUnscaledX = ui.originalPositionUnscaled.left + unscaledLeftChange;
+				const newUnscaledY = ui.originalPositionUnscaled.top + unscaledTopChange;
 				
-				ui.size.width = ui.originalSize.width + scaledDWidth;
-				ui.size.height = ui.originalSize.height + scaledDHeight;
-				ui.position.left = ui.originalPosition.left + scaledDLeft;
-				ui.position.top = ui.originalPosition.top + scaledDTop;
-			},
-			stop: (event, ui) => {
-				const layer = self.getLayerById(layerId); // Use self
-				if (!layer || layer.locked) return;
+				// Store these unscaled values for the 'stop' event
+				ui.newUnscaled = { width: newUnscaledWidth, height: newUnscaledHeight, x: newUnscaledX, y: newUnscaledY };
 				
-				const newX = ui.position.left;
-				const newY = ui.position.top;
-				const newWidth = ui.size.width;
-				const newHeight = (layer.type === 'text' && layer.height === 'auto') ? 'auto' : ui.size.height;
+				// Update the element's CSS directly using the calculated unscaled values
+				// This keeps the element's CSS aligned with the unscaled data model
+				$element.css({
+					left: newUnscaledX + 'px',
+					top: newUnscaledY + 'px',
+					width: newUnscaledWidth + 'px',
+					height: (layer.type === 'text' && layer.height === 'auto') ? 'auto' : newUnscaledHeight + 'px'
+				});
 				
-				self.updateLayerData(layerId, { x: newX, y: newY, width: newWidth, height: newHeight }); // Use self
-				
-				const $element = $(event.target);
-				if (layer.type === 'text' && newHeight === 'auto') {
-					$element.css('width', newWidth + 'px');
-					const updatedLayer = self.getLayerById(layerId); // Use self
-					if (updatedLayer) {
-						self._applyTextStyles($element.find('.text-content'), updatedLayer); // Use self
-					}
+				// If text layer with auto height, reapply styles to potentially adjust height
+				if (layer.type === 'text' && layer.height === 'auto') {
+					self._applyTextStyles($element.find('.text-content'), layer);
 					$element.css('height', 'auto');
-				} else {
-					const finalHeightCSS = (typeof newHeight === 'number') ? newHeight + 'px' : 'auto';
-					$element.css({ width: newWidth + 'px', height: finalHeightCSS });
 				}
 				
+			},
+			stop: (event, ui) => {
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) return;
+				
+				// Use the unscaled values calculated during resize
+				const finalWidth = ui.newUnscaled.width;
+				const finalHeight = (layer.type === 'text' && layer.height === 'auto') ? 'auto' : ui.newUnscaled.height;
+				const finalX = ui.newUnscaled.x;
+				const finalY = ui.newUnscaled.y;
+				
+				self.updateLayerData(layerId, {
+					x: finalX,
+					y: finalY,
+					width: finalWidth,
+					height: finalHeight
+				});
+				
+				// Ensure final CSS matches data (especially for auto height)
+				const $element = $(event.target);
+				$element.css({
+					left: finalX + 'px',
+					top: finalY + 'px',
+					width: finalWidth + 'px',
+					height: (typeof finalHeight === 'number') ? finalHeight + 'px' : 'auto'
+				});
+				if (layer.type === 'text' && finalHeight === 'auto') {
+					$element.css('height', 'auto'); // Ensure it recalculates if needed
+				}
+				
+				
 				$element.removeClass('ui-resizable-resizing');
-				self.saveState(); // Use self
+				self.saveState();
 			}
 		});
 		
-		// --- Click to Select ---
 		$element.on('click', (e) => {
 			e.stopPropagation();
-			self.selectLayer(layerId); // Use self
+			self.selectLayer(layerId);
 		});
 		
-		// --- Initial Interactivity State ---
-		self._updateElementInteractivity($element, layerData); // Use self
+		self._updateElementInteractivity($element, layerData);
 	}
 	
-	
-	// Enable/disable jQuery UI interactions based on lock state
 	_updateElementInteractivity($element, layerData) {
 		const isLocked = layerData.locked;
 		try {
@@ -634,42 +634,31 @@ class LayerManager {
 			if ($element.hasClass('ui-resizable')) {
 				$element.resizable(isLocked ? 'disable' : 'enable');
 			}
-			// Add specific class for cursor styling via CSS
 			$element.toggleClass('interactions-disabled', isLocked);
-			
 		} catch (error) {
-			// Ignore errors if widget not initialized yet
 			// console.warn("Error updating interactivity:", error);
 		}
 	}
 	
-	// Applies styles from layerData to a text element's content div
 	_applyTextStyles($textContent, layerData) {
 		if (!$textContent || !layerData) return;
-		
-		// Basic font properties
 		$textContent.css({
 			fontFamily: layerData.fontFamily || 'Arial',
 			fontSize: (layerData.fontSize || 16) + 'px',
 			fontWeight: layerData.fontWeight || 'normal',
 			fontStyle: layerData.fontStyle || 'normal',
 			textDecoration: layerData.textDecoration || 'none',
-			color: layerData.fill || 'rgba(0,0,0,1)', // Use fill for color
+			color: layerData.fill || 'rgba(0,0,0,1)',
 			textAlign: layerData.align || 'left',
 			lineHeight: layerData.lineHeight || 1.3,
-			letterSpacing: (layerData.letterSpacing || 0) + 'px', // Add px unit
-			padding: (layerData.backgroundPadding || 0) + 'px', // Apply padding for background
-			// Reset properties that might interfere
+			letterSpacing: (layerData.letterSpacing || 0) + 'px',
+			padding: (layerData.backgroundPadding || 0) + 'px',
 			border: 'none',
 			outline: 'none',
-			whiteSpace: 'pre-wrap', // Respect newlines and spaces from content
-			wordWrap: 'break-word', // Break long words
-			// display: 'flex', // Remove flex from text content itself, handle alignment via text-align
-			// alignItems: 'center',
-			// justifyContent: 'center',
+			whiteSpace: 'pre-wrap',
+			wordWrap: 'break-word',
 		});
 		
-		// Text Shadow
 		if (layerData.shadowEnabled && layerData.shadowColor) {
 			const shadow = `${layerData.shadowOffsetX || 0}px ${layerData.shadowOffsetY || 0}px ${layerData.shadowBlur || 0}px ${layerData.shadowColor}`;
 			$textContent.css('text-shadow', shadow);
@@ -677,14 +666,12 @@ class LayerManager {
 			$textContent.css('text-shadow', 'none');
 		}
 		
-		// Text Stroke (using non-standard properties, might not work everywhere)
 		if (layerData.strokeWidth > 0 && layerData.stroke) {
 			$textContent.css({
 				'-webkit-text-stroke-width': layerData.strokeWidth + 'px',
 				'-webkit-text-stroke-color': layerData.stroke,
-				'text-stroke-width': layerData.strokeWidth + 'px', // Standard (future)
-				'text-stroke-color': layerData.stroke, // Standard (future)
-				// Fallback or alternative: paint-order for SVG-like control (limited support)
+				'text-stroke-width': layerData.strokeWidth + 'px',
+				'text-stroke-color': layerData.stroke,
 				'paint-order': 'stroke fill'
 			});
 		} else {
@@ -694,49 +681,34 @@ class LayerManager {
 			});
 		}
 		
-		// Background
-		const $parentElement = $textContent.parent('.canvas-element'); // Apply background to the container
+		const $parentElement = $textContent.parent('.canvas-element');
 		if (layerData.backgroundEnabled && layerData.backgroundColor) {
 			$parentElement.css({
-				backgroundColor: layerData.backgroundColor, // Assumes color includes opacity if needed
+				backgroundColor: layerData.backgroundColor,
 				borderRadius: (layerData.backgroundCornerRadius || 0) + 'px',
-				// Padding is applied to the inner textContent element above
 			});
-			// Adjust parent height if text wraps/changes size significantly AND height is auto
-			if (layerData.height === 'auto') {
-				$parentElement.css('height', 'auto');
-			}
+			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
 		} else {
 			$parentElement.css({
 				backgroundColor: 'transparent',
 				borderRadius: '0',
 			});
-			// Adjust parent height if text wraps/changes size significantly AND height is auto
-			if (layerData.height === 'auto') {
-				$parentElement.css('height', 'auto');
-			}
+			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
 		}
 	}
 	
-	// Applies general styles (non-text specific) from layerData to the main element container
 	_applyStyles($element, layerData) {
 		if (!$element || !layerData) return;
-		
-		// Apply opacity (already handled in _renderLayer and updateLayerData initial CSS)
-		// $element.css('opacity', layerData.opacity ?? 1);
-		
-		// Example: Apply a border if defined (could be a future property)
-		if (layerData.border) { // e.g., layerData.border = "2px solid blue"
+		if (layerData.border) {
 			$element.css('border', layerData.border);
 		} else {
-			// Ensure no residual border if property removed, unless it's the selection border
 			if (!$element.hasClass('selected')) {
-				$element.css('border', '1px dashed transparent'); // Keep the placeholder for selection
+				// Keep transparent border placeholder for consistent spacing if needed
+				// $element.css('border', '1px dashed transparent');
+				$element.css('border', 'none'); // Or remove border completely
 			}
 		}
-		
-		// Example: Apply CSS filters if defined
-		if (layerData.filters) { // e.g., layerData.filters = "grayscale(1) blur(2px)"
+		if (layerData.filters) {
 			$element.css('filter', layerData.filters);
 		} else {
 			$element.css('filter', 'none');
@@ -746,111 +718,76 @@ class LayerManager {
 	// --- Layer List Panel ---
 	initializeList() {
 		this.$layerList.sortable({
-			axis: 'y', // Allow vertical sorting only
-			containment: 'parent', // Keep items within the list container
-			placeholder: 'ui-sortable-placeholder list-group-item', // Class for the placeholder
-			helper: 'clone', // Use a clone of the item while dragging
-			items: '> li:not(.text-muted)', // Only sort actual layer items
-			tolerance: 'pointer', // Trigger sorting when pointer overlaps item
+			axis: 'y',
+			containment: 'parent',
+			placeholder: 'ui-sortable-placeholder list-group-item',
+			helper: 'clone',
+			items: '> li:not(.text-muted)',
+			tolerance: 'pointer',
 			cursor: 'grabbing',
 			update: (event, ui) => {
-				// Get the new order of layer IDs from the DOM (bottom of list is lowest zIndex visually)
 				const newOrderIds = this.$layerList.find('.list-group-item[data-layer-id]')
-					.map(function () {
-						return $(this).data('layerId');
-					})
+					.map(function () { return $(this).data('layerId'); })
 					.get()
-					.reverse(); // Reverse because visually top = highest zIndex
+					.reverse(); // Visually top = highest zIndex
 				
-				// Reorder the internal layers array based on the new DOM order
 				this.layers.sort((a, b) => {
 					const indexA = newOrderIds.indexOf(a.id);
 					const indexB = newOrderIds.indexOf(b.id);
-					// Handle potential errors where an ID might not be found
 					if (indexA === -1) return 1;
 					if (indexB === -1) return -1;
 					return indexA - indexB;
 				});
 				
-				// Update the zIndex property in the data and apply CSS
-				this._updateZIndices();
+				// Reassign zIndex based on new order and update CSS
+				this.layers.forEach((layer, index) => {
+					layer.zIndex = index + 1;
+					$(`#${layer.id}`).css('z-index', layer.zIndex);
+				});
 				
-				// Save the new state
 				this.saveState();
+				// No need to call updateList() here, sortable handles DOM update
 			}
 		});
-		// Initial list population
 		this.updateList();
 	}
 	
-	// Re-draws the entire layer list in the sidebar based on the current this.layers array
 	updateList() {
-		this.$layerList.empty(); // Clear the current list
-		
+		this.$layerList.empty();
 		if (this.layers.length === 0) {
 			this.$layerList.append('<li class="list-group-item text-muted">No layers yet.</li>');
-			// Disable sortable if it was enabled and list is now empty
 			if (this.$layerList.hasClass('ui-sortable')) {
-				try {
-					this.$layerList.sortable('disable');
-				} catch (e) {
-				}
+				try { this.$layerList.sortable('disable'); } catch (e) { }
 			}
 			return;
 		}
 		
-		// Enable sortable if it was disabled and list now has items
 		if (this.$layerList.hasClass('ui-sortable')) {
-			try {
-				this.$layerList.sortable('enable');
-			} catch (e) {
-			}
+			try { this.$layerList.sortable('enable'); } catch (e) { }
 		}
 		
+		const self = this; // Reference LayerManager for event handlers
 		
-		// Iterate in reverse array order (highest zIndex first) to show top layer at the top of the list
+		// Iterate in reverse array order (highest zIndex first)
 		[...this.layers].reverse().forEach(layer => {
-			// Determine icon based on layer type
-			const iconClass = layer.type === 'text' ? 'fa-font' : (layer.type === 'image' ? 'fa-image' : 'fa-square'); // Default icon
+			const iconClass = layer.type === 'text' ? 'fa-font' : (layer.type === 'image' ? 'fa-image' : 'fa-square');
+			const layerName = layer.name || this._generateDefaultLayerName(layer); // Use stored name or generate default
 			
-			// Generate a display name for the layer
-			let layerName = `Layer ${layer.id.split('-')[1] || layer.id}`; // Default name
-			if (layer.type === 'text') {
-				const textContent = (layer.content || '').trim();
-				layerName = textContent.substring(0, 25) + (textContent.length > 25 ? '...' : '');
-				if (!layerName) layerName = 'Empty Text';
-			} else if (layer.type === 'image') {
-				// Try to get filename from src if it's a URL
-				try {
-					const url = new URL(layer.content);
-					const pathParts = url.pathname.split('/');
-					const filename = pathParts[pathParts.length - 1];
-					if (filename) {
-						layerName = filename.substring(0, 25) + (filename.length > 25 ? '...' : '');
-					} else {
-						layerName = `Image ${layer.id.split('-')[1] || layer.id}`;
-					}
-				} catch (e) {
-					// If content is not a valid URL (e.g., base64), use default name
-					layerName = `Image ${layer.id.split('-')[1] || layer.id}`;
-				}
-			}
-			// Add other type name logic here
-			
-			// Determine lock and visibility icons and titles
 			const lockIconClass = layer.locked ? 'fas fa-lock lock-icon locked' : 'fas fa-lock-open lock-icon';
 			const lockTitle = layer.locked ? 'Unlock Layer' : 'Lock Layer';
 			const visibilityIconClass = layer.visible ? 'fas fa-eye' : 'fas fa-eye-slash';
 			const visibilityTitle = layer.visible ? 'Hide Layer' : 'Show Layer';
-			const itemHiddenClass = layer.visible ? '' : 'layer-item-hidden'; // Class for styling hidden layer items
+			const itemHiddenClass = layer.visible ? '' : 'layer-item-hidden';
 			
-			// Create the list item HTML
+			// --- MODIFIED: Added layer-name-display span ---
 			const $item = $(`
                 <li class="list-group-item ${itemHiddenClass}" data-layer-id="${layer.id}">
                     <div class="d-flex align-items-center">
                         <span class="layer-icon me-2"><i class="fas ${iconClass}"></i></span>
-                        <span class="layer-name flex-grow-1">${$('<div>').text(layerName).html()}</span> <!-- Sanitize name -->
-                        <span class="layer-controls ms-auto d-flex align-items-center">
+                        <span class="layer-name flex-grow-1 me-2"> <!-- Added me-2 for spacing -->
+                            <span class="layer-name-display" title="Double-click to rename">${$('<div>').text(layerName).html()}</span> <!-- Display span -->
+                        </span>
+                        <span class="layer-controls ms-auto d-flex align-items-center flex-shrink-0"> <!-- Added flex-shrink-0 -->
                             <button class="btn btn-outline-secondary btn-sm toggle-visibility me-1 p-1" title="${visibilityTitle}">
                                 <i class="${visibilityIconClass}"></i>
                             </button>
@@ -865,52 +802,84 @@ class LayerManager {
                 </li>
             `);
 			
-			// Add 'active' class if this layer is selected
 			if (this.selectedLayerId === layer.id) {
 				$item.addClass('active');
 			}
 			
 			// --- Attach Event Listeners ---
-			
-			// Click on item (but not buttons) to select the layer
 			$item.on('click', (e) => {
-				// Only select if the click wasn't on a button within the item
-				if (!$(e.target).closest('button').length) {
-					this.selectLayer(layer.id);
+				if (!$(e.target).closest('button, input, .layer-name-display').length) { // Don't select if clicking buttons, input or name span
+					self.selectLayer(layer.id);
 				}
 			});
 			
-			// Click on visibility button
+			// --- NEW: Rename functionality ---
+			const $nameDisplay = $item.find('.layer-name-display');
+			const $nameContainer = $item.find('.layer-name'); // The container span
+			
+			$nameDisplay.on('dblclick', (e) => {
+				e.stopPropagation();
+				const currentName = self.getLayerById(layer.id)?.name || ''; // Get fresh name
+				$nameDisplay.hide(); // Hide the display span
+				
+				// Create and configure the input field
+				const $input = $('<input type="text" class="form-control form-control-sm layer-name-input">')
+					.val(currentName)
+					.on('blur keydown', (event) => {
+						// Check if blur or Enter key (13) or Escape key (27)
+						if (event.type === 'blur' || event.key === 'Enter' || event.key === 'Escape') {
+							event.preventDefault();
+							event.stopPropagation();
+							
+							const $currentInput = $(event.target); // Use event.target
+							const newName = $currentInput.val().trim();
+							
+							// Remove input and show display span
+							$currentInput.remove();
+							$nameDisplay.show();
+							
+							// Save if name changed and wasn't cancelled by Escape
+							if (event.key !== 'Escape' && newName && newName !== currentName) {
+								self.updateLayerName(layer.id, newName);
+								$nameDisplay.text(newName); // Update display immediately
+							} else {
+								$nameDisplay.text(currentName); // Revert display if cancelled or no change
+							}
+						}
+					})
+					.on('click', (ev) => ev.stopPropagation()); // Prevent item selection when clicking input
+				
+				// Append input, focus and select text
+				$nameContainer.append($input);
+				$input.trigger('focus').trigger('select');
+			});
+			// --- END NEW Rename ---
+			
+			
 			$item.find('.toggle-visibility').on('click', (e) => {
-				e.stopPropagation(); // Prevent item click selection
-				this.toggleLayerVisibility(layer.id);
+				e.stopPropagation();
+				self.toggleLayerVisibility(layer.id);
 			});
 			
-			// Click on lock button
 			$item.find('.lock-layer').on('click', (e) => {
 				e.stopPropagation();
-				this.toggleLockLayer(layer.id);
+				self.toggleLockLayer(layer.id);
 			});
 			
-			// Click on delete button
 			$item.find('.delete-layer').on('click', (e) => {
 				e.stopPropagation();
-				// Optional: Add confirmation dialog
-				if (confirm(`Are you sure you want to delete layer "${layerName}"?`)) {
-					this.deleteLayer(layer.id);
+				const currentLayer = self.getLayerById(layer.id);
+				const confirmName = currentLayer?.name || `Layer ${layer.id}`;
+				if (confirm(`Are you sure you want to delete layer "${confirmName}"?`)) {
+					self.deleteLayer(layer.id);
 				}
 			});
 			
-			// Append the newly created item to the list
 			this.$layerList.append($item);
 		});
 		
-		// Refresh sortable to recognize new items (might not be strictly necessary with 'items' option)
 		if (this.$layerList.hasClass('ui-sortable')) {
-			try {
-				this.$layerList.sortable('refresh');
-			} catch (e) {
-			}
+			try { this.$layerList.sortable('refresh'); } catch (e) { }
 		}
 	}
 } // End of LayerManager class

@@ -71,7 +71,7 @@ $(document).ready(function () {
 	}
 	
 	function handleZoomChange(currentZoom, minZoom, maxZoom) {
-		$('#zoom-percentage').text(`${Math.round(currentZoom * 100)}%`);
+		$('#zoom-percentage-toggle').text(`${Math.round(currentZoom * 100)}%`);
 		$('#zoom-in').prop('disabled', currentZoom >= maxZoom);
 		$('#zoom-out').prop('disabled', currentZoom <= minZoom);
 	}

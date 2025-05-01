@@ -1,0 +1,15 @@
+name layers ...............................................................................OK
+on zoom controller clicking on the percentage should open a popup with presets ............OK
+convert all json templates to new format ..................................................OK
+make left sidebar templates and covers 2 column, grid background for transparent
+use llm to add tags and title to images put it in the filename
+add search for images
+find transparent png images for elements, load them from folder instead of json
+add text layer
+duplicate text layer
+in text toolbar add visual google font picker
+add line height and letter spacing like polotno
+add effects like polotno
+allow user to align layer to top, bottom, left, right, center, middle like polotno
+make ui look like polotno
+show minimap

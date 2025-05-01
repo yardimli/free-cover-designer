@@ -29,10 +29,11 @@ class CanvasManager {
 		this.setCanvasSize(this.DEFAULT_CANVAS_WIDTH, this.DEFAULT_CANVAS_HEIGHT); // Set initial size
 		this.initializeRulers();
 		this.initializeDroppable();
-		this.initializeZoomPan();
+		this.initializePan();
+		this.initializeZoomControls();
+		this.setZoom(this.currentZoom, false);
 		this.centerCanvas();
-		this.setZoom(this.currentZoom, true); // Apply initial zoom and trigger UI update
-		this.zoom(1);
+		this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
 		
 	}
 	
@@ -60,6 +61,10 @@ class CanvasManager {
 		this.$canvasWrapper.css({
 			width: this.currentCanvasWidth * this.currentZoom + 'px',
 			height: this.currentCanvasHeight * this.currentZoom + 'px'
+		});
+		this.$canvas.css({
+			transform: `scale(${this.currentZoom})`,
+			transformOrigin: 'top left'
 		});
 	}
 	
@@ -118,7 +123,6 @@ class CanvasManager {
 						const imgWidth = img.width * scale;
 						const imgHeight = img.height * scale;
 						
-						// --- MODIFICATION START ---
 						// Set position to 0, 0 instead of centering at drop point
 						const newLayer = this.layerManager.addLayer('image', {
 							content: imgSrc,
@@ -130,7 +134,6 @@ class CanvasManager {
 							// width: this.currentCanvasWidth,
 							// height: this.currentCanvasHeight
 						});
-						// --- MODIFICATION END ---
 						
 						if (newLayer) {
 							// Send background images to the back by default
@@ -205,26 +208,32 @@ class CanvasManager {
 	}
 	
 	
-	initializeZoomPan() {
+	initializePan() {
 		// --- Panning ---
 		this.$canvasArea.on('mousedown', (e) => {
 			// Only pan if clicking directly on the background of canvas-area
-			// Or use middle mouse button? (e.which === 2)
-			if (e.target === this.$canvasArea[0] || e.target === this.$canvasWrapper[0]) {
+			// or the canvas wrapper itself. Exclude clicks starting on the canvas/elements.
+			// Middle mouse button (e.which === 2) can also trigger pan anywhere.
+			if (e.target === this.$canvasArea[0] || e.target === this.$canvasWrapper[0] || e.which === 2) {
+				// Prevent panning if clicking on a layer element directly
+				if ($(e.target).closest('#canvas').length > 0 && e.which !== 2) {
+					return;
+				}
+				
 				this.isPanning = true;
 				this.lastPanX = e.clientX;
 				this.lastPanY = e.clientY;
 				this.$canvasArea.addClass('panning');
-				e.preventDefault(); // Prevent text selection during pan
+				e.preventDefault(); // Prevent text selection or other default drag actions
 				
-				// Deselect layer if clicking background
-				if (this.layerManager.getSelectedLayer()) {
+				// Deselect layer if clicking background (and not middle mouse)
+				if (e.which !== 2 && this.layerManager.getSelectedLayer()) {
 					this.layerManager.selectLayer(null);
 				}
 			}
 		});
 		
-		$(document).on('mousemove.canvasManager', (e) => { // Add namespace for easy removal
+		$(document).on('mousemove.canvasManagerPan', (e) => { // Use specific namespace
 			if (!this.isPanning) return;
 			
 			const deltaX = e.clientX - this.lastPanX;
@@ -241,118 +250,118 @@ class CanvasManager {
 			// Rulers update automatically via their own scroll handler
 		});
 		
-		$(document).on('mouseup.canvasManager mouseleave.canvasManager', (e) => { // Add namespace
+		$(document).on('mouseup.canvasManagerPan mouseleave.canvasManagerPan', (e) => { // Use specific namespace
 			if (this.isPanning) {
 				this.isPanning = false;
 				this.$canvasArea.removeClass('panning');
 			}
 		});
-		
-		// --- Zooming (Mouse Wheel) ---
-		this.$canvasArea.on('wheel', (e) => {
-			e.preventDefault(); // Prevent page scroll
-			
-			const delta = e.originalEvent.deltaY;
-			const zoomFactor = delta < 0 ? 1.1 : (1 / 1.1); // Consistent zoom steps
-			
-			// Calculate mouse position relative to the canvas content (like in drop)
-			const areaRect = this.canvasAreaDiv.getBoundingClientRect();
-			const mouseX = e.clientX - areaRect.left;
-			const mouseY = e.clientY - areaRect.top;
-			const scrollLeft = this.$canvasArea.scrollLeft();
-			const scrollTop = this.$canvasArea.scrollTop();
-			const wrapperPos = this.$canvasWrapper.position();
-			
-			// Mouse position relative to the unscaled canvas origin
-			const mouseOnCanvasX = (scrollLeft + mouseX - wrapperPos.left) / this.currentZoom;
-			const mouseOnCanvasY = (scrollTop + mouseY - wrapperPos.top) / this.currentZoom;
-			
-			// Calculate new zoom level
-			const newZoom = this.currentZoom * zoomFactor;
-			const clampedZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, newZoom));
-			
-			if (clampedZoom !== this.currentZoom) {
-				const oldZoom = this.currentZoom;
-				this.currentZoom = clampedZoom; // Update internal zoom state
-				
-				// Apply scale transform to the canvas itself
-				this.$canvas.css('transform', `scale(${this.currentZoom})`);
-				// Update wrapper size for the new zoom level
-				this.updateWrapperSize();
-				
-				// Calculate the new scroll position to keep the mouse pointer
-				// over the same point on the unscaled canvas.
-				// New position of the mouse point relative to the wrapper's top-left
-				const newWrapperOffsetX = mouseOnCanvasX * this.currentZoom;
-				const newWrapperOffsetY = mouseOnCanvasY * this.currentZoom;
-				
-				// Get the potentially updated wrapper position (it might shift slightly if centering logic runs)
-				const currentWrapperPos = this.$canvasWrapper.position();
-				
-				// Calculate required scroll offset
-				const newScrollLeft = (currentWrapperPos.left + newWrapperOffsetX) - mouseX;
-				const newScrollTop = (currentWrapperPos.top + newWrapperOffsetY) - mouseY;
-				
-				// Apply the new scroll position
-				this.$canvasArea.scrollLeft(newScrollLeft);
-				this.$canvasArea.scrollTop(newScrollTop);
-				
-				// Update rulers and UI
-				if (this.rulers) {
-					this.rulers.setZoom(this.currentZoom);
-					this.rulers.updateRulers(); // Force redraw after scroll/zoom
-				}
-				this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
-			}
-		});
-		
-		// --- Zoom Buttons ---
-		$('#zoom-in').on('click', () => this.zoom(1.25)); // Zoom in by 25%
-		$('#zoom-out').on('click', () => this.zoom(0.8)); // Zoom out (1 / 1.25)
 	}
 	
-	// Zooms towards the center of the visible area
+	initializeZoomControls() {
+		// Listeners for zoom-in, zoom-out buttons
+		$('#zoom-in').on('click', () => this.zoom(1.25));
+		$('#zoom-out').on('click', () => this.zoom(0.8));
+		
+		const self = this; // Preserve context for the dropdown
+		// Listener for the zoom dropdown options
+		$('#zoom-options-menu').on('click', '.zoom-option', function(e) {
+			e.preventDefault(); // Prevent default link behavior
+			const zoomValue = $(this).data('zoom');
+			
+			if (zoomValue === 'fit') {
+				self.zoomToFit();
+			} else {
+				const numericZoom = parseFloat(zoomValue);
+				if (!isNaN(numericZoom)) {
+					self.setZoom(numericZoom);
+				}
+			}
+			// Bootstrap's dropdown should close automatically on item click
+		});
+	}
+	
+	// Zooms by a factor, keeping the center of the view stable
 	zoom(factor) {
-		// Calculate center point of the visible canvas area
+		const newZoom = this.currentZoom * factor;
+		this.setZoom(newZoom); // setZoom handles clamping, applying, and recentering
+	}
+	
+	// Sets zoom level directly
+	setZoom(newZoom, triggerCallbacks = true) {
+		const oldZoom = this.currentZoom;
+		const clampedZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, newZoom));
+		
+		if (clampedZoom === oldZoom) return; // No change
+		
+		// --- Calculate center point before zoom ---
 		const areaWidth = this.$canvasArea.innerWidth();
 		const areaHeight = this.$canvasArea.innerHeight();
-		const centerX = areaWidth / 2;
-		const centerY = areaHeight / 2;
+		const scrollLeftBefore = this.$canvasArea.scrollLeft();
+		const scrollTopBefore = this.$canvasArea.scrollTop();
+		const wrapperPosBefore = this.$canvasWrapper.position();
 		
-		// Simulate a wheel event at the center
-		const fakeEvent = {
-			preventDefault: () => {
-			},
-			originalEvent: {deltaY: factor > 1 ? -1 : 1}, // Negative delta for zoom in
-			clientX: this.$canvasArea.offset().left + centerX,
-			clientY: this.$canvasArea.offset().top + centerY
-		};
-		this.$canvasArea.trigger($.Event('wheel', fakeEvent));
-	}
-	
-	// Sets zoom level directly (used internally and potentially externally)
-	setZoom(newZoom, triggerCallbacks = true) {
-		const clampedZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, newZoom));
-		if (clampedZoom === this.currentZoom) return;
+		// Center of the viewport relative to the canvas-area's scrollable content
+		const viewCenterX = scrollLeftBefore + areaWidth / 2;
+		const viewCenterY = scrollTopBefore + areaHeight / 2;
 		
+		// Center of the viewport relative to the wrapper's top-left
+		const centerRelativeToWrapperX = viewCenterX - wrapperPosBefore.left;
+		const centerRelativeToWrapperY = viewCenterY - wrapperPosBefore.top;
+		
+		// Corresponding point on the unscaled canvas
+		const centerOnCanvasX = centerRelativeToWrapperX / oldZoom;
+		const centerOnCanvasY = centerRelativeToWrapperY / oldZoom;
+		
+		// --- Apply the new zoom ---
 		this.currentZoom = clampedZoom;
 		
-		// Apply scale transform to the canvas
-		this.$canvas.css('transform', `scale(${this.currentZoom})`);
-		// Adjust the wrapper's size
-		this.updateWrapperSize();
+		// Update wrapper size and canvas transform (scale from top-left)
+		this.updateWrapperSize(); // This now handles both wrapper size and canvas transform
 		
-		// Recenter canvas within the view after zoom might have shifted wrapper
-		//this.centerCanvas(); // This also updates rulers
+		// Calculate where the target canvas point *should* be relative to the wrapper's top-left at the new zoom
+		const newCenterRelativeToWrapperX = centerOnCanvasX * this.currentZoom;
+		const newCenterRelativeToWrapperY = centerOnCanvasY * this.currentZoom;
+		
+		// Calculate the new scroll position needed to place this point back at the center of the viewport
+		const newScrollLeft = (wrapperPosBefore.left + newCenterRelativeToWrapperX) - (areaWidth / 2);
+		const newScrollTop = (wrapperPosBefore.top + newCenterRelativeToWrapperY) - (areaHeight / 2);
+		
+		// Apply the new scroll position
+		this.$canvasArea.scrollLeft(newScrollLeft);
+		this.$canvasArea.scrollTop(newScrollTop);
+		
+		
+		// Update rulers zoom factor and redraw them based on new scroll/zoom
+		if (this.rulers) {
+			this.rulers.setZoom(this.currentZoom);
+			this.rulers.updateRulers(); // Essential after scroll/zoom changes
+		}
 		
 		// Update UI (via callback)
 		if (triggerCallbacks) {
 			this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
 		}
-		// Update rulers zoom factor
-		if (this.rulers) {
-			this.rulers.setZoom(this.currentZoom);
-		}
+	}
+	
+	zoomToFit() {
+		requestAnimationFrame(() => {
+			const areaWidth = this.$canvasArea.innerWidth() - 40; // Subtract padding/scrollbar allowance
+			const areaHeight = this.$canvasArea.innerHeight() - 40; // Subtract padding/scrollbar allowance
+			const canvasWidth = this.currentCanvasWidth;
+			const canvasHeight = this.currentCanvasHeight;
+			
+			if (areaWidth <= 0 || areaHeight <= 0 || canvasWidth <= 0 || canvasHeight <= 0) {
+				return; // Avoid division by zero or nonsensical zoom
+			}
+			
+			const scaleX = areaWidth / canvasWidth;
+			const scaleY = areaHeight / canvasHeight;
+			const newZoom = Math.min(scaleX, scaleY); // Fit entirely within view
+			
+			this.setZoom(newZoom); // setZoom handles clamping, applying, and recentering
+			this.centerCanvas(); // Ensure it's centered after fitting
+		});
 	}
 	
 	centerCanvas() {
@@ -578,7 +587,7 @@ class CanvasManager {
 	// --- Cleanup ---
 	destroy() {
 		// Remove event listeners
-		this.$canvasArea.off('mousedown wheel');
+		this.$canvasArea.off('mousedown');
 		$(document).off('.canvasManager'); // Remove namespaced listeners
 		$('#zoom-in').off('click');
 		$('#zoom-out').off('click');
