@@ -6,7 +6,7 @@ in text toolbar add visual google font picker ..................................
 add text effects panel ....................................................................OK
 add line height and letter spacing ........................................................OK
 add text edit to the inspector instead of double click
-align text layer top, bottom, left, right, center, middle
+align text layer top, bottom, left, right, center, middle .................................OK
 add text layer
 duplicate text layer
 use llm to add tags and title to images put it in the filename

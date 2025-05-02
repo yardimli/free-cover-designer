@@ -1,4 +1,7 @@
 /* free-cover-designer/css/style.css */
+:root {
+    --canvas-zoom-x: 1; /* Default zoom level */
+}
 
 body {
     overflow: hidden;
@@ -220,6 +223,13 @@ body {
     z-index: 1002;
     box-sizing: border-box;
     border-radius: 50%;
+    transform: scale(var(--canvas-zoom-x));
+    transform-origin: center center;
+    display: none !important; /* Hide by default */
+}
+
+.canvas-element.selected .ui-resizable-handle {
+    display: block !important; /* Show when selected */
 }
 
 /* Specific handle positions (optional visual tweaks) */
@@ -532,7 +542,6 @@ body {
 }
 
 
-
 .inspector-panel {
     width: 300px; /* Adjust width as needed */
     flex-shrink: 0;
@@ -542,6 +551,7 @@ body {
     overflow-y: auto; /* Allow scrolling */
     font-size: 0.85rem; /* Smaller text in inspector */
 }
+
 .inspector-panel .section-header {
     font-size: 0.9rem;
     font-weight: bold;
@@ -553,62 +563,77 @@ body {
     justify-content: space-between;
     align-items: center;
 }
+
 .inspector-panel .section-content {
     padding: 0.75rem 1rem;
 }
+
 .inspector-panel .form-label {
     margin-bottom: 0.2rem;
     font-size: 0.8rem;
     color: #6c757d;
 }
+
 .inspector-panel .form-control,
 .inspector-panel .form-select,
 .inspector-panel .btn {
     font-size: 0.8rem;
 }
+
 .inspector-panel .input-group-text {
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
 }
+
 .inspector-panel .form-range::-webkit-slider-thumb {
     background: #0d6efd;
 }
+
 .inspector-panel .form-range::-moz-range-thumb {
     background: #0d6efd;
 }
+
 .inspector-panel .btn-group .btn {
     padding: 0.3rem 0.5rem;
 }
+
 .inspector-panel .form-control-color {
     padding: 0.1rem; /* Adjust color picker padding */
     min-width: 30px; /* Ensure minimum size */
     height: calc(1.5em + 0.5rem + 2px); /* Match other controls height */
 }
+
 .inspector-panel .alignment-icons .btn {
     flex: 1;
 }
+
 .inspector-panel .color-input-group {
     display: flex;
     align-items: center;
 }
+
 .inspector-panel .color-input-group .form-control-color {
     flex-shrink: 0;
     width: 40px; /* Fixed width for color picker */
     margin-right: 5px;
 }
+
 .inspector-panel .color-input-group .form-control {
     flex-grow: 1; /* Text input takes remaining space */
     min-width: 80px;
 }
+
 .inspector-panel .opacity-label {
     width: 40px; /* Align with % display */
     text-align: right;
 }
+
 .inspector-text-style-btn.active {
     background-color: #0d6efd;
     color: white;
     border-color: #0d6efd;
 }
+
 .inspector-shading-preset {
     border: 1px solid #ccc;
     padding: 5px;
@@ -617,10 +642,12 @@ body {
     margin: 2px;
     transition: border-color 0.15s ease-in-out;
 }
+
 .inspector-shading-preset.active {
     border-color: #0d6efd;
     box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
 }
+
 .inspector-shading-preset img {
     max-width: 100%;
     display: block;

@@ -27,6 +27,13 @@ class CanvasManager {
 	
 	initialize() {
 		this.setCanvasSize(this.DEFAULT_CANVAS_WIDTH, this.DEFAULT_CANVAS_HEIGHT); // Set initial size
+		
+		if (this.$canvasArea && this.$canvasArea.length) {
+			this.$canvasArea.css('--canvas-zoom-x', 1 / this.currentZoom );
+		} else {
+			console.warn("CanvasManager: $canvasArea not found during initialization for setting CSS variable.");
+		}
+		
 		this.initializeRulers();
 		this.initializeDroppable();
 		this.initializePan();
@@ -320,6 +327,10 @@ class CanvasManager {
 		// --- Apply the new zoom ---
 		this.currentZoom = clampedZoom;
 		
+		if (this.$canvasArea && this.$canvasArea.length) {
+			this.$canvasArea.css('--canvas-zoom-x', 1 / this.currentZoom);
+		}
+		
 		// Update wrapper size and canvas transform (scale from top-left)
 		this.updateWrapperSize();
 		
@@ -604,6 +615,8 @@ class CanvasManager {
 	destroy() {
 		// Remove event listeners
 		this.$canvasArea.off('mousedown mousemove mouseup mouseleave');
+		this.$canvasArea.css('--canvas-zoom-x', '1'); // Or null
+		
 		$(document).off('.canvasManagerPan'); // Remove namespaced listeners
 		$('#zoom-in').off('click');
 		$('#zoom-out').off('click');
