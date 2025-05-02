@@ -23,7 +23,7 @@
 	$templates_json = json_encode($templates);
 
 	// --- Cover Scanning ---
-	$covers_json_path = 'covers.json';
+	$covers_json_path = 'data/covers.json';
 	$covers_data = []; // Initialize as empty array
 
 	if (file_exists($covers_json_path)) {
