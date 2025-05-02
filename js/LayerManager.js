@@ -9,6 +9,8 @@ class LayerManager {
 		this.uniqueIdCounter = 0;
 		this.onLayerSelect = options.onLayerSelect || (() => {
 		});
+		this.onLayerDataUpdate = options.onLayerDataUpdate || (() => {
+		});
 		this.saveState = options.saveState || (() => {
 		});
 		this.canvasManager = options.canvasManager;
@@ -199,7 +201,8 @@ class LayerManager {
 			if (tiny.isValid()) {
 				return tiny.toRgbString(); // Standardize to rgba()
 			}
-		} catch (e) { /* Ignore tinycolor errors */ }
+		} catch (e) { /* Ignore tinycolor errors */
+		}
 		return defaultColor; // Return default if input is invalid
 	}
 	
@@ -236,21 +239,20 @@ class LayerManager {
 		const layerIndex = this.layers.findIndex(l => l.id === layerId);
 		if (layerIndex === -1) return null;
 		
-		// Get the current layer *before* merging
 		const currentLayer = this.layers[layerIndex];
-		const previousContent = currentLayer.content; // Store previous content for name check
+		const previousContent = currentLayer.content;
 		
 		// Merge new data into the existing layer data
-		// Ensure specific properties are parsed correctly (e.g., numbers, colors)
-		const mergedData = { ...currentLayer };
+		const mergedData = {...currentLayer};
+		// ... (loop through newData, parse/validate properties) ...
 		for (const key in newData) {
 			if (newData.hasOwnProperty(key)) {
 				let value = newData[key];
-				// Parse/Validate specific properties
+				// Parse/Validate specific properties (same as before)
 				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundCornerRadius', 'backgroundOpacity'].includes(key)) {
 					value = value === 'auto' ? 'auto' : parseFloat(value);
-					if (key === 'opacity' || key === 'backgroundOpacity') value = Math.max(0, Math.min(1, value ?? 1));
-					if (key === 'fontSize' && isNaN(value)) value = currentLayer.fontSize; // Prevent NaN
+					if (key === 'opacity' || key === 'backgroundOpacity') value = Math.max(0, Math.min(1, isNaN(value) ? 1 : value)); // Ensure value is number before clamp
+					if (key === 'fontSize' && isNaN(value)) value = currentLayer.fontSize;
 					// Add more clamping if needed
 				} else if (['zIndex'].includes(key)) {
 					value = parseInt(value) || currentLayer.zIndex;
@@ -260,10 +262,13 @@ class LayerManager {
 				mergedData[key] = value;
 			}
 		}
+		
+		
 		this.layers[layerIndex] = mergedData;
-		const updatedLayer = this.layers[layerIndex];
+		const updatedLayer = this.layers[layerIndex]; // The final updated data object
 		
 		// --- Update default name if content changed ---
+		// ... (name update logic remains the same) ...
 		if (newData.content !== undefined && newData.content !== previousContent && !newData.name) {
 			const currentName = updatedLayer.name;
 			const defaultName = this._generateDefaultLayerName(updatedLayer);
@@ -278,7 +283,7 @@ class LayerManager {
 		// --- Update visual representation ---
 		const $element = $(`#${layerId}`);
 		if (!$element.length) return null;
-		
+		// ... (update element CSS: left, top, width, height, opacity, visibility, zIndex, locked) ...
 		// Common properties
 		if (newData.x !== undefined) $element.css('left', updatedLayer.x + 'px');
 		if (newData.y !== undefined) $element.css('top', updatedLayer.y + 'px');
@@ -293,14 +298,12 @@ class LayerManager {
 		if (newData.locked !== undefined) {
 			$element.toggleClass('locked', updatedLayer.locked);
 			this._updateElementInteractivity($element, updatedLayer);
-			// If the selected layer was locked/unlocked, refresh the inspector
-			if (updatedLayer.id === this.selectedLayerId) {
-				this.onLayerSelect(updatedLayer); // This will trigger inspector update via App.js
-			}
 		}
+		
 		
 		// Type-specific updates
 		if (updatedLayer.type === 'text') {
+			// ... (text specific updates: content, font, styles) ...
 			const $textContent = $element.find('.text-content');
 			if (newData.content !== undefined) {
 				$textContent.text(updatedLayer.content);
@@ -309,29 +312,42 @@ class LayerManager {
 			if (newData.fontFamily && newData.fontFamily !== currentLayer.fontFamily) {
 				this._ensureGoogleFontLoaded(updatedLayer.fontFamily);
 			}
-			
 			// Re-apply styles if *any* relevant property changed
 			const styleProps = [
 				'content', 'fontSize', 'fontFamily', 'fontStyle', 'fontWeight', 'textDecoration',
-				'fill', 'align', 'lineHeight', 'letterSpacing', 'shadowEnabled', 'shadowBlur',
-				'shadowOffsetX', 'shadowOffsetY', 'shadowColor', 'strokeWidth', 'stroke',
-				'backgroundEnabled', 'backgroundColor', 'backgroundOpacity',
-				'backgroundCornerRadius', 'width' // Width change can affect text wrap
+				'fill', 'align', 'lineHeight', 'letterSpacing',
+				'shadowEnabled', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'shadowColor',
+				'strokeWidth', 'stroke',
+				'backgroundEnabled', 'backgroundColor', 'backgroundOpacity', 'backgroundCornerRadius',
+				'width' // Width change can affect text wrap
 			];
 			if (Object.keys(newData).some(key => styleProps.includes(key))) {
 				this._applyTextStyles($textContent, updatedLayer);
 			}
-			
-			// Adjust height if needed (especially after style changes)
+			// Adjust height if needed
 			if (updatedLayer.height === 'auto') {
 				$element.css('height', 'auto');
 			}
+			
 		} else if (updatedLayer.type === 'image') {
 			if (newData.content !== undefined) {
 				$element.find('img').attr('src', updatedLayer.content);
 			}
 			this._applyStyles($element, updatedLayer); // Apply general styles (border, filters etc)
 		}
+		
+		// --- TRIGGER CALLBACK ---
+		// Notify the application that layer data has been updated
+		this.onLayerDataUpdate(updatedLayer);
+		// --- END TRIGGER ---
+		
+		
+		// If the selected layer was locked/unlocked, refresh the inspector (redundant now with callback)
+		// if (updatedLayer.id === this.selectedLayerId && newData.locked !== undefined) {
+		//     this.onLayerSelect(updatedLayer);
+		// }
+		
+		
 		return updatedLayer;
 	}
 	
@@ -610,8 +626,9 @@ class LayerManager {
 		} else if (layerData.type === 'image') {
 			const $img = $('<img>')
 				.attr('src', layerData.content)
-				.css({ /* ... keep styles ... */ })
-				.on('error', function () { /* ... */ });
+				.css({ /* ... keep styles ... */})
+				.on('error', function () { /* ... */
+				});
 			$element.append($img);
 			// Apply general styles (border, filters etc. to the element div)
 			this._applyStyles($element, layerData);
@@ -685,36 +702,47 @@ class LayerManager {
 			// containment: this.$canvas, // Resizable containment can be tricky with zoom/transforms
 			start: (event, ui) => {
 				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return false; // Prevent resizing locked layers
-				
+				if (!layer || layer.locked) return false;
 				self.selectLayer(layerId);
-				$(event.target).addClass('ui-resizable-resizing');
 				
-				// Store original unscaled size and position for precise calculations
-				ui.originalPositionUnscaled = {left: layer.x, top: layer.y};
-				ui.originalSizeUnscaled = {
-					width: layer.width === 'auto' ? $element.outerWidth() / self.canvasManager.currentZoom : layer.width,
-					height: layer.height === 'auto' ? $element.outerHeight() / self.canvasManager.currentZoom : layer.height
-				};
-				// Also store the initial scaled size/position from jQuery UI for delta calculation
-				ui.originalCss = {
-					left: ui.position.left,
-					top: ui.position.top,
-					width: ui.size.width,
-					height: ui.size.height
-				};
+				// Get the target element itself
+				const $target = $(event.target);
+				$target.addClass('ui-resizable-resizing');
+				
+				// Calculate initial unscaled size (handle 'auto')
+				const currentZoom = self.canvasManager.currentZoom;
+				const initialUnscaledWidth = layer.width === 'auto' ? $target.outerWidth() / currentZoom : layer.width;
+				const initialUnscaledHeight = layer.height === 'auto' ? $target.outerHeight() / currentZoom : layer.height;
+				
+				// --- STORE data on the element ---
+				$target.data('resizableStartData', {
+					originalPositionUnscaled: { left: layer.x, top: layer.y },
+					originalSizeUnscaled: { width: initialUnscaledWidth, height: initialUnscaledHeight },
+					// Store the initial CSS values provided by jQuery UI in the start event's ui object
+					originalCss: { left: ui.position.left, top: ui.position.top, width: ui.size.width, height: ui.size.height }
+				});
+				// --- END STORE ---
 			},
 			resize: (event, ui) => {
 				const layer = self.getLayerById(layerId);
 				if (!layer || layer.locked) return false;
 				
+				// --- RETRIEVE data from the element ---
+				const $target = $(event.target);
+				const startData = $target.data('resizableStartData');
+				if (!startData) {
+					console.error("Resizable start data not found during resize for layer:", layerId);
+					return; // Cannot proceed without start data
+				}
+				// --- END RETRIEVE ---
+				
 				const zoom = self.canvasManager.currentZoom;
 				
-				// Calculate change in scaled dimensions/position provided by jQuery UI
-				const cssWidthChange = ui.size.width - ui.originalCss.width;
-				const cssHeightChange = ui.size.height - ui.originalCss.height;
-				const cssLeftChange = ui.position.left - ui.originalCss.left;
-				const cssTopChange = ui.position.top - ui.originalCss.top;
+				// Calculate change in scaled dimensions/position provided by *this* resize event's ui object
+				const cssWidthChange = ui.size.width - startData.originalCss.width;
+				const cssHeightChange = ui.size.height - startData.originalCss.height;
+				const cssLeftChange = ui.position.left - startData.originalCss.left;
+				const cssTopChange = ui.position.top - startData.originalCss.top;
 				
 				// Convert these CSS changes to unscaled changes
 				const unscaledWidthChange = cssWidthChange / zoom;
@@ -722,69 +750,80 @@ class LayerManager {
 				const unscaledLeftChange = cssLeftChange / zoom;
 				const unscaledTopChange = cssTopChange / zoom;
 				
-				// Calculate the new unscaled dimensions and position
-				const newUnscaledWidth = ui.originalSizeUnscaled.width + unscaledWidthChange;
-				const newUnscaledHeight = ui.originalSizeUnscaled.height + unscaledHeightChange;
-				const newUnscaledX = ui.originalPositionUnscaled.left + unscaledLeftChange;
-				const newUnscaledY = ui.originalPositionUnscaled.top + unscaledTopChange;
-				
-				// Store these unscaled values for the 'stop' event
-				ui.newUnscaled = {
-					width: newUnscaledWidth,
-					height: newUnscaledHeight,
-					x: newUnscaledX,
-					y: newUnscaledY
-				};
+				// Calculate the new unscaled dimensions and position based on the *stored original unscaled values*
+				const newUnscaledWidth = startData.originalSizeUnscaled.width + unscaledWidthChange;
+				const newUnscaledHeight = startData.originalSizeUnscaled.height + unscaledHeightChange;
+				const newUnscaledX = startData.originalPositionUnscaled.left + unscaledLeftChange;
+				const newUnscaledY = startData.originalPositionUnscaled.top + unscaledTopChange;
 				
 				// Update the element's CSS directly using the calculated unscaled values
 				// This keeps the element's CSS aligned with the unscaled data model during resize
-				$element.css({
+				$target.css({
 					left: newUnscaledX + 'px',
 					top: newUnscaledY + 'px',
 					width: newUnscaledWidth + 'px',
+					// Handle auto height for text layers specifically
 					height: (layer.type === 'text' && layer.height === 'auto') ? 'auto' : newUnscaledHeight + 'px'
 				});
 				
 				// If text layer with auto height, reapply styles to potentially adjust height
 				if (layer.type === 'text' && layer.height === 'auto') {
-					// Re-apply styles which might affect layout/size
-					self._applyTextStyles($element.find('.text-content'), layer);
-					$element.css('height', 'auto'); // Ensure CSS height is auto
+					self._applyTextStyles($target.find('.text-content'), layer); // Re-apply styles
+					$target.css('height', 'auto'); // Ensure CSS height remains auto
 				}
+				
+				// --- STORE current calculated unscaled values for the stop event ---
+				// (Optional but can be cleaner than recalculating in stop)
+				$target.data('resizableCurrentUnscaled', {
+					x: newUnscaledX,
+					y: newUnscaledY,
+					width: newUnscaledWidth,
+					height: (layer.type === 'text' && layer.height === 'auto') ? 'auto' : newUnscaledHeight
+				});
+				// --- END STORE ---
 			},
+			
 			stop: (event, ui) => {
 				const layer = self.getLayerById(layerId);
 				if (!layer || layer.locked) return;
 				
-				// Use the final unscaled values calculated during resize
-				const finalWidth = ui.newUnscaled.width;
-				// Determine final height (use 'auto' for text if applicable)
-				const finalHeight = (layer.type === 'text' && layer.height === 'auto') ? 'auto' : ui.newUnscaled.height;
-				const finalX = ui.newUnscaled.x;
-				const finalY = ui.newUnscaled.y;
+				const $target = $(event.target);
+				// --- RETRIEVE the final calculated unscaled values from resize ---
+				const finalUnscaled = $target.data('resizableCurrentUnscaled');
 				
-				// Update layer data with the final unscaled values
-				self.updateLayerData(layerId, {
-					x: finalX,
-					y: finalY,
-					width: finalWidth,
-					height: finalHeight
-				});
-				
-				// Ensure final CSS matches the updated data (especially for auto height)
-				const $element = $(event.target);
-				$element.css({
-					left: finalX + 'px',
-					top: finalY + 'px',
-					width: finalWidth + 'px',
-					height: (typeof finalHeight === 'number') ? finalHeight + 'px' : 'auto' // Set CSS height correctly
-				});
-				if (layer.type === 'text' && finalHeight === 'auto') {
-					$element.css('height', 'auto'); // Ensure it recalculates if needed after potential content reflow
+				if (!finalUnscaled) {
+					console.error("Resizable final unscaled data not found during stop for layer:", layerId);
+					// Attempt graceful recovery or just log error
+				} else {
+					// Update layer data with the final unscaled values
+					self.updateLayerData(layerId, {
+						x: finalUnscaled.x,
+						y: finalUnscaled.y,
+						width: finalUnscaled.width,
+						height: finalUnscaled.height // Already 'auto' if needed
+					});
+					
+					// Ensure final CSS matches the updated data (especially for auto height)
+					$target.css({
+						left: finalUnscaled.x + 'px',
+						top: finalUnscaled.y + 'px',
+						width: finalUnscaled.width + 'px',
+						height: (typeof finalUnscaled.height === 'number') ? finalUnscaled.height + 'px' : 'auto' // Set CSS height correctly
+					});
+					
+					if (layer.type === 'text' && finalUnscaled.height === 'auto') {
+						$target.css('height', 'auto'); // Ensure it recalculates if needed after potential content reflow
+					}
+					self.saveState(); // Save state after resize completes
 				}
 				
-				$element.removeClass('ui-resizable-resizing');
-				self.saveState(); // Save state after resize completes
+				
+				$target.removeClass('ui-resizable-resizing');
+				
+				// --- CLEANUP stored data ---
+				$target.removeData('resizableStartData');
+				$target.removeData('resizableCurrentUnscaled');
+				// --- END CLEANUP ---
 			}
 		});
 		
@@ -892,10 +931,11 @@ class LayerManager {
 			if (bgOpacity < 1) {
 				try {
 					let tiny = tinycolor(bgColor);
-					if(tiny.isValid()) {
+					if (tiny.isValid()) {
 						bgColor = tiny.setAlpha(bgOpacity).toRgbString();
 					}
-				} catch(e) { /* Ignore */ }
+				} catch (e) { /* Ignore */
+				}
 			}
 			
 			$parentElement.css({

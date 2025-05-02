@@ -21,8 +21,9 @@ $(document).ready(function () {
 	
 	// LayerManager needs CanvasManager
 	const layerManager = new LayerManager($canvas, $layerList, {
-		onLayerSelect: handleLayerSelectionChange, // Callback defined below
-		saveState: () => historyManager.saveState(), // Link to history save
+		onLayerSelect: handleLayerSelectionChange,
+		onLayerDataUpdate: handleLayerDataUpdate, // Pass the new handler
+		saveState: () => historyManager.saveState(),
 		canvasManager: canvasManager
 	});
 	
@@ -70,15 +71,26 @@ $(document).ready(function () {
 	historyManager.saveState();
 	updateActionButtons();
 	
+	
 	// --- UI Update Callbacks ---
 	function handleLayerSelectionChange(selectedLayer) {
-		// Show/hide the inspector panel based on selection
 		if (selectedLayer) {
-			inspectorPanel.show(selectedLayer); // Populate and show
+			inspectorPanel.show(selectedLayer); // Show uses the passed data
 		} else {
-			inspectorPanel.hide(); // Hide
+			inspectorPanel.hide();
 		}
-		updateActionButtons(); // Update top toolbar buttons (delete, lock, etc.)
+		updateActionButtons();
+	}
+	
+	function handleLayerDataUpdate(updatedLayer) {
+		// Check if the updated layer is the one currently shown in the inspector
+		if (inspectorPanel.currentLayer && inspectorPanel.currentLayer.id === updatedLayer.id) {
+			// console.log('Refreshing inspector for updated layer:', updatedLayer.id);
+			// Re-populate the inspector with the fresh data
+			inspectorPanel.populate(updatedLayer);
+		}
+		// Optionally update other UI elements if needed based on layer data changes
+		// updateActionButtons(); // Might be needed if update changes lock state etc.
 	}
 	
 	function handleZoomChange(currentZoom, minZoom, maxZoom) {

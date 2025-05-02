@@ -6,9 +6,9 @@
 			<button class="btn btn-outline-secondary btn-sm" data-align-layer="left" title="Align Left"><i class="fas fa-align-left"></i></button>
 			<button class="btn btn-outline-secondary btn-sm" data-align-layer="h-center" title="Align Horizontal Center"><i class="fas fa-align-center"></i></button>
 			<button class="btn btn-outline-secondary btn-sm" data-align-layer="right" title="Align Right"><i class="fas fa-align-right"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="top" title="Align Top"><i class="fas fa-align-left fa-rotate-270"></i></button>
+			<button class="btn btn-outline-secondary btn-sm" data-align-layer="top" title="Align Top"><i class="fas fa-align-left fa-rotate-90"></i></button>
 			<button class="btn btn-outline-secondary btn-sm" data-align-layer="v-center" title="Align Vertical Center"><i class="fas fa-align-center fa-rotate-90"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="bottom" title="Align Bottom"><i class="fas fa-align-left fa-rotate-90"></i></button>
+			<button class="btn btn-outline-secondary btn-sm" data-align-layer="bottom" title="Align Bottom"><i class="fas fa-align-left fa-rotate-270"></i></button>
 		</div>
 	</div>
 

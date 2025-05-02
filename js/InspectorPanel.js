@@ -1,22 +1,23 @@
+// free-cover-designer/js/InspectorPanel.js
+
 class InspectorPanel {
 	constructor(options) {
 		this.$panel = $('#inspectorPanel');
 		this.layerManager = options.layerManager;
 		this.historyManager = options.historyManager;
-		this.canvasManager = options.canvasManager; // For layer alignment potentially
+		this.canvasManager = options.canvasManager; // For layer alignment
 		this.currentLayer = null;
 		this.googleFontsList = options.googleFontsList || [];
-		
 		this.init();
 	}
 	
 	init() {
 		this.bindEvents();
-		// Initialize font picker AFTER the element is definitely in the DOM
 		this._initFontPicker();
 	}
 	
 	_initFontPicker() {
+		// ... (font picker init code remains the same)
 		try {
 			const $fontInput = this.$panel.find('#inspector-font-family');
 			if ($fontInput.length && $.fn.fontpicker) {
@@ -27,18 +28,10 @@ class InspectorPanel {
 					showClear: false,
 					nrRecents: 3,
 					// googleFonts: this.googleFontsList, // From PHP
-					// localFonts: { // Standard web-safe
-					// 	"Arial": { "category": "sans-serif", "variants": "400,700" },
-					// 	"Verdana": { "category": "sans-serif", "variants": "400,700" },
-					// 	"Times New Roman": { "category": "serif", "variants": "400,700" },
-					// 	"Georgia": { "category": "serif", "variants": "400,700" },
-					// 	"Courier New": { "category": "monospace", "variants": "400,700" },
-					// 	"'Helvetica Neue', sans-serif": { "category": "sans-serif", "variants": "400" }
-					// },
+					// localFonts: { ... },
 					onSelect: (font) => {
-						// Ensure font is loaded dynamically if it's a Google Font
 						this.layerManager._ensureGoogleFontLoaded(font.fontFamily);
-						this._updateLayer('fontFamily', font.fontFamily, true); // Save on select
+						this._updateLayer('fontFamily', font.fontFamily, true);
 					}
 				});
 			} else if (!$fontInput.length) {
@@ -65,8 +58,6 @@ class InspectorPanel {
 		};
 		
 		// --- Helper to update layer and potentially schedule history save ---
-		// `saveNow` forces immediate history save (e.g., button clicks, color change final)
-		// `saveDebounced` schedules save (e.g., slider input)
 		const updateLayer = (prop, value, saveNow = false, saveDebounced = true) => {
 			if (this.currentLayer && !this.currentLayer.locked) {
 				this.layerManager.updateLayerData(this.currentLayer.id, { [prop]: value });
@@ -88,55 +79,68 @@ class InspectorPanel {
 			const updateFromPickerOrHex = (sourceValue, isPicker = false) => {
 				if (!this.currentLayer || this.currentLayer.locked) return;
 				let tiny = tinycolor(sourceValue);
-				if (!tiny.isValid()) return; // Ignore invalid input
+				if (!tiny.isValid()) return;
 				
 				const currentOpacity = parseFloat($opacitySlider.val());
 				const newRgba = tiny.setAlpha(currentOpacity).toRgbString();
-				const hexString = tiny.toHexString().toUpperCase().substring(1); // Remove #
+				const hexString = tiny.toHexString().toUpperCase().substring(1);
 				
 				if (isPicker) {
 					$hex.val(hexString);
 				} else {
-					$picker.val(tiny.toHexString()); // Update picker color
+					$picker.val(tiny.toHexString());
 				}
 				
-				updateLayer(layerPropPrefix + 'Color', newRgba, false, false); // Don't save yet
-				// Special case: If it's 'fill', update 'fill' property
+				// Decide which property to update based on prefix
 				if (layerPropPrefix === 'fill') {
 					updateLayer('fill', newRgba, false, false);
-				} else {
-					updateLayer(layerPropPrefix, newRgba, false, false); // Update 'stroke', 'shadowColor', 'backgroundColor'
+				} else if (layerPropPrefix === 'stroke') {
+					updateLayer('stroke', newRgba, false, false);
+				} else if (layerPropPrefix === 'shadowColor') {
+					updateLayer('shadowColor', newRgba, false, false);
+				} else if (layerPropPrefix === 'backgroundColor') {
+					updateLayer('backgroundColor', newRgba, false, false);
+					// Background opacity is handled separately below
 				}
 				
-				// Update opacity prop separately if exists (e.g., backgroundOpacity)
-				const opacityProp = layerPropPrefix + 'Opacity';
+				// Handle separate opacity properties if they exist
+				const opacityProp = layerPropPrefix + 'Opacity'; // e.g., 'backgroundOpacity'
 				if (this.currentLayer.hasOwnProperty(opacityProp)) {
-					updateLayer(opacityProp, currentOpacity, false, false);
+					updateLayer(opacityProp, currentOpacity, false, false); // Update opacity, don't save yet
 				}
-				
 			};
 			
 			$picker.on('input', () => updateFromPickerOrHex($picker.val(), true));
-			$hex.on('input', () => updateFromPickerOrHex('#' + $hex.val(), false)); // Add # for tinycolor
+			$hex.on('input', () => updateFromPickerOrHex('#' + $hex.val(), false));
+			
 			$opacitySlider.on('input', () => {
 				if (!this.currentLayer || this.currentLayer.locked) return;
 				const opacity = parseFloat($opacitySlider.val());
 				$opacityValue.text(`${Math.round(opacity * 100)}%`);
+				
 				let tiny = tinycolor($picker.val()); // Get current color
 				if (tiny.isValid()) {
 					const newRgba = tiny.setAlpha(opacity).toRgbString();
-					// Special case: If it's 'fill', update 'fill' property
+					
+					// Decide which property to update based on prefix
 					if (layerPropPrefix === 'fill') {
-						updateLayer('fill', newRgba, false, true);
-					} else {
-						updateLayer(layerPropPrefix, newRgba, false, true);
+						updateLayer('fill', newRgba, false, true); // Debounce save
+					} else if (layerPropPrefix === 'stroke') {
+						updateLayer('stroke', newRgba, false, true); // Debounce save
+					} else if (layerPropPrefix === 'shadowColor') {
+						updateLayer('shadowColor', newRgba, false, true); // Debounce save
+					} else if (layerPropPrefix === 'backgroundColor') {
+						// For background, update the separate opacity property
+						updateLayer('backgroundColor', tiny.toHexString(), false, false); // Keep hex color
+						updateLayer('backgroundOpacity', opacity, false, true); // Update opacity, debounce save
 					}
 					
-					// Update opacity prop separately if exists
-					const opacityProp = layerPropPrefix + 'Opacity';
-					if (this.currentLayer.hasOwnProperty(opacityProp)) {
-						updateLayer(opacityProp, opacity, false, true);
-					}
+					// Handle separate opacity properties if they exist (Redundant with above?)
+					// Maybe just keep the logic within the 'backgroundColor' condition
+					// const opacityProp = layerPropPrefix + 'Opacity';
+					// if (this.currentLayer.hasOwnProperty(opacityProp)) {
+					//     updateLayer(opacityProp, opacity, false, true); // Debounce save
+					// }
 				}
 			});
 			
@@ -144,25 +148,26 @@ class InspectorPanel {
 			$picker.on('change', () => this.historyManager.saveState());
 			$hex.on('change', () => this.historyManager.saveState());
 			$opacitySlider.on('change', () => this.historyManager.saveState());
-			
 		};
 		
 		// Bind color groups
-		bindColorInputGroup('fill', 'fill'); // Layer fill color/opacity
-		bindColorInputGroup('border', 'stroke'); // Layer border/stroke color/opacity
-		bindColorInputGroup('shading', 'shadowColor'); // Text shadow color/opacity
-		bindColorInputGroup('background', 'backgroundColor'); // Text background color/opacity
-		
+		bindColorInputGroup('fill', 'fill');
+		bindColorInputGroup('border', 'stroke');
+		bindColorInputGroup('shading', 'shadowColor');
+		bindColorInputGroup('background', 'backgroundColor');
 		
 		// --- Generic Range Slider + Number Input ---
 		const bindRangeAndNumber = (rangeId, numberId, layerProp, min, max, step, saveDebounced = true) => {
+			// ... (bindRangeAndNumber code remains the same)
 			const $range = $(`#${rangeId}`);
 			const $number = $(`#${numberId}`);
+			
 			$range.on('input', () => {
 				const val = parseFloat($range.val());
 				$number.val(val);
 				updateLayer(layerProp, val, false, saveDebounced);
 			});
+			
 			$number.on('input', () => {
 				let val = parseFloat($number.val());
 				if (isNaN(val)) return;
@@ -170,14 +175,15 @@ class InspectorPanel {
 				$range.val(val);
 				updateLayer(layerProp, val, false, saveDebounced);
 			});
+			
 			// Save history on final change
 			$range.on('change', () => this.historyManager.saveState());
-			$number.on('change', () => { // Also update range if number is changed directly
+			$number.on('change', () => {
 				let val = parseFloat($number.val());
 				if (isNaN(val)) val = min;
 				val = Math.max(min, Math.min(max, val));
-				$range.val(val);
-				updateLayer(layerProp, val, true); // Save immediately on direct number change
+				$range.val(val); // Update range slider to match number input
+				updateLayer(layerProp, val, true); // Save immediately on direct number change finalization
 			});
 		};
 		
@@ -205,71 +211,152 @@ class InspectorPanel {
 		this.$panel.find('#inspector-line-height').on('input', (e) => updateLayer('lineHeight', parseFloat($(e.target).val()) || 1.3))
 			.on('change', () => this.historyManager.saveState());
 		
-		// Text Style Buttons (Bold, Italic, Underline)
+		// Text Style Buttons
 		this.$panel.find('#inspector-bold-btn').on('click', () => this.toggleStyle('fontWeight', 'bold', 'normal'));
 		this.$panel.find('#inspector-italic-btn').on('click', () => this.toggleStyle('fontStyle', 'italic', 'normal'));
 		this.$panel.find('#inspector-underline-btn').on('click', () => this.toggleStyle('textDecoration', 'underline', 'none'));
 		
-		// Text Alignment
+		// Text Alignment (within text box)
 		this.$panel.find('#inspector-text-align button').on('click', (e) => {
 			const align = $(e.currentTarget).data('align');
-			updateLayer('align', align, true); // Save immediately
+			updateLayer('align', align, true);
 			this.$panel.find('#inspector-text-align button').removeClass('active');
 			$(e.currentTarget).addClass('active');
 		});
 		
 		// --- Shading ---
 		this.$panel.find('#inspector-shading-enabled').on('change', (e) => {
+			// ... (shading enabled code remains the same)
 			const isChecked = $(e.target).prop('checked');
-			// Update layer data and save history
 			updateLayer('shadowEnabled', isChecked, true);
-			// REMOVED: this.populate(this.currentLayer);
-			
-			// INSTEAD: Directly toggle the visibility of the shading controls section
 			$(e.target).closest('.inspector-section').find('.section-content').toggle(isChecked);
 		});
-		
 		bindRangeAndNumber('inspector-shading-blur', 'inspector-shading-blur-value', 'shadowBlur', 0, 100, 1);
-		// Offset/Angle require recalculating shadowOffsetX/Y
 		const updateShadowOffset = () => {
 			const offset = parseFloat($('#inspector-shading-offset').val());
 			const angleRad = parseFloat($('#inspector-shading-angle').val()) * Math.PI / 180;
 			const offsetX = Math.round(offset * Math.cos(angleRad));
 			const offsetY = Math.round(offset * Math.sin(angleRad));
-			updateLayer('shadowOffsetX', offsetX, false, false); // Don't save individually
+			updateLayer('shadowOffsetX', offsetX, false, false);
 			updateLayer('shadowOffsetY', offsetY, false, true); // Save on Y update
 		};
-		bindRangeAndNumber('inspector-shading-offset', 'inspector-shading-offset-value', 'shadowOffsetInternal', 0, 100, 1, false); // Internal temp prop
-		bindRangeAndNumber('inspector-shading-angle', 'inspector-shading-angle-value', 'shadowAngleInternal', -180, 180, 1, false); // Internal temp prop
+		bindRangeAndNumber('inspector-shading-offset', 'inspector-shading-offset-value', 'shadowOffsetInternal', 0, 100, 1, false);
+		bindRangeAndNumber('inspector-shading-angle', 'inspector-shading-angle-value', 'shadowAngleInternal', -180, 180, 1, false);
 		$('#inspector-shading-offset, #inspector-shading-angle').on('input', updateShadowOffset);
 		$('#inspector-shading-offset, #inspector-shading-angle').on('change', () => this.historyManager.saveState());
 		
 		// --- Background (Text Only) ---
 		this.$panel.find('#inspector-background-enabled').on('change', (e) => {
+			// ... (background enabled code remains the same)
 			const isChecked = $(e.target).prop('checked');
-			// Update layer data and save history
 			updateLayer('backgroundEnabled', isChecked, true);
-			// REMOVED: this.populate(this.currentLayer);
-			
-			// INSTEAD: Directly toggle the visibility of the background controls section
 			$(e.target).closest('.inspector-section').find('.section-content').toggle(isChecked);
 		});
-		
 		bindRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', 'backgroundCornerRadius', 0, 100, 0.5);
 		
-		// Layer Alignment Buttons (Example - Implement actual logic if needed)
+		
+		// --- Layer Alignment Buttons --- START IMPLEMENTATION ---
 		this.$panel.find('#inspector-alignment button[data-align-layer]').on('click', (e) => {
-			if(this.currentLayer && !this.currentLayer.locked) {
-				console.log("Layer Alignment Clicked:", $(e.currentTarget).data('alignLayer'));
-				alert('Layer alignment not fully implemented yet.');
-				// Add logic here to calculate new X/Y based on canvasManager.currentCanvasWidth/Height
-				// and updateLayerData, then saveState
+			// 1. Get the ID of the currently selected layer from the inspector's state
+			const currentLayerId = this.currentLayer?.id;
+			const alignType = $(e.currentTarget).data('alignLayer');
+			
+			// 2. Check if LayerManager and an ID exist
+			if (!currentLayerId || !this.layerManager) {
+				console.log("Alignment: No layer selected ID or LayerManager missing.");
+				return;
+			}
+			
+			// --- FETCH LATEST DATA ---
+			// 3. Get the most up-to-date layer data directly from LayerManager
+			const layer = this.layerManager.getLayerById(currentLayerId);
+			console.log("Alignment: Layer fetched for alignment:", layer);
+			// --- END FETCH ---
+			
+			// 4. Check if the layer exists and is not locked
+			if (!layer || layer.locked) {
+				console.log("Alignment: Layer not found or is locked.");
+				return;
+			}
+			
+			// 5. Check if CanvasManager is available
+			if (!this.canvasManager) {
+				console.error("Alignment: CanvasManager not available in InspectorPanel.");
+				return;
+			}
+			
+			// 6. Get canvas dimensions
+			const canvasWidth = this.canvasManager.currentCanvasWidth;
+			const canvasHeight = this.canvasManager.currentCanvasHeight;
+			
+			// 7. Get layer dimensions (handle 'auto' using rendered size)
+			const $element = $('#' + layer.id);
+			if (!$element.length) {
+				console.error("Alignment: Layer element not found for ID:", layer.id);
+				return;
+			}
+			
+			const zoom = this.canvasManager.currentZoom;
+			let layerWidth = layer.width;
+			let layerHeight = layer.height;
+			
+			if (layerWidth === 'auto' || typeof layerWidth !== 'number') {
+				layerWidth = $element.outerWidth() / zoom;
+			}
+			if (layerHeight === 'auto' || typeof layerHeight !== 'number') {
+				layerHeight = $element.outerHeight() / zoom;
+			}
+			
+			layerWidth = parseFloat(layerWidth);
+			layerHeight = parseFloat(layerHeight);
+			if (isNaN(layerWidth) || isNaN(layerHeight) || layerWidth <= 0 || layerHeight <= 0) {
+				console.error("Alignment: Invalid layer dimensions for calculation.", layer);
+				return;
+			}
+			
+			// 8. Calculate new X/Y (using the fresh 'layer' data)
+			let newX = parseFloat(layer.x);
+			let newY = parseFloat(layer.y);
+			
+			switch (alignType) {
+				case 'left': newX = 0; break;
+				case 'h-center': newX = (canvasWidth / 2) - (layerWidth / 2); break;
+				case 'right': newX = canvasWidth - layerWidth; break;
+				case 'top': newY = 0; break;
+				case 'v-center': newY = (canvasHeight / 2) - (layerHeight / 2); break;
+				case 'bottom': newY = canvasHeight - layerHeight; break;
+				default: console.warn("Alignment: Unknown alignment type:", alignType); return;
+			}
+			
+			newX = Math.round(newX);
+			newY = Math.round(newY);
+			
+			// 9. Update layer data only if position actually changed
+			if (newX !== Math.round(parseFloat(layer.x)) || newY !== Math.round(parseFloat(layer.y))) {
+				console.log(`Alignment: Aligning ${layer.id} to ${alignType}. New pos: (${newX}, ${newY})`);
+				// Use LayerManager to update, which will also update the element's CSS
+				this.layerManager.updateLayerData(layer.id, { x: newX, y: newY });
+				this.historyManager.saveState(); // Save the change
+				
+				// --- OPTIONAL: Re-populate inspector AFTER update to reflect new state ---
+				// This ensures subsequent clicks use the just-set position
+				// Fetch the *very latest* data after the update and repopulate
+				const finalUpdatedLayer = this.layerManager.getLayerById(layer.id);
+				if (finalUpdatedLayer) {
+					this.populate(finalUpdatedLayer);
+				}
+				// --- END OPTIONAL ---
+				
+			} else {
+				console.log(`Alignment: Layer ${layer.id} already aligned to ${alignType}.`);
 			}
 		});
+		// --- Layer Alignment Buttons --- END IMPLEMENTATION ---
 		
-	}
+	} // End bindEvents
 	
 	toggleStyle(property, activeValue, inactiveValue) {
+		// ... (toggleStyle code remains the same)
 		if (this.currentLayer && this.currentLayer.type === 'text' && !this.currentLayer.locked) {
 			const currentValue = this.currentLayer[property];
 			const newValue = (currentValue === activeValue) ? inactiveValue : activeValue;
@@ -278,18 +365,30 @@ class InspectorPanel {
 	}
 	
 	_updateLayer(property, value, saveNow = false) {
+		// ... (_updateLayer code remains the same)
 		if (this.currentLayer && !this.currentLayer.locked) {
+			// Store previous value to compare
+			const previousValue = this.currentLayer[property];
 			this.layerManager.updateLayerData(this.currentLayer.id, { [property]: value });
+			
 			if (saveNow) {
 				this.historyManager.saveState();
 			}
-			// Re-populate to reflect changes and potentially related states
-			// Avoid infinite loops by checking if the value actually changed if necessary
-			this.populate(this.layerManager.getLayerById(this.currentLayer.id));
+			// Re-populate only if the value actually changed to avoid potential issues/loops
+			// And avoid re-populating if the change came FROM populate itself (difficult to track perfectly here)
+			// A simple check for value change is usually sufficient
+			const updatedLayer = this.layerManager.getLayerById(this.currentLayer.id);
+			if(updatedLayer && updatedLayer[property] !== previousValue) {
+				// Delay populate slightly to prevent potential issues with rapid updates (e.g. color picker)
+				// setTimeout(() => this.populate(updatedLayer), 50);
+				// Or just populate directly - test which works best
+				this.populate(updatedLayer);
+			}
 		}
 	}
 	
 	show(layerData) {
+		// ... (show code remains the same)
 		this.currentLayer = layerData;
 		if (!layerData) {
 			this.hide();
@@ -300,12 +399,13 @@ class InspectorPanel {
 	}
 	
 	hide() {
+		// ... (hide code remains the same)
 		this.currentLayer = null;
 		this.$panel.addClass('d-none');
 	}
 	
-	// --- Helper to populate color input group ---
 	_populateColorInputGroup(groupId, colorValue, opacityValue = 1) {
+		// ... (populate color group code remains the same)
 		const $picker = $(`#inspector-${groupId}-color`);
 		const $hex = $(`#inspector-${groupId}-hex`);
 		const $opacitySlider = $(`#inspector-${groupId}-opacity`);
@@ -315,11 +415,17 @@ class InspectorPanel {
 		if (!tiny.isValid()) {
 			tiny = tinycolor('#000000');
 		}
-		// Handle case where opacity might be separate property or included in colorValue
-		let alpha = opacityValue;
+		
+		let alpha = opacityValue; // Use provided opacity value first
+		
+		// If color string itself has alpha, use that instead (rgba/hsla)
 		if (colorValue && typeof colorValue === 'string' && (colorValue.startsWith('rgba') || colorValue.startsWith('hsla'))) {
-			alpha = tiny.getAlpha(); // Use alpha from the color string itself if present
+			alpha = tiny.getAlpha();
+		} else if (groupId === 'background') { // Special case for background, use backgroundOpacity
+			alpha = this.currentLayer?.backgroundOpacity ?? 1;
 		}
+		
+		
 		alpha = isNaN(alpha) ? 1 : Math.max(0, Math.min(1, alpha)); // Clamp opacity
 		
 		$picker.val(tiny.toHexString()); // Set color picker (ignores alpha)
@@ -328,14 +434,14 @@ class InspectorPanel {
 		$opacityValue.text(`${Math.round(alpha * 100)}%`);
 	}
 	
-	// --- Helper to populate range + number ---
+	
 	_populateRangeAndNumber(rangeId, numberId, value, fallback = 0) {
+		// ... (populate range/number code remains the same)
 		const numValue = parseFloat(value);
 		const finalValue = isNaN(numValue) ? fallback : numValue;
 		$(`#${rangeId}`).val(finalValue);
 		$(`#${numberId}`).val(finalValue);
 	}
-	
 	
 	populate(layerData) {
 		if (!layerData) {
@@ -343,25 +449,28 @@ class InspectorPanel {
 			return;
 		}
 		this.currentLayer = layerData; // Update internal reference
-		
 		const isLocked = layerData.locked;
 		const isText = layerData.type === 'text';
+		const isImage = layerData.type === 'image'; // Added for clarity
 		
 		// --- Enable/Disable Panel Sections ---
 		this.$panel.find('#inspector-text').toggle(isText);
 		this.$panel.find('#inspector-text-shading').toggle(isText);
 		this.$panel.find('#inspector-text-background').toggle(isText);
-		// Keep generic sections visible (Layer, Color, Border)
-		// Show/hide Alignment based on selection? Maybe always show.
-		this.$panel.find('#inspector-alignment').show();
-		this.$panel.find('#inspector-layer').show();
-		this.$panel.find('#inspector-color').toggle(isText); // Only show fill for text for now
-		this.$panel.find('#inspector-border').toggle(isText); // Only show border (stroke) for text
+		this.$panel.find('#inspector-color').toggle(isText); // Show Color (fill) only for text
+		this.$panel.find('#inspector-border').toggle(isText); // Show Border (stroke) only for text
+		// Generic sections always visible (or based on layer type if needed later)
+		this.$panel.find('#inspector-alignment').show(); // Keep alignment always visible
+		this.$panel.find('#inspector-layer').show(); // Keep layer (opacity) always visible
 		
 		// Disable all controls if locked
 		this.$panel.find('input, select, button, textarea').prop('disabled', isLocked);
-		// Specifically disable/enable the font picker button if it exists
 		this.$panel.find('#inspector-font-family').next('.fp-button').prop('disabled', isLocked);
+		// Re-enable alignment buttons if not locked (since they are outside the type-specific blocks)
+		if (!isLocked) {
+			this.$panel.find('#inspector-alignment button').prop('disabled', false);
+		}
+		
 		
 		// --- Populate Common Controls ---
 		const opacity = layerData.opacity ?? 1;
@@ -370,22 +479,18 @@ class InspectorPanel {
 		
 		// --- Populate Text Controls (if Text Layer) ---
 		if (isText) {
-			// Fill Color
-			this._populateColorInputGroup('fill', layerData.fill, 1); // Text fill opacity is part of the color
+			// Fill Color (uses layer 'fill' property)
+			this._populateColorInputGroup('fill', layerData.fill, 1); // Opacity included in fill RGBA
 			
 			// Border (Stroke) Color & Weight
 			const strokeWidth = parseFloat(layerData.strokeWidth) || 0;
-			this._populateColorInputGroup('border', layerData.stroke, 1); // Stroke opacity part of color
+			this._populateColorInputGroup('border', layerData.stroke, 1); // Opacity included in stroke RGBA
 			this._populateRangeAndNumber('inspector-border-weight', 'inspector-border-weight-value', strokeWidth);
 			
 			// Font
 			const font = layerData.fontFamily || 'Arial';
 			$('#inspector-font-family').val(font);
-			// Attempt to visually update font picker (might need plugin specific method)
-			try {
-				$('#inspector-font-family').data('fontpicker')?.set(font);
-			} catch(e) { console.warn("Couldn't update fontpicker selection visually", e)}
-			
+			try { $('#inspector-font-family').data('fontpicker')?.set(font); } catch(e) { console.warn("Couldn't update fontpicker selection visually", e)}
 			this._populateRangeAndNumber('inspector-font-size', 'inspector-font-size', layerData.fontSize, 24);
 			this._populateRangeAndNumber('inspector-letter-spacing', 'inspector-letter-spacing', layerData.letterSpacing, 0);
 			this._populateRangeAndNumber('inspector-line-height', 'inspector-line-height', layerData.lineHeight, 1.3);
@@ -395,17 +500,17 @@ class InspectorPanel {
 			$('#inspector-italic-btn').toggleClass('active', layerData.fontStyle === 'italic');
 			$('#inspector-underline-btn').toggleClass('active', layerData.textDecoration === 'underline');
 			
-			// Text Align
+			// Text Align (internal)
 			$('#inspector-text-align button').removeClass('active');
 			$(`#inspector-text-align button[data-align="${layerData.align || 'left'}"]`).addClass('active');
 			
 			// Shading / Shadow
 			const shadowEnabled = !!layerData.shadowEnabled;
 			$('#inspector-shading-enabled').prop('checked', shadowEnabled);
-			this.$panel.find('#inspector-text-shading .section-content').toggle(shadowEnabled); // Show/hide details
-			
+			this.$panel.find('#inspector-text-shading .section-content').toggle(shadowEnabled);
 			if (shadowEnabled) {
-				this._populateColorInputGroup('shading', layerData.shadowColor, layerData.shadowOpacity); // Pass opacity separately if needed
+				// Shading color includes opacity in its RGBA value
+				this._populateColorInputGroup('shading', layerData.shadowColor, 1);
 				this._populateRangeAndNumber('inspector-shading-blur', 'inspector-shading-blur-value', layerData.shadowBlur, 0);
 				
 				// Calculate Offset/Angle from X/Y for sliders
@@ -413,8 +518,7 @@ class InspectorPanel {
 				const shadowY = parseFloat(layerData.shadowOffsetY) || 0;
 				const shadowOffset = Math.sqrt(shadowX * shadowX + shadowY * shadowY);
 				let shadowAngle = Math.atan2(shadowY, shadowX) * 180 / Math.PI;
-				shadowAngle = Math.round(shadowAngle); // Round for slider
-				
+				shadowAngle = Math.round(shadowAngle);
 				this._populateRangeAndNumber('inspector-shading-offset', 'inspector-shading-offset-value', shadowOffset);
 				this._populateRangeAndNumber('inspector-shading-angle', 'inspector-shading-angle-value', shadowAngle);
 			}
@@ -423,22 +527,28 @@ class InspectorPanel {
 			const backgroundEnabled = !!layerData.backgroundEnabled;
 			$('#inspector-background-enabled').prop('checked', backgroundEnabled);
 			this.$panel.find('#inspector-text-background .section-content').toggle(backgroundEnabled);
-			
 			if (backgroundEnabled) {
+				// Background color group handles its own opacity slider via backgroundOpacity
 				this._populateColorInputGroup('background', layerData.backgroundColor, layerData.backgroundOpacity);
 				this._populateRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', layerData.backgroundCornerRadius, 0);
 			}
 		}
 		
 		// --- Populate Image Controls (if Image Layer) ---
-		// else if (layerData.type === 'image') {
-		// Populate image-specific controls here (e.g., filters)
+		// else if (isImage) {
+		// Populate image-specific controls here (e.g., filters, border?)
+		// Example: If you add an image border section:
+		// this._populateColorInputGroup('image-border', layerData.imageBorderColor, layerData.imageBorderOpacity);
+		// this._populateRangeAndNumber('image-border-width', 'image-border-width-value', layerData.imageBorderWidth);
 		// }
 		
 		// Ensure locked state disables controls again after populating
+		// (This catches controls in always-visible sections like Alignment/Layer)
 		if (isLocked) {
 			this.$panel.find('input, select, button, textarea').prop('disabled', true);
 			this.$panel.find('#inspector-font-family').next('.fp-button').prop('disabled', true);
 		}
-	}
-}
+		
+	} // End populate
+	
+} // End class InspectorPanel
