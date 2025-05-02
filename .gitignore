@@ -2,3 +2,6 @@
 /covers
 /text-templates-preview
 /text-templates
+/vendor
+.env
+error_log.txt

@@ -92,6 +92,8 @@ class CanvasManager {
 				tickColor: '#888',
 				rulerBgColor: 'rgba(240, 240, 240, 0.95)'
 			});
+			
+			
 			// Set initial zoom for rulers
 			this.rulers.setZoom(this.currentZoom);
 		} else {

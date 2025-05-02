@@ -86,6 +86,12 @@ class DivRulers {
 		this.target.style.width = `calc(100% - ${this.options.rulerSize}px)`;
 		this.target.style.height = `calc(100% - ${this.options.rulerSize}px)`;
 		
+		
+		this.wrapper.style.flexGrow = '1';
+		this.wrapper.style.flexShrink = '1';
+		this.wrapper.style.flexBasis = '0';
+		this.wrapper.style.height = '100%'; // Or let align-items: stretch handle it
+		
 		// --- 2. Create Ruler Elements ---
 		this.rulerH = document.createElement('div');
 		this.rulerV = document.createElement('div');
@@ -263,13 +269,13 @@ class DivRulers {
 			const contentY = Math.round((this.target.scrollTop + mouseYTarget) / this.zoomFactor);
 			
 			// Display in corner (adjust styling as needed)
-			this.corner.textContent = `${contentX}, ${contentY}`;
-			this.corner.style.fontSize = '10px';
-			this.corner.style.textAlign = 'center';
-			this.corner.style.lineHeight = this.options.rulerSize + 'px';
-			this.corner.style.color = this.options.labelColor;
-			this.corner.style.overflow = 'hidden';
-			this.corner.style.whiteSpace = 'nowrap';
+			// this.corner.textContent = `${contentX}, ${contentY}`;
+			// this.corner.style.fontSize = '10px';
+			// this.corner.style.textAlign = 'center';
+			// this.corner.style.lineHeight = this.options.rulerSize + 'px';
+			// this.corner.style.color = this.options.labelColor;
+			// this.corner.style.overflow = 'hidden';
+			// this.corner.style.whiteSpace = 'nowrap';
 		}
 	}
 	
@@ -283,9 +289,10 @@ class DivRulers {
 	}
 	
 	handleResize() {
+		console.log('DivRulers: Resize detected');
 		// Update wrapper size to match target's potential new offsetWidth/Height
 		this.wrapper.style.width = this.target.offsetWidth + this.options.rulerSize + 'px';
-		this.wrapper.style.height = this.target.offsetHeight + this.options.rulerSize + 'px';
+		// this.wrapper.style.height = this.target.offsetHeight + this.options.rulerSize + 'px';
 		// Recalculate and redraw rulers
 		this.updateRulers();
 	}

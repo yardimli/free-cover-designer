@@ -1,6 +1,6 @@
 class SidebarItemManager {
 	constructor(options) {
-		// Selectors from options
+		// Selectors
 		this.$templateList = $(options.templateListSelector);
 		this.$coverList = $(options.coverListSelector);
 		this.$coverSearch = $(options.coverSearchSelector);
@@ -8,8 +8,9 @@ class SidebarItemManager {
 		this.$uploadPreview = $(options.uploadPreviewSelector);
 		this.$uploadInput = $(options.uploadInputSelector);
 		this.$addImageBtn = $(options.addImageBtnSelector);
+		this.$sidebarContent = this.$coverList.closest('.sidebar-content'); // Get the scrollable container
 		
-		// Data URLs from options
+		// Data URLs
 		this.elementsUrl = options.elementsUrl;
 		
 		// Callbacks
@@ -17,8 +18,16 @@ class SidebarItemManager {
 		this.addLayer = options.addLayer;
 		this.saveState = options.saveState;
 		
+		// State
 		this.uploadedFile = null;
-		this.allCoversData = []; // Store all covers for filtering
+		this.allCoversData = [];
+		this.filteredCoversData = [];
+		this.coversToShow = 12;
+		this.currentlyDisplayedCovers = 0;
+		this.isLoadingCovers = false;
+		this.currentSearchTerm = '';
+		this.searchTimeout = null;
+		this.searchDelay = 300;
 	}
 	
 	loadAll() {
@@ -28,31 +37,42 @@ class SidebarItemManager {
 		this.initializeUpload();
 	}
 	
-	// --- Templates ---
+	// --- Templates --- (Keep existing method)
 	loadTemplates() {
 		try {
 			const templateDataElement = document.getElementById('templateData');
 			const templates = JSON.parse(templateDataElement.textContent || '[]');
 			this.$templateList.empty();
 			if (templates.length === 0) {
-				this.$templateList.html('<p class="text-muted">No templates found.</p>');
+				this.$templateList.html('<p class="text-muted p-2">No templates found.</p>');
 				return;
 			}
+			
+			const $newThumbs = $();
 			templates.forEach(template => {
+				// Add loading class and spinner overlay div
 				const $thumb = $(`
-                    <div class="item-thumbnail template-thumbnail" title="${template.name}">
+                    <div class="item-thumbnail template-thumbnail loading" title="${template.name}">
+                        <div class="thumbnail-spinner-overlay">
+                            <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
                         <img src="${template.thumbnailPath}" alt="${template.name}">
                         <span>${template.name}</span>
                     </div>
                 `);
 				$thumb.data('templateJsonPath', template.jsonPath);
-				this.$templateList.append($thumb);
+				$newThumbs.push($thumb[0]);
 			});
-			// Pass a descriptive object, though it won't be directly used for sizing anymore
-			this._makeDraggable(this.$templateList.find('.template-thumbnail'), { type: 'template' });
+			
+			this.$templateList.append($newThumbs);
+			this._makeDraggable($newThumbs, { type: 'template' });
+			this._setupImageLoading($newThumbs); // Setup loading state
+			
 		} catch (error) {
 			console.error("Error loading templates:", error);
-			this.$templateList.html('<p class="text-danger">Error loading templates.</p>');
+			this.$templateList.html('<p class="text-danger p-2">Error loading templates.</p>');
 		}
 	}
 	
@@ -60,67 +80,213 @@ class SidebarItemManager {
 	loadCovers() {
 		try {
 			const coverDataElement = document.getElementById('coverData');
-			const covers = JSON.parse(coverDataElement.textContent || '[]');
-			this.allCoversData = covers;
-			this.renderCovers(this.allCoversData);
+			this.allCoversData = JSON.parse(coverDataElement.textContent || '[]');
+			this.filteredCoversData = this.allCoversData;
 			
+			if (this.allCoversData.length === 0) {
+				this.$coverList.html('<p class="text-muted p-2">No covers found.</p>');
+				return;
+			}
+			
+			this.displayMoreCovers(true); // Initial display
+			
+			// Debounced Search Listener
 			this.$coverSearch.on('input', () => {
-				const searchTerm = this.$coverSearch.val().toLowerCase();
-				const filteredData = this.allCoversData.filter(cover =>
-					cover.name.toLowerCase().includes(searchTerm)
-				);
-				this.renderCovers(filteredData);
+				clearTimeout(this.searchTimeout);
+				this.searchTimeout = setTimeout(() => {
+					this.currentSearchTerm = this.$coverSearch.val().toLowerCase().trim();
+					this.filterCovers();
+					this.displayMoreCovers(true); // Reset and display filtered
+				}, this.searchDelay);
+			});
+			
+			// Infinite Scroll Listener
+			this.$sidebarContent.on('scroll', () => {
+				if ($('#coversPanel').hasClass('show') && !this.isLoadingCovers) { // Use isLoadingCovers for scroll throttling
+					const container = this.$sidebarContent[0];
+					const threshold = 200;
+					if (container.scrollTop + container.clientHeight >= container.scrollHeight - threshold) {
+						if (this.currentlyDisplayedCovers < this.filteredCoversData.length) {
+							this.displayMoreCovers(); // Load next batch
+						}
+					}
+				}
 			});
 			
 		} catch (error) {
-			console.error("Error loading covers:", error);
-			this.$coverList.html('<p class="text-danger">Error loading covers.</p>');
+			console.error("Error loading or parsing covers data:", error);
+			this.$coverList.html('<p class="text-danger p-2">Error loading covers.</p>');
 		}
 	}
 	
-	renderCovers(coverData) {
-		this.$coverList.empty();
-		if (coverData.length === 0) {
-			this.$coverList.html('<p class="text-muted">No covers found.</p>');
+	filterCovers() {
+		if (!this.currentSearchTerm) {
+			this.filteredCoversData = this.allCoversData;
 			return;
 		}
-		coverData.forEach(cover => {
+		
+		const searchKeywords = this.currentSearchTerm.split(/\s+/).filter(Boolean);
+		
+		this.filteredCoversData = this.allCoversData.filter(cover => {
+			const coverKeywordsLower = cover.keywords.map(k => k.toLowerCase());
+			
+			return searchKeywords.every(searchTerm =>
+				coverKeywordsLower.some(coverKeyword => coverKeyword.startsWith(searchTerm))
+			);
+		});
+	}
+	
+	displayMoreCovers(reset = false) {
+		// Use isLoadingCovers to prevent multiple scroll triggers firing this
+		if (this.isLoadingCovers && !reset) return;
+		this.isLoadingCovers = true;
+		
+		// REMOVE old spinner logic
+		// this.removeSpinner();
+		
+		if (reset) {
+			this.$coverList.empty();
+			this.currentlyDisplayedCovers = 0;
+		}
+		
+		const coversToRender = this.filteredCoversData.slice(
+			this.currentlyDisplayedCovers,
+			this.currentlyDisplayedCovers + this.coversToShow
+		);
+		
+		// Handle no results message *only on reset*
+		if (coversToRender.length === 0 && reset) {
+			if (this.currentSearchTerm) {
+				this.$coverList.html('<p class="text-muted p-2">No covers match your search.</p>');
+			} else if (this.allCoversData.length === 0) {
+				this.$coverList.html('<p class="text-muted p-2">No covers found.</p>');
+			}
+			// If not reset and no covers, we just reached the end of infinite scroll.
+			this.isLoadingCovers = false; // Reset flag
+			return;
+		}
+		// If no covers left to render in this batch (scrolled to end)
+		if (coversToRender.length === 0 && !reset) {
+			this.isLoadingCovers = false; // Reset flag
+			return;
+		}
+		
+		
+		const $newThumbs = $(); // Create an empty jQuery object
+		
+		coversToRender.forEach(cover => {
+			const title = cover.caption ? `${cover.name} - ${cover.caption}` : cover.name;
+			// Add loading class and spinner overlay div
 			const $thumb = $(`
-                <div class="item-thumbnail cover-thumbnail" title="${cover.name}">
+                <div class="item-thumbnail cover-thumbnail loading" title="${title}">
+                     <div class="thumbnail-spinner-overlay">
+                        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
                     <img src="${cover.thumbnailPath}" alt="${cover.name}">
                     <span>${cover.name}</span>
                 </div>
             `);
 			$thumb.data('coverSrc', cover.imagePath);
-			this.$coverList.append($thumb);
+			$newThumbs.push($thumb[0]);
 		});
-		// Pass a descriptive object
-		this._makeDraggable(this.$coverList.find('.cover-thumbnail'), { type: 'cover' });
+		
+		this.$coverList.append($newThumbs);
+		this._makeDraggable($newThumbs, { type: 'cover' });
+		this._setupImageLoading($newThumbs); // Setup loading state for new images
+		
+		this.currentlyDisplayedCovers += coversToRender.length;
+		
+		// Reset flag slightly later to allow DOM updates and prevent rapid re-trigger
+		setTimeout(() => {
+			this.isLoadingCovers = false;
+		}, 100);
 	}
 	
-	// --- Elements ---
+	_setupImageLoading($thumbnails) {
+		$thumbnails.each(function() {
+			const $thumb = $(this);
+			const $img = $thumb.find('img');
+			const $spinnerOverlay = $thumb.find('.thumbnail-spinner-overlay');
+			
+			if ($img.length === 0) {
+				$thumb.removeClass('loading').addClass('loaded'); // No image, treat as loaded
+				$spinnerOverlay.hide();
+				return;
+			}
+			
+			const img = $img[0];
+			
+			const onImageLoad = () => {
+				$spinnerOverlay.hide(); // Hide spinner
+				$thumb.removeClass('loading').addClass('loaded'); // Add loaded class (triggers img opacity)
+			};
+			
+			const onImageError = () => {
+				console.error("Failed to load image:", img.src);
+				$spinnerOverlay.html('<i class="fas fa-exclamation-triangle text-danger"></i>'); // Show error icon
+				// Keep overlay visible with error icon
+				$thumb.removeClass('loading').addClass('error'); // Add error class
+			}
+			
+			// Check if image is already loaded (e.g., from cache)
+			if (img.complete) {
+				onImageLoad();
+			} else {
+				$img.on('load', onImageLoad);
+				$img.on('error', onImageError);
+				// Double-check completion state after attaching listeners,
+				// in case it loaded between the check and listener attachment.
+				if (img.complete) {
+					onImageLoad();
+					$img.off('load', onImageLoad); // Remove listener if already complete
+					$img.off('error', onImageError);
+				}
+			}
+		});
+	}
+	
+
+	// --- Elements --- (Keep existing method)
 	loadElements() {
 		$.getJSON(this.elementsUrl)
 			.done(data => {
 				this.$elementList.empty();
+				if (!data || data.length === 0) {
+					this.$elementList.html('<p class="text-muted p-2">No elements found.</p>');
+					return;
+				}
+				
+				const $newThumbs = $();
 				data.forEach(element => {
+					// Add loading class and spinner overlay div
 					const $thumb = $(`
-                        <div class="item-thumbnail element-thumbnail" title="${element.name}">
+                        <div class="item-thumbnail element-thumbnail loading" title="${element.name}">
+                            <div class="thumbnail-spinner-overlay">
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
                             <img src="${element.image}" alt="${element.name}">
                             <span>${element.name}</span>
                         </div>
                     `);
 					$thumb.data('elementSrc', element.image);
-					this.$elementList.append($thumb);
+					$newThumbs.push($thumb[0]);
 				});
-				// Pass a descriptive object
-				this._makeDraggable(this.$elementList.find('.element-thumbnail'), { type: 'element' });
+				
+				this.$elementList.append($newThumbs);
+				this._makeDraggable($newThumbs, { type: 'element' });
+				this._setupImageLoading($newThumbs); // Setup loading state
+				
 			})
-			.fail(() => this.$elementList.html('<p class="text-danger">Error loading elements.</p>'));
+			.fail(() => this.$elementList.html('<p class="text-danger p-2">Error loading elements.</p>'));
 	}
 	
-	// --- Draggable Helper ---
-	_makeDraggable($items, options) { // options might contain type or other info if needed later
+	// --- Draggable Helper --- (Keep existing method)
+	_makeDraggable($items, options) {
+		// options might contain type or other info if needed later
 		$items.draggable({
 			helper: 'clone',
 			appendTo: 'body',
@@ -134,7 +300,7 @@ class SidebarItemManager {
 				
 				let targetWidth = 100; // Default width if natural dimensions fail
 				let targetHeight = 'auto'; // Default height
-				const maxWidth = 300; // The desired maximum width
+				const maxWidth = 150; // Max width for helper clone
 				
 				// Use naturalWidth/Height if available (best for aspect ratio)
 				if (imgElement && imgElement.naturalWidth && imgElement.naturalWidth > 0) {
@@ -152,17 +318,18 @@ class SidebarItemManager {
 					}
 				} else if ($img.width() > 0) {
 					// Fallback to rendered dimensions if natural dimensions aren't ready/available
-					console.warn("Using rendered dimensions for draggable helper, aspect ratio might be slightly off if image wasn't fully loaded.");
+					// console.warn("Using rendered dimensions for draggable helper, aspect ratio might be slightly off if image wasn't fully loaded.");
 					const currentWidth = $img.width();
 					const currentHeight = $img.height();
-					const aspectRatio = currentHeight / currentWidth;
-					
-					if (currentWidth > maxWidth) {
-						targetWidth = maxWidth;
-						targetHeight = targetWidth * aspectRatio;
-					} else {
-						targetWidth = currentWidth;
-						targetHeight = currentHeight;
+					if (currentWidth > 0) { // Ensure width is not zero
+						const aspectRatio = currentHeight / currentWidth;
+						if (currentWidth > maxWidth) {
+							targetWidth = maxWidth;
+							targetHeight = targetWidth * aspectRatio;
+						} else {
+							targetWidth = currentWidth;
+							targetHeight = currentHeight;
+						}
 					}
 				}
 				// If both fail, the default 100/auto is used.
@@ -171,7 +338,7 @@ class SidebarItemManager {
 				$helper.css({
 					'width': targetWidth + 'px',
 					'height': targetHeight === 'auto' ? 'auto' : targetHeight + 'px',
-					'opacity': 0.8, // Slightly increased opacity
+					'opacity': 0.9, // Slightly increased opacity
 					'background': '#fff',
 					'border': '1px dashed #aaa', // Slightly darker border
 					'padding': '5px',
@@ -184,8 +351,8 @@ class SidebarItemManager {
 					'display': 'block', // Remove potential extra space below image
 					'max-width': '100%',
 					'max-height': '100%', // Ensure it doesn't exceed helper bounds
-					'width': 'auto',     // Let dimensions scale based on container
-					'height': 'auto',    // Let dimensions scale based on container
+					'width': 'auto', // Let dimensions scale based on container
+					'height': 'auto', // Let dimensions scale based on container
 					'object-fit': 'contain', // Ensure entire image is visible within bounds
 					'margin': '0 auto' // Center the image horizontally
 				});
@@ -203,8 +370,7 @@ class SidebarItemManager {
 		});
 	}
 	
-	
-	// --- Upload ---
+	// --- Upload --- (Keep existing method)
 	initializeUpload() {
 		this.$uploadInput.on('change', (event) => {
 			const file = event.target.files[0];
@@ -230,12 +396,21 @@ class SidebarItemManager {
 				reader.onload = (e) => {
 					const img = new Image();
 					img.onload = () => {
+						// Add layer centered or at a default position
+						const canvasWidth = $('#canvas').width();
+						const canvasHeight = $('#canvas').height();
+						const layerWidth = Math.min(img.width, canvasWidth * 0.8); // Scale down if too large
+						const aspectRatio = img.height / img.width;
+						const layerHeight = layerWidth * aspectRatio;
+						const layerX = Math.max(0, (canvasWidth - layerWidth) / 2);
+						const layerY = Math.max(0, (canvasHeight - layerHeight) / 2);
+						
 						this.addLayer('image', {
 							content: e.target.result,
-							x: 20,
-							y: 20,
-							width: img.width,
-							height: img.height
+							x: layerX,
+							y: layerY,
+							width: layerWidth,
+							height: layerHeight
 						});
 						this.saveState();
 					};
