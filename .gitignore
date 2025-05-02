@@ -5,3 +5,4 @@
 /vendor
 .env
 error_log.txt
+composer.lock
