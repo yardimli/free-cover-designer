@@ -5,9 +5,9 @@ make left sidebar templates and covers 2 column, grid background for transparent
 in text toolbar add visual google font picker .............................................OK
 add text effects panel ....................................................................OK
 add line height and letter spacing ........................................................OK
-add text edit to the inspector instead of double click
+add text edit to the inspector instead of double click ....................................OK
 align text layer top, bottom, left, right, center, middle .................................OK
-add text layer
+add new text layer
 duplicate text layer
 use llm to add tags and title to images put it in the filename
 add search for images

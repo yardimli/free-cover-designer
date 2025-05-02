@@ -607,19 +607,6 @@ class LayerManager {
 			// Apply all styles (including background on parent)
 			this._applyTextStyles($textContent, layerData);
 			
-			// Double-click to edit text
-			$textContent.on('dblclick', () => {
-				const currentLayer = this.getLayerById(layerData.id);
-				if (!currentLayer || currentLayer.locked) return;
-				const currentText = $textContent.text();
-				const newText = prompt("Enter new text:", currentText);
-				if (newText !== null && newText !== currentText) {
-					// Use updateLayerData which handles name update logic
-					this.updateLayerData(currentLayer.id, {content: newText});
-					this.saveState(); // Save state after direct text edit
-				}
-			});
-			
 			// Ensure parent height is auto if text height is auto
 			if (layerData.height === 'auto') $element.css('height', 'auto');
 			

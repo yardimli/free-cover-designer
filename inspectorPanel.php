@@ -59,6 +59,11 @@
 	<div class="inspector-section" id="inspector-text">
 		<h6 class="section-header">Text</h6>
 		<div class="section-content">
+			<div class="mb-2">
+				<label for="inspector-text-content" class="form-label">Content</label>
+				<textarea id="inspector-text-content" class="form-control form-control-sm" rows="4" placeholder="Enter text..."></textarea>
+			</div>
+
 			<!-- Font Picker -->
 			<div class="mb-2">
 				<input type="text" id="inspector-font-family" class="form-control form-control-sm font-picker" placeholder="Select Font...">
@@ -109,11 +114,6 @@
 					<button type="button" class="btn btn-outline-secondary btn-sm" data-align="justify" title="Align Justify"><i class="fas fa-align-justify"></i></button>
 				</div>
 			</div>
-			<!-- Text Content (Optional - maybe better via dblclick) -->
-			<!-- <div class="mb-2">
-					<label for="inspector-text-content" class="form-label">Content</label>
-					<textarea id="inspector-text-content" class="form-control form-control-sm" rows="3"></textarea>
-			</div> -->
 		</div>
 	</div>
 

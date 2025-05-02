@@ -254,6 +254,25 @@ class InspectorPanel {
 		});
 		bindRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', 'backgroundCornerRadius', 0, 100, 0.5);
 		
+		const $textContentArea = this.$panel.find('#inspector-text-content');
+		
+		$textContentArea.on('input', () => {
+			if (this.currentLayer && this.currentLayer.type === 'text' && !this.currentLayer.locked) {
+				const newContent = $textContentArea.val();
+				// Update layer data immediately (live update)
+				// Don't save history on every keystroke, let 'change' handle it
+				this.layerManager.updateLayerData(this.currentLayer.id, { content: newContent });
+				
+				// Clear existing timeout if user is still typing
+				clearTimeout(this.textareaChangeTimeout);
+				// Set a timeout to save history after user stops typing
+				this.textareaChangeTimeout = setTimeout(() => {
+					console.log("Saving history after textarea pause...");
+					this.historyManager.saveState();
+				}, 750); // Save 750ms after the last input
+			}
+		});
+		
 		
 		// --- Layer Alignment Buttons --- START IMPLEMENTATION ---
 		this.$panel.find('#inspector-alignment button[data-align-layer]').on('click', (e) => {
@@ -479,6 +498,8 @@ class InspectorPanel {
 		
 		// --- Populate Text Controls (if Text Layer) ---
 		if (isText) {
+			$('#inspector-text-content').val(layerData.content || '');
+			
 			// Fill Color (uses layer 'fill' property)
 			this._populateColorInputGroup('fill', layerData.fill, 1); // Opacity included in fill RGBA
 			
@@ -532,6 +553,9 @@ class InspectorPanel {
 				this._populateColorInputGroup('background', layerData.backgroundColor, layerData.backgroundOpacity);
 				this._populateRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', layerData.backgroundCornerRadius, 0);
 			}
+		} else
+		{
+			$('#inspector-text-content').val('');
 		}
 		
 		// --- Populate Image Controls (if Image Layer) ---
