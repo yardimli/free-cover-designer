@@ -449,84 +449,190 @@ class CanvasManager {
 			width: this.currentCanvasWidth + 'px',
 			height: this.currentCanvasHeight + 'px'
 		});
+		// Ensure the canvas is scrolled into view within the area for capture
 		const wrapperPos = this.$canvasWrapper.position();
 		this.$canvasArea.scrollLeft(wrapperPos.left);
 		this.$canvasArea.scrollTop(wrapperPos.top);
 		
+		
+		// --- Get current layer data BEFORE calling screenshot ---
+		const layersData = this.layerManager.getLayers(); // Get fresh data
+		const defaultFilters = this.layerManager.defaultFilters; // Get default filters
+		
 		// Temporarily make all layers visible for export
-		const hiddenLayerIds = this.layerManager.getLayers().filter(l => !l.visible).map(l => l.id);
+		const hiddenLayerIds = layersData.filter(l => !l.visible).map(l => l.id);
 		hiddenLayerIds.forEach(id => $(`#${id}`).show());
 		
-		const canvasElement = this.$canvas[0];
+		const canvasElement = this.$canvas[0]; // The DOM node to capture
 		const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-		const quality = format === 'jpeg' ? 0.92 : 1.0;
+		const quality = format === 'jpeg' ? 0.92 : undefined; // Quality only for JPEG
 		const filename = `book-cover-export.${format}`;
 		
-		setTimeout(() => { // Allow browser re-render
-			html2canvas(canvasElement, {
-				useCORS: true,
-				allowTaint: true, // Use with caution if CORS isn't fully working
-				logging: false,
-				scale: 1,
-				width: this.currentCanvasWidth,
-				height: this.currentCanvasHeight,
-				x: 0,
-				y: 0,
-				scrollX: 0,
-				scrollY: 0,
-				backgroundColor: '#ffffff', // Or null for transparency if PNG
-				onclone: (clonedDoc) => {
-					const clonedCanvas = clonedDoc.getElementById('canvas');
-					if (clonedCanvas) {
-						clonedCanvas.style.transform = 'scale(1.0)'; // Ensure no transform
-						// Remove selection borders
-						clonedCanvas.querySelectorAll('.canvas-element.selected').forEach(el => el.classList.remove('selected'));
-						// Ensure originally hidden layers are visible in clone
-						hiddenLayerIds.forEach(id => {
-							const el = clonedCanvas.querySelector(`#${id}`);
-							if (el) el.style.display = 'block';
-						});
-						// Remove resize handles
-						clonedCanvas.querySelectorAll('.ui-resizable-handle').forEach(h => h.style.display = 'none');
-						// Remove lock class if visual lock shouldn't be exported
-						// clonedCanvas.querySelectorAll('.canvas-element.locked').forEach(el => el.classList.remove('locked'));
-						
-						// *** NEW: Ensure Text Styles are Applied Correctly in Clone ***
-						// Re-apply styles using LayerManager's logic on the *cloned* elements
-						// This helps if html2canvas doesn't perfectly capture CSS text-stroke etc.
-						// Note: This relies on accessing LayerManager's data, which might be tricky in onclone.
-						// A simpler approach is to trust html2canvas as much as possible first.
-						// If text stroke/shadow isn't exporting well, more complex cloning logic might be needed.
-					}
+		// --- Options for modern-screenshot ---
+		const screenshotOptions = {
+			width: this.currentCanvasWidth,
+			height: this.currentCanvasHeight,
+			scale: 1,
+			backgroundColor: '#ffffff', // Or null/omit for transparency in PNG
+			quality: quality, // Will be ignored by toPng
+			fetch: {
+				// Add fetch options if needed, e.g., for CORS handling
+				// mode: 'cors', // Example
+			},
+			onCloneNode: (clonedNode) => {
+				// This function receives the cloned version of canvasElement
+				if (!clonedNode || clonedNode.id !== 'canvas') {
+					console.warn("onCloneNode did not receive the expected #canvas clone.");
+					return;
 				}
-			}).then(canvas => {
-				const image = canvas.toDataURL(mimeType, quality);
-				const a = document.createElement('a');
-				a.href = image;
-				a.download = filename;
-				document.body.appendChild(a);
-				a.click();
-				document.body.removeChild(a);
-			}).catch(err => {
-				console.error("Error exporting canvas:", err);
-				alert("Error exporting canvas. Check console. Cross-origin images or complex CSS might be the cause.");
-			}).finally(() => {
-				// --- Restore original state ---
+				
+				clonedNode.style.transform = 'scale(1.0)'; // Ensure no transform on clone
+				
+				// Remove selection borders
+				clonedNode.querySelectorAll('.canvas-element.selected').forEach(el => el.classList.remove('selected'));
+				
+				// Ensure originally hidden layers are visible in clone
 				hiddenLayerIds.forEach(id => {
-					const layer = this.layerManager.getLayerById(id);
-					if (layer && !layer.visible) {
-						$(`#${id}`).hide();
+					const el = clonedNode.querySelector(`#${id}`);
+					if (el) el.style.display = 'block';
+				});
+				
+				// Remove resize handles
+				clonedNode.querySelectorAll('.ui-resizable-handle').forEach(h => h.style.display = 'none');
+				
+				// *** Re-apply Filters and Blend Modes to Cloned Elements ***
+				layersData.forEach(layer => {
+					const clonedElement = clonedNode.querySelector(`#${layer.id}`);
+					if (!clonedElement) return; // Skip if element not found in clone
+					
+					// Apply Blend Mode to the container element
+					clonedElement.style.mixBlendMode = layer.blendMode || 'normal';
+					
+					// Apply Filters specifically to the IMG tag if it's an image layer
+					if (layer.type === 'image') {
+						const clonedImg = clonedElement.querySelector('img');
+						if (clonedImg) {
+							const filters = layer.filters || defaultFilters;
+							let filterString = '';
+							// Build filter string (same logic as before)
+							if (filters.brightness !== 100) filterString += `brightness(${filters.brightness}%) `;
+							if (filters.contrast !== 100) filterString += `contrast(${filters.contrast}%) `;
+							if (filters.saturation !== 100) filterString += `saturate(${filters.saturation}%) `;
+							if (filters.grayscale !== 0) filterString += `grayscale(${filters.grayscale}%) `;
+							if (filters.sepia !== 0) filterString += `sepia(${filters.sepia}%) `;
+							if (filters.hueRotate !== 0) filterString += `hue-rotate(${filters.hueRotate}deg) `;
+							if (filters.blur !== 0) filterString += `blur(${filters.blur}px) `;
+							
+							clonedImg.style.filter = filterString.trim() || 'none';
+						}
+					}
+					
+					// Re-apply text styles (Optional but recommended for robustness)
+					if (layer.type === 'text') {
+						const clonedTextContent = clonedElement.querySelector('.text-content');
+						if (clonedTextContent) {
+							// Re-apply necessary text styles directly
+							let fontFamily = layer.fontFamily || 'Arial';
+							if (fontFamily.includes(' ') && !fontFamily.startsWith("'") && !fontFamily.startsWith('"')) {
+								fontFamily = `"${fontFamily}"`;
+							}
+							clonedTextContent.style.fontFamily = fontFamily;
+							clonedTextContent.style.fontSize = (layer.fontSize || 16) + 'px';
+							clonedTextContent.style.fontWeight = layer.fontWeight || 'normal';
+							clonedTextContent.style.fontStyle = layer.fontStyle || 'normal';
+							clonedTextContent.style.textDecoration = layer.textDecoration || 'none';
+							clonedTextContent.style.color = layer.fill || 'rgba(0,0,0,1)';
+							clonedTextContent.style.textAlign = layer.align || 'left';
+							clonedTextContent.style.lineHeight = layer.lineHeight || 1.3;
+							clonedTextContent.style.letterSpacing = (layer.letterSpacing || 0) + 'px';
+							clonedTextContent.style.whiteSpace = 'pre-wrap';
+							clonedTextContent.style.wordWrap = 'break-word';
+							
+							// Text Shadow
+							if (layer.shadowEnabled && layer.shadowColor) {
+								const shadow = `${layer.shadowOffsetX || 0}px ${layer.shadowOffsetY || 0}px ${layer.shadowBlur || 0}px ${layer.shadowColor}`;
+								clonedTextContent.style.textShadow = shadow;
+							} else {
+								clonedTextContent.style.textShadow = 'none';
+							}
+							// Text Stroke
+							const strokeWidth = parseFloat(layer.strokeWidth) || 0;
+							if (strokeWidth > 0 && layer.stroke) {
+								const strokeColor = layer.stroke || 'rgba(0,0,0,1)';
+								clonedTextContent.style.webkitTextStrokeWidth = strokeWidth + 'px';
+								clonedTextContent.style.webkitTextStrokeColor = strokeColor;
+								clonedTextContent.style.textStrokeWidth = strokeWidth + 'px';
+								clonedTextContent.style.textStrokeColor = strokeColor;
+								clonedTextContent.style.paintOrder = 'stroke fill';
+							} else {
+								clonedTextContent.style.webkitTextStrokeWidth = '0';
+								clonedTextContent.style.textStrokeWidth = '0';
+							}
+							
+							// Re-apply parent background if enabled
+							if (layer.backgroundEnabled && layer.backgroundColor) {
+								let bgColor = layer.backgroundColor;
+								const bgOpacity = layer.backgroundOpacity ?? 1;
+								if (bgOpacity < 1) {
+									try {
+										let tiny = tinycolor(bgColor);
+										if (tiny.isValid()) {
+											bgColor = tiny.setAlpha(bgOpacity).toRgbString();
+										}
+									} catch(e) {/* ignore */}
+								}
+								clonedElement.style.backgroundColor = bgColor;
+								clonedElement.style.borderRadius = (layer.backgroundCornerRadius || 0) + 'px';
+								clonedElement.style.padding = (layer.backgroundPadding || 0) + 'px';
+							} else {
+								clonedElement.style.backgroundColor = 'transparent';
+								clonedElement.style.borderRadius = '0';
+								clonedElement.style.padding = '0';
+							}
+						}
 					}
 				});
-				this.$canvas.css('transform', originalTransform);
-				this.$canvasWrapper.css({width: originalWrapperWidth, height: originalWrapperHeight});
-				this.$canvasArea.scrollLeft(originalScrollLeft);
-				this.$canvasArea.scrollTop(originalScrollTop);
-				if (this.layerManager.getSelectedLayer()) {
-					$(`#${this.layerManager.getSelectedLayer().id}`).addClass('selected');
+				// *** END Re-apply ***
+			}
+		};
+		
+		// --- Choose the correct function based on format ---
+		let screenshotPromise;
+		if (format === 'jpeg') {
+			screenshotPromise = modernScreenshot.domToJpeg(canvasElement, screenshotOptions);
+		} else { // Default to PNG
+			screenshotPromise = modernScreenshot.domToPng(canvasElement, screenshotOptions);
+		}
+		
+		// --- Handle the promise ---
+		screenshotPromise.then(dataUrl => {
+			const a = document.createElement('a');
+			a.href = dataUrl;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+		}).catch(err => {
+			console.error(`Error exporting canvas with modernScreenshot (.${format}):`, err);
+			alert(`Error exporting canvas as ${format.toUpperCase()}. Check console. CORS issues or complex CSS might be the cause.`);
+		}).finally(() => {
+			// --- Restore original state ---
+			hiddenLayerIds.forEach(id => {
+				const layer = this.layerManager.getLayerById(id);
+				if (layer && !layer.visible) {
+					$(`#${id}`).hide();
 				}
 			});
-		}, 250); // Delay
+			this.$canvas.css('transform', originalTransform);
+			this.$canvasWrapper.css({width: originalWrapperWidth, height: originalWrapperHeight});
+			this.$canvasArea.scrollLeft(originalScrollLeft);
+			this.$canvasArea.scrollTop(originalScrollTop);
+			// Re-apply selected class if a layer was selected before export
+			const selectedLayer = this.layerManager.getSelectedLayer();
+			if (selectedLayer) {
+				$(`#${selectedLayer.id}`).addClass('selected');
+			}
+		});
 	}
 	
 	

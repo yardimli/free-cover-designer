@@ -51,7 +51,7 @@
 			<label for="inspector-border-weight" class="form-label">Border Weight</label>
 			<div class="d-flex align-items-center">
 				<input type="range" class="form-range" id="inspector-border-weight" min="0" max="50" step="0.5" value="0">
-				<input type="number" class="form-control form-control-sm ms-2" id="inspector-border-weight-value" style="width: 60px;" min="0" max="50" step="0.5" value="0">
+				<span class="ms-2 opacity-label" id="inspector-border-weight-value">0</span>
 			</div>
 		</div>
 	</div>
@@ -85,6 +85,7 @@
 					</div>
 				</div>
 			</div>
+
 			<!-- Spacing (Letter, Line) -->
 			<div class="row gx-2 mb-2">
 				<div class="col">
@@ -92,18 +93,17 @@
 					<div class="input-group input-group-sm">
 						<span class="input-group-text"><i class="fas fa-text-width"></i></span>
 						<input type="number" id="inspector-letter-spacing" class="form-control" value="0" step="0.1">
-						<span class="input-group-text">px</span>
 					</div>
 				</div>
 				<div class="col">
 					<label for="inspector-line-height" class="form-label">Line Height</label>
 					<div class="input-group input-group-sm">
 						<span class="input-group-text"><i class="fas fa-text-height"></i></span>
-						<input type="number" id="inspector-line-height" class="form-control" value="1.3" step="0.1" min="0.5">
-						<span class="input-group-text">x</span>
+						<input type="number" id="inspector-line-height" class="form-control" value="1.3" step="0.01" min="0.5">
 					</div>
 				</div>
 			</div>
+
 			<!-- Text Alignment -->
 			<div class="mb-2">
 				<label class="form-label">Align</label>
@@ -139,15 +139,16 @@
 				<label for="inspector-shading-offset" class="form-label">Offset</label>
 				<div class="d-flex align-items-center">
 					<input type="range" class="form-range" id="inspector-shading-offset" min="0" max="100" step="1" value="5">
-					<input type="number" class="form-control form-control-sm ms-2" id="inspector-shading-offset-value" style="width: 60px;" min="0" max="100" step="1" value="5">
+					<span class="ms-2 opacity-label" id="inspector-shading-offset-value">5</span>
 				</div>
 			</div>
+
 			<!-- Angle -->
 			<div class="mb-2">
 				<label for="inspector-shading-angle" class="form-label">Angle</label>
 				<div class="d-flex align-items-center">
 					<input type="range" class="form-range" id="inspector-shading-angle" min="-180" max="180" step="1" value="-90">
-					<input type="number" class="form-control form-control-sm ms-2" id="inspector-shading-angle-value" style="width: 60px;" min="-180" max="180" step="1" value="-90">
+					<span class="ms-2 opacity-label" id="inspector-shading-angle-value">-90</span>
 				</div>
 			</div>
 			<!-- Blur -->
@@ -155,7 +156,7 @@
 				<label for="inspector-shading-blur" class="form-label">Blur</label>
 				<div class="d-flex align-items-center">
 					<input type="range" class="form-range" id="inspector-shading-blur" min="0" max="100" step="1" value="10">
-					<input type="number" class="form-control form-control-sm ms-2" id="inspector-shading-blur-value" style="width: 60px;" min="0" max="100" step="1" value="10">
+					<span class="ms-2 opacity-label" id="inspector-shading-blur-value">10</span>
 				</div>
 			</div>
 		</div>
@@ -178,14 +179,121 @@
 			</div>
 			<input type="range" class="form-range mt-1 mb-2" id="inspector-background-opacity" min="0" max="1" step="0.01" value="1">
 
+			<!-- Background Padding -->
+			<div class="mb-2">
+				<label for="inspector-background-padding" class="form-label">Padding</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-background-padding" min="0" max="200" step="0" value="0">
+					<span class="ms-2 opacity-label" id="inspector-background-padding-value">0</span>
+				</div>
+			</div>
+
 			<!-- Corner Radius -->
 			<div class="mb-2">
 				<label for="inspector-background-radius" class="form-label">Corner Radius</label>
 				<div class="d-flex align-items-center">
 					<input type="range" class="form-range" id="inspector-background-radius" min="0" max="100" step="0.5" value="0">
-					<input type="number" class="form-control form-control-sm ms-2" id="inspector-background-radius-value" style="width: 60px;" min="0" max="100" step="0.5" value="0">
+					<span class="ms-2 opacity-label" id="inspector-background-radius-value">100</span>
 				</div>
 			</div>
+
 		</div>
 	</div>
+
+	<!-- Image Filters Section -->
+	<div class="inspector-section" id="inspector-image-filters" style="display: none;"> <!-- Initially hidden -->
+		<h6 class="section-header">Image Filters</h6>
+		<div class="section-content">
+
+			<!-- Brightness -->
+			<div class="mb-2">
+				<label for="inspector-filter-brightness" class="form-label">Brightness</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-brightness" min="0" max="200" step="1" value="100">
+					<span class="ms-2 text-nowrap" id="inspector-filter-brightness-value" style="min-width: 45px; text-align: right;">100%</span>
+				</div>
+			</div>
+
+			<!-- Contrast -->
+			<div class="mb-2">
+				<label for="inspector-filter-contrast" class="form-label">Contrast</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-contrast" min="0" max="200" step="1" value="100">
+					<span class="ms-2 text-nowrap" id="inspector-filter-contrast-value" style="min-width: 45px; text-align: right;">100%</span>
+				</div>
+			</div>
+
+			<!-- Saturation -->
+			<div class="mb-2">
+				<label for="inspector-filter-saturation" class="form-label">Saturation</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-saturation" min="0" max="200" step="1" value="100">
+					<span class="ms-2 text-nowrap" id="inspector-filter-saturation-value" style="min-width: 45px; text-align: right;">100%</span>
+				</div>
+			</div>
+
+			<!-- Grayscale -->
+			<div class="mb-2">
+				<label for="inspector-filter-grayscale" class="form-label">Grayscale</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-grayscale" min="0" max="100" step="1" value="0">
+					<span class="ms-2 text-nowrap" id="inspector-filter-grayscale-value" style="min-width: 45px; text-align: right;">0%</span>
+				</div>
+			</div>
+
+			<!-- Sepia -->
+			<div class="mb-2">
+				<label for="inspector-filter-sepia" class="form-label">Sepia</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-sepia" min="0" max="100" step="1" value="0">
+					<span class="ms-2 text-nowrap" id="inspector-filter-sepia-value" style="min-width: 45px; text-align: right;">0%</span>
+				</div>
+			</div>
+
+			<!-- Hue Rotate -->
+			<div class="mb-2">
+				<label for="inspector-filter-hue-rotate" class="form-label">Hue Rotate</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-hue-rotate" min="0" max="360" step="1" value="0">
+					<span class="ms-2 text-nowrap" id="inspector-filter-hue-rotate-value" style="min-width: 45px; text-align: right;">0deg</span>
+				</div>
+			</div>
+
+			<!-- Blur -->
+			<div class="mb-2">
+				<label for="inspector-filter-blur" class="form-label">Blur</label>
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range" id="inspector-filter-blur" min="0" max="20" step="0.1" value="0">
+					<span class="ms-2 text-nowrap" id="inspector-filter-blur-value" style="min-width: 45px; text-align: right;">0px</span>
+				</div>
+			</div>
+
+		</div>
+	</div>
+
+	<!-- NEW: Blend Mode Section -->
+	<div class="inspector-section" id="inspector-image-blend-mode" style="display: none;"> <!-- Initially hidden -->
+		<h6 class="section-header">Blend Mode</h6>
+		<div class="section-content">
+			<select class="form-select form-select-sm" id="inspector-blend-mode">
+				<option value="normal">Normal</option>
+				<option value="multiply">Multiply</option>
+				<option value="screen">Screen</option>
+				<option value="overlay">Overlay</option>
+				<option value="darken">Darken</option>
+				<option value="lighten">Lighten</option>
+				<option value="color-dodge">Color Dodge</option>
+				<option value="color-burn">Color Burn</option>
+				<option value="hard-light">Hard Light</option>
+				<option value="soft-light">Soft Light</option>
+				<option value="difference">Difference</option>
+				<option value="exclusion">Exclusion</option>
+				<option value="hue">Hue</option>
+				<option value="saturation">Saturation</option>
+				<option value="color">Color</option>
+				<option value="luminosity">Luminosity</option>
+			</select>
+		</div>
+	</div>
+
 </div>

@@ -8,6 +8,8 @@ class InspectorPanel {
 		this.canvasManager = options.canvasManager; // For layer alignment
 		this.currentLayer = null;
 		this.googleFontsList = options.googleFontsList || [];
+		this.filterUpdateTimeout = null; // For debouncing filter updates
+		this.filterUpdateDelay = 150; // ms delay for filter slider updates
 		this.init();
 	}
 	
@@ -53,14 +55,31 @@ class InspectorPanel {
 				setTimeout(() => {
 					self.historyManager.saveState();
 					historySaveScheduled = false;
-				}, 300); // Debounce history save slightly
+				}, 300);
 			}
 		};
 		
 		// --- Helper to update layer and potentially schedule history save ---
 		const updateLayer = (prop, value, saveNow = false, saveDebounced = true) => {
 			if (this.currentLayer && !this.currentLayer.locked) {
-				this.layerManager.updateLayerData(this.currentLayer.id, { [prop]: value });
+				let updateData = {};
+				// --- Handle nested filter update ---
+				if (prop.startsWith('filters.')) {
+					const filterKey = prop.split('.')[1];
+					// Ensure currentLayer.filters exists
+					const currentFilters = this.currentLayer.filters || { ...this.layerManager.defaultFilters };
+					updateData = {
+						filters: {
+							...currentFilters, // Spread existing filters
+							[filterKey]: value // Update the specific filter
+						}
+					};
+				} else {
+					updateData = { [prop]: value };
+				}
+				
+				this.layerManager.updateLayerData(this.currentLayer.id, updateData);
+				
 				if (saveNow) {
 					this.historyManager.saveState();
 				} else if (saveDebounced) {
@@ -157,33 +176,37 @@ class InspectorPanel {
 		bindColorInputGroup('background', 'backgroundColor');
 		
 		// --- Generic Range Slider + Number Input ---
-		const bindRangeAndNumber = (rangeId, numberId, layerProp, min, max, step, saveDebounced = true) => {
-			// ... (bindRangeAndNumber code remains the same)
+		const bindRangeAndNumber =(rangeId, displayId, layerProp, min, max, step, unit = '', saveDebounced = true, isFilter = false, skipUpdateLayer = false) => {
 			const $range = $(`#${rangeId}`);
-			const $number = $(`#${numberId}`);
+			const $display = $(`#${displayId}`);
+			const self = this;
 			
-			$range.on('input', () => {
+			const updateDisplayAndLayer = () => {
 				const val = parseFloat($range.val());
-				$number.val(val);
-				updateLayer(layerProp, val, false, saveDebounced);
-			});
-			
-			$number.on('input', () => {
-				let val = parseFloat($number.val());
 				if (isNaN(val)) return;
-				val = Math.max(min, Math.min(max, val)); // Clamp value
-				$range.val(val);
-				updateLayer(layerProp, val, false, saveDebounced);
-			});
+				
+				// Format value for display (e.g., handle decimals for blur)
+				const displayValue = (step < 1) ? val.toFixed(1) : Math.round(val);
+				$display.text(`${displayValue}${unit}`);
+				
+				// Use the generic updateLayer function which handles filters
+				// Pass the raw value (not rounded/formatted)
+				if (!skipUpdateLayer) {
+					updateLayer(layerProp, val, false, saveDebounced);
+				}
+			};
+			
+			$range.on('input', updateDisplayAndLayer);
 			
 			// Save history on final change
-			$range.on('change', () => this.historyManager.saveState());
-			$number.on('change', () => {
-				let val = parseFloat($number.val());
-				if (isNaN(val)) val = min;
-				val = Math.max(min, Math.min(max, val));
-				$range.val(val); // Update range slider to match number input
-				updateLayer(layerProp, val, true); // Save immediately on direct number change finalization
+			$range.on('change', () => {
+				// Ensure final value is applied before saving
+				const finalVal = parseFloat($range.val());
+				if (!isNaN(finalVal)) {
+					updateLayer(layerProp, finalVal, true); // Save immediately
+				} else {
+					self.historyManager.saveState();
+				}
 			});
 		};
 		
@@ -231,17 +254,22 @@ class InspectorPanel {
 			updateLayer('shadowEnabled', isChecked, true);
 			$(e.target).closest('.inspector-section').find('.section-content').toggle(isChecked);
 		});
+		
 		bindRangeAndNumber('inspector-shading-blur', 'inspector-shading-blur-value', 'shadowBlur', 0, 100, 1);
+
 		const updateShadowOffset = () => {
 			const offset = parseFloat($('#inspector-shading-offset').val());
 			const angleRad = parseFloat($('#inspector-shading-angle').val()) * Math.PI / 180;
 			const offsetX = Math.round(offset * Math.cos(angleRad));
 			const offsetY = Math.round(offset * Math.sin(angleRad));
 			updateLayer('shadowOffsetX', offsetX, false, false);
-			updateLayer('shadowOffsetY', offsetY, false, true); // Save on Y update
+			updateLayer('shadowOffsetY', offsetY, false, true);
 		};
-		bindRangeAndNumber('inspector-shading-offset', 'inspector-shading-offset-value', 'shadowOffsetInternal', 0, 100, 1, false);
-		bindRangeAndNumber('inspector-shading-angle', 'inspector-shading-angle-value', 'shadowAngleInternal', -180, 180, 1, false);
+		
+		bindRangeAndNumber('inspector-shading-offset', 'inspector-shading-offset-value', 'shadowOffsetInternal', 0, 100, 1, '', false, false, true);
+
+		bindRangeAndNumber('inspector-shading-angle', 'inspector-shading-angle-value', 'shadowAngleInternal', -180, 180, 1, '', false, false, true);
+		
 		$('#inspector-shading-offset, #inspector-shading-angle').on('input', updateShadowOffset);
 		$('#inspector-shading-offset, #inspector-shading-angle').on('change', () => this.historyManager.saveState());
 		
@@ -252,6 +280,9 @@ class InspectorPanel {
 			updateLayer('backgroundEnabled', isChecked, true);
 			$(e.target).closest('.inspector-section').find('.section-content').toggle(isChecked);
 		});
+		
+		bindRangeAndNumber('inspector-background-padding', 'inspector-background-padding-value', 'backgroundPadding', 0, 200, 1);
+
 		bindRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', 'backgroundCornerRadius', 0, 100, 0.5);
 		
 		const $textContentArea = this.$panel.find('#inspector-text-content');
@@ -274,7 +305,7 @@ class InspectorPanel {
 		});
 		
 		
-		// --- Layer Alignment Buttons --- START IMPLEMENTATION ---
+		// --- Layer Alignment Buttons
 		this.$panel.find('#inspector-alignment button[data-align-layer]').on('click', (e) => {
 			// 1. Get the ID of the currently selected layer from the inspector's state
 			const currentLayerId = this.currentLayer?.id;
@@ -370,7 +401,22 @@ class InspectorPanel {
 				console.log(`Alignment: Layer ${layer.id} already aligned to ${alignType}.`);
 			}
 		});
-		// --- Layer Alignment Buttons --- END IMPLEMENTATION ---
+		// --- Layer Alignment Buttons
+		
+		bindRangeAndNumber('inspector-filter-brightness', 'inspector-filter-brightness-value', 'filters.brightness', 0, 200, 1, '', true, true);
+		bindRangeAndNumber('inspector-filter-contrast', 'inspector-filter-contrast-value', 'filters.contrast', 0, 200, 1, '', true, true);
+		bindRangeAndNumber('inspector-filter-saturation', 'inspector-filter-saturation-value', 'filters.saturation', 0, 200, 1, '', true, true);
+		bindRangeAndNumber('inspector-filter-grayscale', 'inspector-filter-grayscale-value', 'filters.grayscale', 0, 100, 1, '', true, true);
+		bindRangeAndNumber('inspector-filter-sepia', 'inspector-filter-sepia-value', 'filters.sepia', 0, 100, 1, '', true, true);
+		bindRangeAndNumber('inspector-filter-hue-rotate', 'inspector-filter-hue-rotate-value', 'filters.hueRotate', 0, 360, 1, '', true, true);
+		bindRangeAndNumber('inspector-filter-blur', 'inspector-filter-blur-value', 'filters.blur', 0, 20, 0.1, '', true, true);
+		
+		// --- Bind Blend Mode Control ---
+		this.$panel.find('#inspector-blend-mode').on('change', (e) => {
+			const blendMode = $(e.target).val();
+			updateLayer('blendMode', blendMode, true); // Save immediately
+		});
+		
 		
 	} // End bindEvents
 	
@@ -407,7 +453,6 @@ class InspectorPanel {
 	}
 	
 	show(layerData) {
-		// ... (show code remains the same)
 		this.currentLayer = layerData;
 		if (!layerData) {
 			this.hide();
@@ -418,13 +463,11 @@ class InspectorPanel {
 	}
 	
 	hide() {
-		// ... (hide code remains the same)
 		this.currentLayer = null;
 		this.$panel.addClass('d-none');
 	}
 	
 	_populateColorInputGroup(groupId, colorValue, opacityValue = 1) {
-		// ... (populate color group code remains the same)
 		const $picker = $(`#inspector-${groupId}-color`);
 		const $hex = $(`#inspector-${groupId}-hex`);
 		const $opacitySlider = $(`#inspector-${groupId}-opacity`);
@@ -455,11 +498,13 @@ class InspectorPanel {
 	
 	
 	_populateRangeAndNumber(rangeId, numberId, value, fallback = 0) {
-		// ... (populate range/number code remains the same)
 		const numValue = parseFloat(value);
 		const finalValue = isNaN(numValue) ? fallback : numValue;
-		$(`#${rangeId}`).val(finalValue);
-		$(`#${numberId}`).val(finalValue);
+		// Check if elements exist before trying to set value
+		const $range = $(`#${rangeId}`);
+		const $number = $(`#${numberId}`);
+		if ($range.length) $range.val(finalValue);
+		if ($number.length) $number.val(finalValue);
 	}
 	
 	populate(layerData) {
@@ -476,16 +521,21 @@ class InspectorPanel {
 		this.$panel.find('#inspector-text').toggle(isText);
 		this.$panel.find('#inspector-text-shading').toggle(isText);
 		this.$panel.find('#inspector-text-background').toggle(isText);
-		this.$panel.find('#inspector-color').toggle(isText); // Show Color (fill) only for text
-		this.$panel.find('#inspector-border').toggle(isText); // Show Border (stroke) only for text
+		this.$panel.find('#inspector-color').toggle(isText);
+		this.$panel.find('#inspector-border').toggle(isText);
+		
+		this.$panel.find('#inspector-image-filters').toggle(isImage);
+		this.$panel.find('#inspector-image-blend-mode').toggle(isImage);
+		
 		// Generic sections always visible (or based on layer type if needed later)
-		this.$panel.find('#inspector-alignment').show(); // Keep alignment always visible
-		this.$panel.find('#inspector-layer').show(); // Keep layer (opacity) always visible
+		this.$panel.find('#inspector-alignment').show();
+		this.$panel.find('#inspector-layer').show();
 		
 		// Disable all controls if locked
 		this.$panel.find('input, select, button, textarea').prop('disabled', isLocked);
 		this.$panel.find('#inspector-font-family').next('.fp-button').prop('disabled', isLocked);
-		// Re-enable alignment buttons if not locked (since they are outside the type-specific blocks)
+		
+		// Re-enable alignment buttons if not locked
 		if (!isLocked) {
 			this.$panel.find('#inspector-alignment button').prop('disabled', false);
 		}
@@ -551,6 +601,7 @@ class InspectorPanel {
 			if (backgroundEnabled) {
 				// Background color group handles its own opacity slider via backgroundOpacity
 				this._populateColorInputGroup('background', layerData.backgroundColor, layerData.backgroundOpacity);
+				this._populateRangeAndNumber('inspector-background-padding', 'inspector-background-padding-value', layerData.backgroundPadding, 0);
 				this._populateRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', layerData.backgroundCornerRadius, 0);
 			}
 		} else
@@ -559,15 +610,22 @@ class InspectorPanel {
 		}
 		
 		// --- Populate Image Controls (if Image Layer) ---
-		// else if (isImage) {
-		// Populate image-specific controls here (e.g., filters, border?)
-		// Example: If you add an image border section:
-		// this._populateColorInputGroup('image-border', layerData.imageBorderColor, layerData.imageBorderOpacity);
-		// this._populateRangeAndNumber('image-border-width', 'image-border-width-value', layerData.imageBorderWidth);
-		// }
+		if (isImage) {
+			// Populate Filters
+			const filters = layerData.filters || this.layerManager.defaultFilters; // Use defaults if missing
+			this._populateRangeAndNumber('inspector-filter-brightness', 'inspector-filter-brightness-value', filters.brightness, 100);
+			this._populateRangeAndNumber('inspector-filter-contrast', 'inspector-filter-contrast-value', filters.contrast, 100);
+			this._populateRangeAndNumber('inspector-filter-saturation', 'inspector-filter-saturation-value', filters.saturation, 100);
+			this._populateRangeAndNumber('inspector-filter-grayscale', 'inspector-filter-grayscale-value', filters.grayscale, 0);
+			this._populateRangeAndNumber('inspector-filter-sepia', 'inspector-filter-sepia-value', filters.sepia, 0);
+			this._populateRangeAndNumber('inspector-filter-hue-rotate', 'inspector-filter-hue-rotate-value', filters.hueRotate, 0);
+			this._populateRangeAndNumber('inspector-filter-blur', 'inspector-filter-blur-value', filters.blur, 0);
+			
+			// Populate Blend Mode
+			$('#inspector-blend-mode').val(layerData.blendMode || 'normal');
+		}
 		
 		// Ensure locked state disables controls again after populating
-		// (This catches controls in always-visible sections like Alignment/Layer)
 		if (isLocked) {
 			this.$panel.find('input, select, button, textarea').prop('disabled', true);
 			this.$panel.find('#inspector-font-family').next('.fp-button').prop('disabled', true);

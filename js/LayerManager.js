@@ -18,6 +18,16 @@ class LayerManager {
 			console.error("LayerManager requires an instance of CanvasManager!");
 		}
 		this.loadedGoogleFonts = new Set();
+		
+		this.defaultFilters = {
+			brightness: 100,
+			contrast: 100,
+			saturation: 100,
+			grayscale: 0,
+			sepia: 0,
+			hueRotate: 0,
+			blur: 0,
+		};
 	}
 	
 	_isGoogleFont(fontFamily) {
@@ -116,7 +126,7 @@ class LayerManager {
 		// Define defaults for the NEW structure
 		const defaultProps = {
 			id: layerId,
-			name: '', // Initialize name as empty, will be set below
+			name: '',
 			type: type,
 			layerSubType: null,
 			opacity: 1,
@@ -148,15 +158,23 @@ class LayerManager {
 			backgroundEnabled: false,
 			backgroundColor: 'rgba(255,255,255,1)',
 			backgroundOpacity: 1,
+			backgroundPadding: 0,
 			backgroundCornerRadius: 0,
+			// NEW: Image specific defaults
+			filters: {...this.defaultFilters}, // Clone defaults
+			blendMode: 'normal',
 		};
 		// Merge provided props with defaults
 		const layerData = {...defaultProps, ...props};
-		// --- NEW: Generate default name if not provided ---
+		
+		if (type === 'image') {
+			layerData.filters = {...this.defaultFilters, ...(props.filters || {})};
+		}
+		
 		if (!layerData.name) {
 			layerData.name = this._generateDefaultLayerName(layerData);
 		}
-		// --- END NEW ---
+		
 		// Ensure numeric types are numbers
 		layerData.x = parseFloat(layerData.x) || 0;
 		layerData.y = parseFloat(layerData.y) || 0;
@@ -164,6 +182,7 @@ class LayerManager {
 		layerData.height = layerData.height === 'auto' ? 'auto' : (parseFloat(layerData.height) || defaultProps.height);
 		layerData.opacity = parseFloat(layerData.opacity) ?? 1;
 		layerData.zIndex = parseInt(layerData.zIndex) || initialZIndex;
+		
 		if (type === 'text') {
 			layerData.fontSize = Math.max(1, parseFloat(layerData.fontSize) || defaultProps.fontSize);
 			layerData.lineHeight = Math.max(0.1, parseFloat(layerData.lineHeight) || defaultProps.lineHeight);
@@ -175,6 +194,7 @@ class LayerManager {
 			// Stroke
 			layerData.strokeWidth = Math.max(0, parseFloat(layerData.strokeWidth) || 0);
 			// Background
+			layerData.backgroundPadding = Math.max(0, parseInt(layerData.backgroundPadding) || 0);
 			layerData.backgroundCornerRadius = Math.max(0, parseFloat(layerData.backgroundCornerRadius) || 0);
 			layerData.backgroundOpacity = Math.max(0, Math.min(1, parseFloat(layerData.backgroundOpacity) ?? 1));
 			
@@ -183,6 +203,16 @@ class LayerManager {
 			layerData.shadowColor = this._ensureRgba(layerData.shadowColor, 'rgba(0,0,0,0.5)');
 			layerData.stroke = this._ensureRgba(layerData.stroke, 'rgba(0,0,0,1)');
 			layerData.backgroundColor = this._ensureRgba(layerData.backgroundColor, 'rgba(255,255,255,1)');
+		} else if (type === 'image') {
+			// Ensure filter values are numbers
+			for (const key in layerData.filters) {
+				layerData.filters[key] = parseFloat(layerData.filters[key]) || this.defaultFilters[key];
+			}
+			// Validate blend mode? (Optional, CSS handles invalid values gracefully)
+			const validBlendModes = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
+			if (!validBlendModes.includes(layerData.blendMode)) {
+				layerData.blendMode = 'normal';
+			}
 		}
 		
 		// Add to layers array and sort by zIndex
@@ -241,23 +271,43 @@ class LayerManager {
 		const currentLayer = this.layers[layerIndex];
 		const previousContent = currentLayer.content;
 		
-		// Merge new data into the existing layer data
 		const mergedData = {...currentLayer};
-		// ... (loop through newData, parse/validate properties) ...
+		
 		for (const key in newData) {
 			if (newData.hasOwnProperty(key)) {
 				let value = newData[key];
+				
+				if (key === 'filters' && typeof value === 'object' && currentLayer.type === 'image') {
+					// Merge the incoming filter changes with existing filters
+					mergedData.filters = {...currentLayer.filters}; // Start with current
+					for (const filterKey in value) {
+						if (this.defaultFilters.hasOwnProperty(filterKey)) { // Check if it's a valid filter key
+							const filterValue = parseFloat(value[filterKey]);
+							mergedData.filters[filterKey] = isNaN(filterValue) ? this.defaultFilters[filterKey] : filterValue;
+						}
+					}
+					continue; // Skip the generic assignment below for 'filters'
+				}
+				
 				// Parse/Validate specific properties (same as before)
-				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundCornerRadius', 'backgroundOpacity'].includes(key)) {
+				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundPadding', 'backgroundCornerRadius', 'backgroundOpacity'].includes(key)) {
 					value = value === 'auto' ? 'auto' : parseFloat(value);
 					if (key === 'opacity' || key === 'backgroundOpacity') value = Math.max(0, Math.min(1, isNaN(value) ? 1 : value)); // Ensure value is number before clamp
 					if (key === 'fontSize' && isNaN(value)) value = currentLayer.fontSize;
-					// Add more clamping if needed
+					
 				} else if (['zIndex'].includes(key)) {
 					value = parseInt(value) || currentLayer.zIndex;
+					
 				} else if (['fill', 'shadowColor', 'stroke', 'backgroundColor'].includes(key)) {
 					value = this._ensureRgba(value, currentLayer[key]); // Ensure valid RGBA
+					
+				} else if (key === 'blendMode' && currentLayer.type === 'image') {
+					const validBlendModes = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
+					if (!validBlendModes.includes(value)) {
+						value = 'normal'; // Reset to default if invalid
+					}
 				}
+				
 				mergedData[key] = value;
 			}
 		}
@@ -266,8 +316,6 @@ class LayerManager {
 		this.layers[layerIndex] = mergedData;
 		const updatedLayer = this.layers[layerIndex]; // The final updated data object
 		
-		// --- Update default name if content changed ---
-		// ... (name update logic remains the same) ...
 		if (newData.content !== undefined && newData.content !== previousContent && !newData.name) {
 			const currentName = updatedLayer.name;
 			const defaultName = this._generateDefaultLayerName(updatedLayer);
@@ -282,7 +330,7 @@ class LayerManager {
 		// --- Update visual representation ---
 		const $element = $(`#${layerId}`);
 		if (!$element.length) return null;
-		// ... (update element CSS: left, top, width, height, opacity, visibility, zIndex, locked) ...
+		
 		// Common properties
 		if (newData.x !== undefined) $element.css('left', updatedLayer.x + 'px');
 		if (newData.y !== undefined) $element.css('top', updatedLayer.y + 'px');
@@ -317,7 +365,7 @@ class LayerManager {
 				'fill', 'align', 'lineHeight', 'letterSpacing',
 				'shadowEnabled', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'shadowColor',
 				'strokeWidth', 'stroke',
-				'backgroundEnabled', 'backgroundColor', 'backgroundOpacity', 'backgroundCornerRadius',
+				'backgroundEnabled', 'backgroundColor', 'backgroundOpacity', 'backgroundPadding', 'backgroundCornerRadius',
 				'width' // Width change can affect text wrap
 			];
 			if (Object.keys(newData).some(key => styleProps.includes(key))) {
@@ -571,7 +619,6 @@ class LayerManager {
 				zIndex: layerData.zIndex || 0,
 				opacity: layerData.opacity ?? 1,
 				display: layerData.visible ? 'block' : 'none',
-				// Background color/radius set via _applyTextStyles for text
 			})
 			.data('layerId', layerData.id);
 		
@@ -594,11 +641,23 @@ class LayerManager {
 		} else if (layerData.type === 'image') {
 			const $img = $('<img>')
 				.attr('src', layerData.content)
-				.css({ /* ... keep styles ... */})
-				.on('error', function () { /* ... */
+				.css({
+					display: 'block',
+					width: '100%',
+					height: '100%',
+					objectFit: 'cover', // Or 'contain' depending on desired default
+					userSelect: 'none',
+					'-webkit-user-drag': 'none',
+					pointerEvents: 'none', // Image itself shouldn't capture pointer events
+					// Filters applied in _applyStyles
+				})
+				.on('error', function () {
+					console.error("Failed to load image:", layerData.content);
+					// Optionally display a placeholder or error indicator
+					$(this).parent().addClass('load-error'); // Add class to parent
 				});
+
 			$element.append($img);
-			// Apply general styles (border, filters etc. to the element div)
 			this._applyStyles($element, layerData);
 		}
 		
@@ -684,10 +743,10 @@ class LayerManager {
 				
 				// --- STORE data on the element ---
 				$target.data('resizableStartData', {
-					originalPositionUnscaled: { left: layer.x, top: layer.y },
-					originalSizeUnscaled: { width: initialUnscaledWidth, height: initialUnscaledHeight },
+					originalPositionUnscaled: {left: layer.x, top: layer.y},
+					originalSizeUnscaled: {width: initialUnscaledWidth, height: initialUnscaledHeight},
 					// Store the initial CSS values provided by jQuery UI in the start event's ui object
-					originalCss: { left: ui.position.left, top: ui.position.top, width: ui.size.width, height: ui.size.height }
+					originalCss: {left: ui.position.left, top: ui.position.top, width: ui.size.width, height: ui.size.height}
 				});
 				// --- END STORE ---
 			},
@@ -909,7 +968,7 @@ class LayerManager {
 			$parentElement.css({
 				backgroundColor: bgColor,
 				borderRadius: (layerData.backgroundCornerRadius || 0) + 'px',
-				// Padding is applied to the inner textContent div
+				padding: (layerData.backgroundPadding || 0) + 'px',
 			});
 			// Re-evaluate parent height if text content drives it
 			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
@@ -933,6 +992,29 @@ class LayerManager {
 		// General styles for non-text elements (e.g., images)
 		if (!$element || !layerData) return;
 		
+		// Apply to the main element container
+		$element.css({
+			mixBlendMode: layerData.blendMode || 'normal',
+			// Add other container styles if needed (e.g., box-shadow)
+		});
+		
+		// Apply filters specifically to the image tag within the container
+		const $img = $element.find('img');
+		if ($img.length > 0 && layerData.type === 'image') {
+			let filterString = '';
+			const filters = layerData.filters || this.defaultFilters;
+			// Build filter string, only including non-default values
+			if (filters.brightness !== 100) filterString += `brightness(${filters.brightness}%) `;
+			if (filters.contrast !== 100) filterString += `contrast(${filters.contrast}%) `;
+			if (filters.saturation !== 100) filterString += `saturate(${filters.saturation}%) `; // CSS uses 'saturate'
+			if (filters.grayscale !== 0) filterString += `grayscale(${filters.grayscale}%) `;
+			if (filters.sepia !== 0) filterString += `sepia(${filters.sepia}%) `;
+			if (filters.hueRotate !== 0) filterString += `hue-rotate(${filters.hueRotate}deg) `;
+			if (filters.blur !== 0) filterString += `blur(${filters.blur}px) `;
+			
+			$img.css('filter', filterString.trim() || 'none');
+		}
+		
 		// Border (Example - could be extended)
 		if (layerData.border) { // Assuming border is a string like "1px solid red"
 			$element.css('border', layerData.border);
@@ -942,15 +1024,6 @@ class LayerManager {
 				$element.css('border', 'none'); // Remove default/placeholder border
 			}
 		}
-		
-		// Filters (Example - assuming filter is a CSS filter string)
-		if (layerData.filters) {
-			$element.css('filter', layerData.filters);
-		} else {
-			$element.css('filter', 'none');
-		}
-		
-		// Add other general styling updates here (e.g., box-shadow, rounded corners for the div itself)
 	}
 	
 	

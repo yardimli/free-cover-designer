@@ -283,24 +283,23 @@
 <!-- Embed cover data -->
 <script id="coverData" type="application/json"><?php echo $covers_json; ?></script>
 <!-- Embed element data -->
-<script id="elementData" type="application/json"><?php echo $elements_json; ?></script> <!-- ADDED -->
+<script id="elementData" type="application/json"><?php echo $elements_json; ?></script>
 
 <!-- Scripts -->
 <script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script>
 <script src="vendors/jquery-ui-1.14.1/external/jquery/jquery.js"></script>
 <script src="vendors/jquery-ui-1.14.1/jquery-ui.min.js"></script>
 <script src="vendors/jsfontpicker/dist/jquery.fontpicker.min.js"></script>
-<script src="vendors/html2canvas.min.js"></script>
-<script src="vendors/tinycolor-min.js"></script> <!-- ADDED for color manipulation -->
+<!--<script src="vendors/html2canvas.min.js"></script>-->
+<script type="module" src="vendors/modern-screenshot.js"></script>
+<script src="vendors/tinycolor-min.js"></script>
 <script src="js/rulers.js"></script>
 <script src="js/LayerManager.js"></script>
 <script src="js/HistoryManager.js"></script>
 <script src="js/CanvasManager.js"></script>
-<script src="js/InspectorPanel.js"></script> <!-- NEW Inspector Panel Class -->
+<script src="js/InspectorPanel.js"></script>
 <script src="js/SidebarItemManager.js"></script>
-<script src="js/App.js"></script> <!-- Modified App.js -->
-
-<script id="googleFontsData" type="application/json"><?php echo $googleFontsJson; ?></script>
+<script src="js/App.js"></script>
 
 </body>
 </html>
