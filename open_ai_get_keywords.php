@@ -136,7 +136,7 @@
 
 	$coversDir = 'covers';
 	$filePattern = $coversDir . '/*-preview.jpg';
-	$resultsFile = 'results.json';
+	$resultsFile = 'data/covers.json';
 	$resultsData = [];
 
 	// 1. Load existing results if the file exists

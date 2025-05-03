@@ -7,9 +7,11 @@ add text effects panel .........................................................
 add line height and letter spacing ........................................................OK
 add text edit to the inspector instead of double click ....................................OK
 align text layer top, bottom, left, right, center, middle .................................OK
+use llm to add tags and title to images put it in the filename ............................OK
+add search for images .....................................................................OK
 add new text layer
 duplicate text layer
-use llm to add tags and title to images put it in the filename
-add search for images
-find transparent png images for elements, load them from folder instead of json
+find transparent png images for elements, load them from folder instead of json ...........OK
 make ui look like polotno
+make responsive ui
+add magnetic lines when moving elements and snap to grid

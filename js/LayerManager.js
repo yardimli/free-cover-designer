@@ -118,6 +118,7 @@ class LayerManager {
 			id: layerId,
 			name: '', // Initialize name as empty, will be set below
 			type: type,
+			layerSubType: null,
 			opacity: 1,
 			visible: true,
 			locked: false,
@@ -148,8 +149,6 @@ class LayerManager {
 			backgroundColor: 'rgba(255,255,255,1)',
 			backgroundOpacity: 1,
 			backgroundCornerRadius: 0,
-			// Image specific defaults
-			// content: type === 'image' ? 'path/to/placeholder.png' : '',
 		};
 		// Merge provided props with defaults
 		const layerData = {...defaultProps, ...props};
@@ -336,18 +335,8 @@ class LayerManager {
 			this._applyStyles($element, updatedLayer); // Apply general styles (border, filters etc)
 		}
 		
-		// --- TRIGGER CALLBACK ---
 		// Notify the application that layer data has been updated
 		this.onLayerDataUpdate(updatedLayer);
-		// --- END TRIGGER ---
-		
-		
-		// If the selected layer was locked/unlocked, refresh the inspector (redundant now with callback)
-		// if (updatedLayer.id === this.selectedLayerId && newData.locked !== undefined) {
-		//     this.onLayerSelect(updatedLayer);
-		// }
-		
-		
 		return updatedLayer;
 	}
 	
@@ -367,7 +356,6 @@ class LayerManager {
 		}
 	}
 	
-	// --- NEW: Method to specifically update the layer name ---
 	updateLayerName(layerId, newName) {
 		const layer = this.getLayerById(layerId);
 		if (layer && layer.name !== newName) {
@@ -378,8 +366,6 @@ class LayerManager {
 		}
 	}
 	
-	// --- END NEW ---
-	
 	getLayerById(layerId) {
 		return this.layers.find(l => l.id === layerId);
 	}
@@ -388,13 +374,11 @@ class LayerManager {
 		return JSON.parse(JSON.stringify(this.layers));
 	}
 	
-	setLayers(layersData, keepNonTextLayers = false) { /* ... Minor update needed ... */
+	setLayers(layersData, keepNonTextLayers = false) {
 		if (!keepNonTextLayers) {
 			this.$canvas.empty();
 			this.layers = [];
 		} else {
-			// If keeping non-text, ensure the logic correctly handles merging/replacing
-			// For now, assume template load handles this externally
 			console.warn("setLayers called with keepNonTextLayers=true");
 		}
 		this.selectedLayerId = null;
@@ -428,19 +412,16 @@ class LayerManager {
 			if (keepNonTextLayers || !layerData.id || this.getLayerById(layerData.id)) {
 				layerData.id = this._generateId();
 			}
-			// Use addLayer to handle defaults, rendering, and pushing to this.layers
-			// Pass the full layerData which includes zIndex
 			const addedLayer = this.addLayer(layerData.type, layerData);
-			// addLayer sets initial zIndex, override if one was provided in data
 			if (layerData.zIndex !== undefined && addedLayer) {
-				addedLayer.zIndex = parseInt(layerData.zIndex) || addedLayer.zIndex; // Use parsed or existing
+				addedLayer.zIndex = parseInt(layerData.zIndex) || addedLayer.zIndex;
 				$(`#${addedLayer.id}`).css('z-index', addedLayer.zIndex);
 			}
 		});
 		
 		// Final sort and Z-index update after all are added
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-		this._updateZIndices(); // Re-apply z-index based on final sorted array
+		this._updateZIndices();
 		
 		this.updateList();
 		this.selectLayer(null); // Deselect after load

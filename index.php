@@ -9,7 +9,6 @@
 				$name = pathinfo($file, PATHINFO_FILENAME);
 				$json_path = $template_dir . '/' . $file;
 				$thumb_path = $template_dir . '/' . $name . '.png'; // Check if thumbnail exists
-
 				if (file_exists($thumb_path)) {
 					$templates[] = [
 						'name' => ucwords(str_replace(['-', '_'], ' ', $name)),
@@ -25,15 +24,12 @@
 	// --- Cover Scanning ---
 	$covers_json_path = 'data/covers.json';
 	$covers_data = []; // Initialize as empty array
-
 	if (file_exists($covers_json_path)) {
 		try {
 			$json_content = file_get_contents($covers_json_path);
 			$raw_covers_data = json_decode($json_content, true); // Decode as associative array
-
 			if (is_array($raw_covers_data)) {
 				$covers_dir = 'covers'; // Base directory for constructing paths
-
 				foreach ($raw_covers_data as $preview_filename => $details) {
 					// Extract base name (remove -preview.jpg)
 					// Use pathinfo for robustness, though substr is fine if format is guaranteed
@@ -45,10 +41,8 @@
 						$base_name = pathinfo($preview_filename, PATHINFO_FILENAME);
 					}
 
-
 					// Construct paths
 					$thumbnail_path = $covers_dir . '/' . $preview_filename;
-
 					// Prefer JPG, then PNG for target image
 					$target_jpg_path = $covers_dir . '/' . $base_name . '.jpg';
 					$target_png_path = $covers_dir . '/' . $base_name . '.png';
@@ -72,12 +66,10 @@
 						];
 					}
 				}
-
 				// Sort covers alphabetically by name (optional)
 				usort($covers_data, function ($a, $b) {
 					return strcmp($a['name'], $b['name']);
 				});
-
 			} else {
 				error_log("Error: covers.json did not decode into an array.");
 			}
@@ -88,8 +80,38 @@
 	} else {
 		error_log("Error: covers.json not found at path: " . $covers_json_path);
 	}
+	$covers_json = json_encode($covers_data);
 
-	$covers_json = json_encode($covers_data); // Encode the processed array for the frontend
+	// --- Element (Shapes) Scanning --- START NEW ---
+	$shapes_dir = 'shapes';
+	$elements_data = [];
+	if (is_dir($shapes_dir)) {
+		// Use glob to find only PNG files
+		$png_files = glob($shapes_dir . '/*.png');
+		if ($png_files === false) {
+			// Handle potential glob error
+			error_log("Error reading shapes directory: " . $shapes_dir);
+		} else {
+			foreach ($png_files as $file_path) {
+				$filename = basename($file_path);
+				$name = pathinfo($filename, PATHINFO_FILENAME); // Get name without extension
+				$elements_data[] = [
+					// Keep name for potential title attribute, even if not displayed below image
+					'name' => ucwords(str_replace(['-', '_'], ' ', $name)),
+					'image' => $file_path // Use the full path for the image source
+				];
+			}
+			// Optional: Sort elements alphabetically by name
+			usort($elements_data, function ($a, $b) {
+				return strcmp($a['name'], $b['name']);
+			});
+		}
+	} else {
+		error_log("Shapes directory not found: " . $shapes_dir);
+	}
+	$elements_json = json_encode($elements_data);
+	// --- Element (Shapes) Scanning --- END NEW ---
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -110,12 +132,9 @@
 	<!-- Preconnect for Google Fonts -->
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
 	<!-- <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap" rel="stylesheet"> -->
-
 </head>
 <body>
-
 <div class="app-container d-flex flex-column vh-100">
 	<!-- Top Toolbar -->
 	<nav class="navbar navbar-expand-sm navbar-dark bg-dark top-toolbar">
@@ -168,15 +187,14 @@
 
 	<!-- Main Content Area -->
 	<div class="d-flex flex-grow-1 overflow-hidden main-content">
-
 		<!-- Left Sidebar -->
 		<div class="left-sidebar bg-light border-end d-flex">
 			<!-- Sidebar Nav (Templates, Covers, etc.) -->
 			<ul class="nav nav-pills flex-column text-center sidebar-nav">
 				<li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#coversPanel" title="Covers"><i
 							class="fas fa-book-open fa-lg"></i></a></li>
-				<li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#templatesPanel"
-				                        title="Templates"><i class="fas fa-th-large fa-lg"></i></a></li>
+				<li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#templatesPanel" title="Templates"><i
+							class="fas fa-th-large fa-lg"></i></a></li>
 				<li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#elementsPanel" title="Elements"><i
 							class="fas fa-shapes fa-lg"></i></a></li>
 				<li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#uploadPanel" title="Upload"><i
@@ -188,31 +206,30 @@
 			<div class="tab-content flex-grow-1 overflow-auto sidebar-content">
 				<!-- Covers Panel -->
 				<div class="tab-pane fade show active" id="coversPanel">
-					<h6>Covers</h6>
-					<input type="search" id="coverSearch" class="form-control form-control-sm mb-2"
-					       placeholder="Search covers...">
+					<!-- Sticky Header Wrapper -->
+					<div style="position: sticky; top: 0; z-index: 10; padding: 10px; background-color: #7c858d;">
+						<input type="search" id="coverSearch" class="form-control form-control-sm mb-2"
+						       placeholder="Search covers...">
+					</div>
+					<!-- Scrollable Content -->
 					<div id="coverList" class="item-grid"><p>Loading covers...</p></div>
 				</div>
 				<!-- Templates Panel -->
 				<div class="tab-pane fade" id="templatesPanel">
-					<h6>Templates</h6>
 					<div id="templateList" class="item-grid"><p>Loading templates...</p></div>
 				</div>
 				<!-- Elements Panel -->
 				<div class="tab-pane fade" id="elementsPanel">
-					<h6>Elements</h6>
 					<div id="elementList" class="item-grid"><p>Loading elements...</p></div>
 				</div>
 				<!-- Upload Panel -->
 				<div class="tab-pane fade" id="uploadPanel">
-					<h6>Upload Image</h6>
 					<input type="file" id="imageUploadInput" class="form-control form-control-sm" accept="image/*">
 					<div id="uploadPreview" class="mt-2 text-center"></div>
 					<button id="addImageFromUpload" class="btn btn-primary btn-sm mt-2 w-100" disabled>Add to Canvas</button>
 				</div>
 				<!-- Layers Panel -->
 				<div class="tab-pane fade" id="layersPanel">
-					<h6>Layers</h6>
 					<ul id="layerList" class="list-group list-group-flush">
 						<li class="list-group-item text-muted">No layers yet.</li>
 					</ul>
@@ -225,9 +242,9 @@
 		     class="text-center align-items-center bg-secondary overflow-auto position-relative flex-grow-1">
 			<div id="canvas-wrapper" class="position-relative">
 				<div id="canvas" class="bg-white shadow position-relative">
+					<!-- Canvas elements added here by JS -->
 				</div>
 			</div>
-
 			<!-- Zoom Controls -->
 			<div id="zoom-controls" class="position-fixed rounded shadow-sm p-1 m-2 bg-dark d-flex align-items-center"
 			     style="bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 1060;">
@@ -265,6 +282,8 @@
 <script id="templateData" type="application/json"><?php echo $templates_json; ?></script>
 <!-- Embed cover data -->
 <script id="coverData" type="application/json"><?php echo $covers_json; ?></script>
+<!-- Embed element data -->
+<script id="elementData" type="application/json"><?php echo $elements_json; ?></script> <!-- ADDED -->
 
 <!-- Scripts -->
 <script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script>
@@ -280,6 +299,8 @@
 <script src="js/InspectorPanel.js"></script> <!-- NEW Inspector Panel Class -->
 <script src="js/SidebarItemManager.js"></script>
 <script src="js/App.js"></script> <!-- Modified App.js -->
+
+<script id="googleFontsData" type="application/json"><?php echo $googleFontsJson; ?></script>
 
 </body>
 </html>

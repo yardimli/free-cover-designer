@@ -10,9 +10,6 @@ class SidebarItemManager {
 		this.$addImageBtn = $(options.addImageBtnSelector);
 		this.$sidebarContent = this.$coverList.closest('.sidebar-content'); // Get the scrollable container
 		
-		// Data URLs
-		this.elementsUrl = options.elementsUrl;
-		
 		// Callbacks
 		this.applyTemplate = options.applyTemplate;
 		this.addLayer = options.addLayer;
@@ -250,38 +247,43 @@ class SidebarItemManager {
 
 	// --- Elements --- (Keep existing method)
 	loadElements() {
-		$.getJSON(this.elementsUrl)
-			.done(data => {
-				this.$elementList.empty();
-				if (!data || data.length === 0) {
-					this.$elementList.html('<p class="text-muted p-2">No elements found.</p>');
-					return;
-				}
-				
-				const $newThumbs = $();
-				data.forEach(element => {
-					// Add loading class and spinner overlay div
-					const $thumb = $(`
-                        <div class="item-thumbnail element-thumbnail loading" title="${element.name}">
-                            <div class="thumbnail-spinner-overlay">
-                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
+		try {
+			// Read data embedded by PHP
+			const elementDataElement = document.getElementById('elementData');
+			const elements = JSON.parse(elementDataElement.textContent || '[]');
+			
+			this.$elementList.empty();
+			if (elements.length === 0) {
+				this.$elementList.html('<p class="text-muted p-2">No elements found.</p>');
+				return;
+			}
+			
+			const $newThumbs = $();
+			elements.forEach(element => {
+				// Add loading class and spinner overlay div
+				// REMOVED the <span> element
+				const $thumb = $(`
+                    <div class="item-thumbnail element-thumbnail loading" title="${element.name}">
+                        <div class="thumbnail-spinner-overlay">
+                            <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                            <img src="${element.image}" alt="${element.name}">
-                            <span>${element.name}</span>
                         </div>
-                    `);
-					$thumb.data('elementSrc', element.image);
-					$newThumbs.push($thumb[0]);
-				});
-				
-				this.$elementList.append($newThumbs);
-				this._makeDraggable($newThumbs, { type: 'element' });
-				this._setupImageLoading($newThumbs); // Setup loading state
-				
-			})
-			.fail(() => this.$elementList.html('<p class="text-danger p-2">Error loading elements.</p>'));
+                        <img src="${element.image}" alt="${element.name}">
+                    </div>
+                `);
+				$thumb.data('elementSrc', element.image); // Store the path to the actual image
+				$newThumbs.push($thumb[0]);
+			});
+			
+			this.$elementList.append($newThumbs);
+			this._makeDraggable($newThumbs, { type: 'element' });
+			this._setupImageLoading($newThumbs); // Setup loading state
+			
+		} catch (error) {
+			console.error("Error loading elements:", error);
+			this.$elementList.html('<p class="text-danger p-2">Error loading elements.</p>');
+		}
 	}
 	
 	// --- Draggable Helper --- (Keep existing method)
@@ -410,7 +412,8 @@ class SidebarItemManager {
 							x: layerX,
 							y: layerY,
 							width: layerWidth,
-							height: layerHeight
+							height: layerHeight,
+							layerSubType: 'upload'
 						});
 						this.saveState();
 					};

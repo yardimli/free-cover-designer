@@ -12,13 +12,8 @@ $(document).ready(function () {
 		onZoomChange: handleZoomChange
 	});
 	
-	// Retrieve Google Fonts from embedded data for Inspector
 	let googleFonts = [];
-	try {
-		googleFonts = JSON.parse($('#googleFontsData').text() || '[]');
-	} catch (e) { console.error("Error parsing Google Fonts Data for Inspector", e); }
-	
-	
+
 	// LayerManager needs CanvasManager
 	const layerManager = new LayerManager($canvas, $layerList, {
 		onLayerSelect: handleLayerSelectionChange,

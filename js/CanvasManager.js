@@ -9,7 +9,8 @@ class CanvasManager {
 		// Dependencies
 		this.layerManager = options.layerManager; // Should be passed in App.js
 		this.historyManager = options.historyManager; // Should be passed in App.js
-		this.onZoomChange = options.onZoomChange || (() => { }); // Callback for UI updates
+		this.onZoomChange = options.onZoomChange || (() => {
+		}); // Callback for UI updates
 		// State
 		this.rulers = null;
 		this.currentZoom = 0.3;
@@ -29,7 +30,7 @@ class CanvasManager {
 		this.setCanvasSize(this.DEFAULT_CANVAS_WIDTH, this.DEFAULT_CANVAS_HEIGHT); // Set initial size
 		
 		if (this.$canvasArea && this.$canvasArea.length) {
-			this.$canvasArea.css('--canvas-zoom-x', 1 / this.currentZoom );
+			this.$canvasArea.css('--canvas-zoom-x', 1 / this.currentZoom);
 		} else {
 			console.warn("CanvasManager: $canvasArea not found during initialization for setting CSS variable.");
 		}
@@ -108,7 +109,7 @@ class CanvasManager {
 			tolerance: 'pointer', // Drop when pointer overlaps canvas
 			drop: (event, ui) => {
 				const $draggedItem = $(ui.draggable);
-				const dropPosition = this._calculateDropPosition(event, ui); // Calculate drop coords relative to canvas 0,0
+				const dropPosition = this._calculateDropPosition(event);
 				
 				// --- TEMPLATE DROP ---
 				if ($draggedItem.hasClass('template-thumbnail')) {
@@ -129,9 +130,6 @@ class CanvasManager {
 						}
 						// --- END NEW ---
 						
-						// Load the template design. The `isTemplate=true` flag tells loadDesign
-						// *not* to clear canvas size/history, and tells setLayers to add to existing (non-text) layers.
-						// saveState will happen inside loadDesign after layers are set.
 						this.loadDesign(jsonPath, true);
 					}
 					// --- COVER DROP ---
@@ -142,6 +140,18 @@ class CanvasManager {
 					// Add image as a layer, positioned at (0,0) and sized to canvas
 					const img = new Image();
 					img.onload = () => {
+						
+						console.log("Applying template, removing existing cover layers...");
+						const existingLayers = this.layerManager.getLayers();
+						const coverLayerIdsToDelete = existingLayers
+							.filter(layer => layer.type === 'image' && layer.layerSubType === 'cover')
+							.map(layer => layer.id);
+						
+						if (coverLayerIdsToDelete.length > 0) {
+							coverLayerIdsToDelete.forEach(id => this.layerManager.deleteLayer(id, false));
+							console.log(`Removed ${coverLayerIdsToDelete.length} image layers.`);
+						}
+						
 						// --- MODIFIED: Set dimensions to canvas size ---
 						const newLayer = this.layerManager.addLayer('image', {
 							content: imgSrc,
@@ -150,18 +160,15 @@ class CanvasManager {
 							width: this.currentCanvasWidth,
 							height: this.currentCanvasHeight,
 							// Generate a more specific default name
-							name: `Background Cover ${this.layerManager.uniqueIdCounter}`
+							name: `Cover ${this.layerManager.uniqueIdCounter}`,
+							layerSubType: 'cover'
 						});
 						
 						if (newLayer) {
 							// Move to back and lock
-							this.layerManager.moveLayer(newLayer.id, 'back'); // Move without saving yet
-							this.layerManager.toggleLockLayer(newLayer.id, false); // Lock without saving yet
-							
-							// --- Select the newly added layer (optional) ---
+							this.layerManager.moveLayer(newLayer.id, 'back');
+							this.layerManager.toggleLockLayer(newLayer.id, false);
 							this.layerManager.selectLayer(newLayer.id);
-							
-							// Save state AFTER all changes (add, move, lock) are applied
 							this.historyManager.saveState();
 						}
 					};
@@ -176,24 +183,32 @@ class CanvasManager {
 					// Add element image, centered at drop point (Keep this behavior for elements)
 					const img = new Image();
 					img.onload = () => {
-						// Default size for elements, maybe smaller
-						const elemWidth = Math.min(img.width, 150); // Use actual width up to 150px
-						const elemHeight = (img.height / img.width) * elemWidth; // Maintain aspect ratio
+						const elemWidth = Math.min(img.width, 150);
+						const elemHeight = (img.height / img.width) * elemWidth;
+						
+						// --- Calculate and Clamp Position ---
+						// 1. Calculate intended top-left based on centered drop point
+						const intendedX = dropPosition.x - (elemWidth / 2);
+						const intendedY = dropPosition.y - (elemHeight / 2);
+						
+						// 2. Clamp the final top-left position to keep the element fully within bounds
+						const finalX = Math.max(0, Math.min(intendedX, this.currentCanvasWidth - elemWidth));
+						const finalY = Math.max(0, Math.min(intendedY, this.currentCanvasHeight - elemHeight));
+						// --- End Clamp ---
 						
 						const newLayer = this.layerManager.addLayer('image', {
 							content: imgSrc,
-							x: dropPosition.x - (elemWidth / 2), // Center X at drop
-							y: dropPosition.y - (elemHeight / 2), // Center Y at drop
+							x: finalX, // Use clamped X
+							y: finalY, // Use clamped Y
 							width: elemWidth,
-							height: elemHeight
+							height: elemHeight,
+							layerSubType: 'element'
 						});
 						
 						if (newLayer) {
-							// --- Select the newly added layer ---
 							this.layerManager.selectLayer(newLayer.id);
 						}
 						
-						// Save state after adding element
 						this.historyManager.saveState();
 					};
 					img.onerror = () => console.error("Failed to load element image for dropping:", imgSrc);
@@ -203,40 +218,42 @@ class CanvasManager {
 		});
 	}
 	
-	_calculateDropPosition(event, ui) {
-		// Calculate drop position relative to the UNZOOMED canvas origin (0,0)
-		// 1. Get mouse coordinates relative to the viewport
-		const mouseXViewport = event.clientX;
-		const mouseYViewport = event.clientY;
-		// 2. Get the bounding box of the scrollable canvas area
-		const areaRect = this.canvasAreaDiv.getBoundingClientRect();
-		// 3. Calculate mouse position relative to the canvas area's top-left corner
-		const mouseXInArea = mouseXViewport - areaRect.left;
-		const mouseYInArea = mouseYViewport - areaRect.top;
-		// 4. Account for the canvas area's scroll position
-		const scrollLeft = this.$canvasArea.scrollLeft();
-		const scrollTop = this.$canvasArea.scrollTop();
-		const mouseXInScrollContent = mouseXInArea + scrollLeft;
-		const mouseYInScrollContent = mouseYInArea + scrollTop;
-		// 5. Get the position of the canvas WRAPPER relative to the scrolled content of canvas area
-		// We use the wrapper because it's the element being positioned/centered.
-		const wrapperPos = this.$canvasWrapper.position(); // { top: ..., left: ... } relative to offset parent (canvas-area)
-		// 6. Calculate mouse position relative to the wrapper's top-left corner
-		const relativeToWrapperX = mouseXInScrollContent - wrapperPos.left;
-		const relativeToWrapperY = mouseYInScrollContent - wrapperPos.top;
-		// 7. Account for the current zoom level to get coordinates relative to the unscaled canvas (0,0)
-		const dropX = relativeToWrapperX / this.currentZoom;
-		const dropY = relativeToWrapperY / this.currentZoom;
+	_calculateDropPosition(event) {
+		// 1. Get mouse coordinates relative to the document
+		const mouseXDoc = event.pageX;
+		const mouseYDoc = event.pageY;
+		
+		// 2. Get the offset of the #canvas element relative to the document
+		//    This accounts for wrapper positioning and canvas transform origin
+		const canvasOffset = this.$canvas.offset();
+		
+		// 3. Calculate mouse position relative to the SCALED canvas's top-left corner
+		const relativeScaledX = mouseXDoc - canvasOffset.left;
+		const relativeScaledY = mouseYDoc - canvasOffset.top;
+		
+		// 4. Convert to coordinates relative to the UNSCALED canvas (0,0)
+		let dropX = relativeScaledX / this.currentZoom;
+		let dropY = relativeScaledY / this.currentZoom;
+		
+		// 5. Clamp the drop coordinates to be within the canvas boundaries
+		//    This ensures the *mouse pointer location* used for placement is on the canvas.
+		dropX = Math.max(0, Math.min(dropX, this.currentCanvasWidth));
+		dropY = Math.max(0, Math.min(dropY, this.currentCanvasHeight));
+		
 		// console.log(`Drop Coords: CanvasX=${dropX.toFixed(2)}, CanvasY=${dropY.toFixed(2)}`);
-		return { x: dropX, y: dropY };
+		return {x: dropX, y: dropY};
 	}
 	
 	initializePan() {
 		// --- Panning ---
 		this.$canvasArea.on('mousedown', (e) => {
 			if (e.target === this.$canvasArea[0] || e.target === this.$canvasWrapper[0] || e.which === 2) {
-				if ($(e.target).closest('#canvas .canvas-element').length > 0 && e.which !== 2) { return; }
-				if ($(e.target).closest('.ruler').length > 0) { return; }
+				if ($(e.target).closest('#canvas .canvas-element').length > 0 && e.which !== 2) {
+					return;
+				}
+				if ($(e.target).closest('.ruler').length > 0) {
+					return;
+				}
 				
 				this.isPanning = true;
 				this.lastPanX = e.clientX;
@@ -502,7 +519,7 @@ class CanvasManager {
 					}
 				});
 				this.$canvas.css('transform', originalTransform);
-				this.$canvasWrapper.css({ width: originalWrapperWidth, height: originalWrapperHeight });
+				this.$canvasWrapper.css({width: originalWrapperWidth, height: originalWrapperHeight});
 				this.$canvasArea.scrollLeft(originalScrollLeft);
 				this.$canvasArea.scrollTop(originalScrollTop);
 				if (this.layerManager.getSelectedLayer()) {
@@ -524,13 +541,13 @@ class CanvasManager {
 			},
 			// Filter out temporary internal properties before saving
 			layers: sortedLayers.map(layer => {
-				const { shadowOffsetInternal, shadowAngleInternal, ...layerToSave } = layer;
+				const {shadowOffsetInternal, shadowAngleInternal, ...layerToSave} = layer;
 				return layerToSave;
 			})
 		};
 		// ... (rest of save logic: JSON.stringify, Blob, download) ...
 		const jsonData = JSON.stringify(designData, null, 2);
-		const blob = new Blob([jsonData], { type: 'application/json' });
+		const blob = new Blob([jsonData], {type: 'application/json'});
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
@@ -628,7 +645,7 @@ class CanvasManager {
 			this.$canvas.droppable('destroy');
 		}
 		// Destroy layer interactivity (draggable/resizable) - handled by LayerManager? No, do it here.
-		this.$canvas.find('.canvas-element').each(function() {
+		this.$canvas.find('.canvas-element').each(function () {
 			if ($(this).hasClass('ui-draggable')) $(this).draggable('destroy');
 			if ($(this).hasClass('ui-resizable')) $(this).resizable('destroy');
 		});
