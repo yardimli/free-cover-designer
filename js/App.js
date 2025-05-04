@@ -5,37 +5,43 @@ $(document).ready(function () {
 	const $canvasArea = $('#canvas-area');
 	const $canvasWrapper = $('#canvas-wrapper');
 	const $loadDesignInput = $('#loadDesignInput');
-	const $inspectorPanel = $('#inspectorPanel');
+	const $inspectorPanelElement = $('#inspectorPanel'); // Reference the panel element itself
+	
+	// Sidebar Panel References
+	const $sidebarNav = $('.sidebar-nav');
+	const $sidebarPanelsContainer = $('#sidebar-panels-container');
+	const $sidebarPanels = $('.sidebar-panel');
+	const $sidebarNavLinks = $('.sidebar-nav .nav-link[data-panel-target]');
+	const $closePanelBtns = $('.close-panel-btn');
 	
 	// --- Instantiate Managers ---
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
 		onZoomChange: handleZoomChange
 	});
 	
-	let googleFonts = [];
-
+	let googleFonts = []; // Placeholder if needed elsewhere
+	
 	// LayerManager needs CanvasManager
 	const layerManager = new LayerManager($canvas, $layerList, {
-		onLayerSelect: handleLayerSelectionChange,
-		onLayerDataUpdate: handleLayerDataUpdate, // Pass the new handler
+		onLayerSelect: handleLayerSelectionChange, // Connect the callback
+		onLayerDataUpdate: handleLayerDataUpdate,
 		saveState: () => historyManager.saveState(),
 		canvasManager: canvasManager
 	});
 	
-	// HistoryManager needs LayerManager
 	const historyManager = new HistoryManager(layerManager, {
-		onUpdate: updateActionButtons // Callback defined below
+		onUpdate: updateActionButtons
 	});
 	
-	// InspectorPanel needs LayerManager, HistoryManager, and potentially CanvasManager + Fonts
+	// Instantiate InspectorPanel AFTER LayerManager and HistoryManager
 	const inspectorPanel = new InspectorPanel({
 		layerManager: layerManager,
 		historyManager: historyManager,
-		canvasManager: canvasManager, // Pass canvasManager if needed (e.g., alignment)
-		googleFontsList: googleFonts // Pass fonts for picker
+		canvasManager: canvasManager,
+		googleFontsList: googleFonts
 	});
 	
-	// Sidebar Manager needs LayerManager, HistoryManager, CanvasManager (for applyTemplate)
+	// Sidebar Manager
 	const sidebarManager = new SidebarItemManager({
 		templateListSelector: '#templateList',
 		coverListSelector: '#coverList',
@@ -44,67 +50,70 @@ $(document).ready(function () {
 		uploadPreviewSelector: '#uploadPreview',
 		uploadInputSelector: '#imageUploadInput',
 		addImageBtnSelector: '#addImageFromUpload',
-		overlaysListSelector: '#overlayList',
-		overlaysSearchSelector: '#overlaySearch',
-		sidebarContentSelector: '#sidebarContent',
-		elementsUrl: 'data/elements.json',
+		overlaysListSelector: '#overlayList', // Corrected selector name
+		overlaysSearchSelector: '#overlaySearch', // Corrected selector name
+		sidebarPanelsContainerSelector: '#sidebar-panels-container',
+		elementsUrl: 'data/elements.json', // Example if loading elements via JSON
 		applyTemplate: (jsonPath) => {
-			// Delete existing text layers BEFORE loading the template design
+			// ... (apply template logic - remove text layers, load design) ...
 			console.log("Applying template via click, removing existing text layers...");
-			const existingLayers = layerManager.getLayers(); // Use the layerManager instance
+			const existingLayers = layerManager.getLayers();
 			const textLayerIdsToDelete = existingLayers
 				.filter(layer => layer.type === 'text')
 				.map(layer => layer.id);
 			
 			if (textLayerIdsToDelete.length > 0) {
-				textLayerIdsToDelete.forEach(id => layerManager.deleteLayer(id, false)); // Delete without saving history yet
+				textLayerIdsToDelete.forEach(id => layerManager.deleteLayer(id, false)); // Don't save history per deletion
 				console.log(`Removed ${textLayerIdsToDelete.length} text layers.`);
 			} else {
 				console.log("No existing text layers found to remove.");
 			}
-			// Now call loadDesign, which will add template layers and save history
-			canvasManager.loadDesign(jsonPath, true);
+			canvasManager.loadDesign(jsonPath, true); // Load as template
+			closeSidebarPanel(); // Close left panel after applying
+			// Don't explicitly save history here, loadDesign(true) handles it
 		},
 		addLayer: (type, props) => layerManager.addLayer(type, props),
-		saveState: () => historyManager.saveState(), // Pass saveState function
-		layerManager: layerManager,                   // Pass LayerManager instance
-		canvasManager: canvasManager                  // Pass CanvasManager instance
+		saveState: () => historyManager.saveState(),
+		layerManager: layerManager,
+		canvasManager: canvasManager
 	});
 	
-	// Set cross-dependencies (already done for LM/CM)
+	// Set cross-dependencies
 	canvasManager.layerManager = layerManager;
 	canvasManager.historyManager = historyManager;
 	
 	// --- Initialization ---
 	sidebarManager.loadAll();
 	layerManager.initializeList();
-	canvasManager.initialize(); // Init zoom, pan, rulers, droppable
-	
-	// --- Global Action Listeners (Top Toolbar) ---
-	initializeGlobalActions(); // Setup Undo, Redo, Save, Load etc.
+	canvasManager.initialize();
+	initializeGlobalActions();
+	initializeSidebarPanelControls(); // Init left panel sliding
 	
 	// --- Initial State ---
 	historyManager.saveState();
 	updateActionButtons();
-	
+	inspectorPanel.hide(); // Ensure inspector starts hidden
 	
 	// --- UI Update Callbacks ---
+	
+	// MODIFIED: Only show inspector, don't hide on deselect
 	function handleLayerSelectionChange(selectedLayer) {
 		if (selectedLayer) {
-			inspectorPanel.show(selectedLayer); // Show uses the passed data
+			// If a layer is selected, show the inspector panel
+			inspectorPanel.show(selectedLayer);
 		} else {
-			inspectorPanel.hide();
+			// If no layer is selected (deselected), DO NOTHING to the inspector.
+			// It stays open/closed based on user action (close button).
 		}
-		updateActionButtons();
+		updateActionButtons(); // Update buttons based on selection state
 	}
 	
 	function handleLayerDataUpdate(updatedLayer) {
-		// Check if the updated layer is the one currently shown in the inspector
-		if (inspectorPanel.currentLayer && inspectorPanel.currentLayer.id === updatedLayer.id) {
-			// console.log('Refreshing inspector for updated layer:', updatedLayer.id);
+		// If the inspector is currently open and showing the layer that was updated,
+		// re-populate the inspector with the fresh data.
+		if (inspectorPanel.currentLayer && inspectorPanel.currentLayer.id === updatedLayer.id && $inspectorPanelElement.hasClass('open')) {
 			inspectorPanel.populate(updatedLayer);
 		}
-		// Optionally update other UI elements if needed based on layer data changes
 		// updateActionButtons(); // Might be needed if update changes lock state etc.
 	}
 	
@@ -113,6 +122,60 @@ $(document).ready(function () {
 		$('#zoom-in').prop('disabled', currentZoom >= maxZoom);
 		$('#zoom-out').prop('disabled', currentZoom <= minZoom);
 	}
+	
+	// --- Sidebar Panel Sliding Logic (Left Side) ---
+	function initializeSidebarPanelControls() {
+		$sidebarNavLinks.on('click', function(e) {
+			e.preventDefault();
+			const $link = $(this);
+			const targetPanelId = $link.data('panel-target');
+			const $targetPanel = $(targetPanelId);
+			
+			if (!$targetPanel.length) {
+				console.warn("Target panel not found:", targetPanelId);
+				return;
+			}
+			
+			// If clicking the already active icon, close the panel
+			if ($link.hasClass('active') && $sidebarPanelsContainer.hasClass('open')) {
+				closeSidebarPanel();
+			} else {
+				openSidebarPanel(targetPanelId);
+			}
+		});
+		
+		$closePanelBtns.on('click', function() {
+			closeSidebarPanel();
+		});
+		
+		// REMOVED: Canvas click listener that closed left panels.
+		// $canvasArea.on('mousedown', function(e) { ... });
+	}
+	
+	function openSidebarPanel(panelId) {
+		const $targetPanel = $(panelId);
+		if (!$targetPanel.length) return;
+		
+		// Deactivate other panels and links
+		$sidebarNavLinks.removeClass('active');
+		$sidebarPanels.removeClass('active').hide(); // Hide inactive panels
+		
+		// Activate target panel and link
+		$targetPanel.addClass('active').show(); // Show the target panel
+		$sidebarNavLinks.filter(`[data-panel-target="${panelId}"]`).addClass('active');
+		
+		// Open the container
+		$sidebarPanelsContainer.addClass('open');
+	}
+	
+	function closeSidebarPanel() {
+		$sidebarPanelsContainer.removeClass('open');
+		$sidebarNavLinks.removeClass('active');
+		// Don't hide panels immediately, let the container slide out first
+		// $sidebarPanels.removeClass('active');
+	}
+	// --- END Sidebar Panel Logic ---
+	
 	
 	// --- Global Action Button Setup & Updates ---
 	function initializeGlobalActions() {
@@ -134,7 +197,7 @@ $(document).ready(function () {
 		$loadDesignInput.on('change', (event) => {
 			const file = event.target.files[0];
 			if (file) {
-				canvasManager.loadDesign(file, false); // Load from file, not template
+				canvasManager.loadDesign(file, false); // Load full design
 			}
 			$(event.target).val(''); // Reset input
 		});
@@ -153,11 +216,11 @@ $(document).ready(function () {
 		const hasSelection = !!selectedLayer;
 		const isLocked = hasSelection && selectedLayer.locked;
 		
-		// Enable/Disable based on selection & lock state
+		// Enable/disable based on selection and lock status
 		$('#deleteBtn').prop('disabled', !hasSelection || isLocked);
-		$('#lockBtn').prop('disabled', !hasSelection);
+		$('#lockBtn').prop('disabled', !hasSelection); // Can always lock/unlock if selected
 		
-		// Update Lock Button Icon
+		// Update lock button icon and title
 		if (selectedLayer) {
 			const lockIconClass = selectedLayer.locked ? 'fa-lock' : 'fa-lock-open';
 			$('#lockBtn i').removeClass('fa-lock fa-lock-open').addClass(lockIconClass);
@@ -167,29 +230,32 @@ $(document).ready(function () {
 			$('#lockBtn').attr('title', 'Lock/Unlock Selected');
 		}
 		
-		// Layer Order Buttons
+		// Layer order buttons
 		let isAtFront = false;
 		let isAtBack = false;
 		if (hasSelection && layers.length > 1) {
+			// Sort by zIndex to determine position
 			const sortedLayers = [...layers].sort((a,b) => (a.zIndex || 0) - (b.zIndex || 0));
 			const selectedIndex = sortedLayers.findIndex(l => l.id === selectedLayer.id);
 			isAtBack = selectedIndex === 0;
 			isAtFront = selectedIndex === sortedLayers.length - 1;
 		} else if (layers.length <= 1) {
-			isAtFront = true; // Consider single layer as both front/back
+			// If only one layer (or none), it's both front and back
+			isAtFront = true;
 			isAtBack = true;
 		}
-		
 		$('#bringToFrontBtn').prop('disabled', !hasSelection || isLocked || isAtFront);
 		$('#sendToBackBtn').prop('disabled', !hasSelection || isLocked || isAtBack);
 		
-		// Undo/Redo Buttons
+		
+		// History buttons
 		$('#undoBtn').prop('disabled', !historyManager.canUndo());
 		$('#redoBtn').prop('disabled', !historyManager.canRedo());
 		
-		// Download/Export Buttons (disable if canvas empty)
-		$('#downloadBtn, #exportPng, #exportJpg').prop('disabled', layers.length === 0);
-		$('#saveDesign').prop('disabled', layers.length === 0); // Also disable save if empty
+		// Export/Save buttons (disabled if no layers)
+		const hasLayers = layers.length > 0;
+		$('#downloadBtn, #exportPng, #exportJpg').prop('disabled', !hasLayers);
+		$('#saveDesign').prop('disabled', !hasLayers);
 	}
 	
-});
+}); // End document ready

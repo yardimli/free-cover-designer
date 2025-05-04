@@ -1,6 +1,9 @@
 /* free-cover-designer/css/style.css */
 :root {
     --canvas-zoom-x: 1; /* Default zoom level */
+    --sidebar-icon-width: 60px;
+    --sidebar-panel-width: 340px;
+    --inspector-panel-width: 300px;
 }
 
 body {
@@ -16,72 +19,155 @@ body {
     height: calc(100vh - 56px);
 }
 
-/* --- Left Sidebar --- */
-.left-sidebar {
-    width: 400px;
-    flex-shrink: 0;
-    height: 100%;
-}
-
+/* --- Icon Bar --- */
 .sidebar-nav {
-    width: 60px;
-    background-color: #7c858d;
+    width: var(--sidebar-icon-width);
+    background-color: #343a40; /* Darker background for icon bar */
     padding-top: 0.5rem;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent shrinking */
+    z-index: 1030; /* Below panels and inspector */
+    height: 100%; /* Fill height */
+    border-right: 1px solid #495057; /* Separator */
 }
 
 .sidebar-nav .nav-link {
-    color: #c8c9ca;
+    color: #adb5bd; /* Lighter grey */
     padding: 0.8rem 0;
     border-radius: 0;
     cursor: pointer;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
 }
 
 .sidebar-nav .nav-link.active {
-    background-color: #f8f9fa;
-    color: #0d6efd;
+    background-color: #0d6efd; /* Bootstrap primary */
+    color: #fff;
 }
 
 .sidebar-nav .nav-link:hover:not(.active) {
-    background-color: #dee2e6;
+    background-color: #495057; /* Slightly lighter dark */
+    color: #f8f9fa;
 }
 
-.sidebar-content {
-    width: calc(400px - 60px);
-    background-color: #7c858d;
-    overflow-y: auto;
-    flex-grow: 1;
+/* --- Sliding Panels Container --- */
+#sidebar-panels-container {
+    position: absolute;
+    top: 0;
+    left: 0; /* Start at the very left edge */
+    width: var(--sidebar-panel-width);
     height: 100%;
+    background-color: #f8f9fa; /* Light background for panels */
+    z-index: 1045; /* Above icon bar and canvas, below modals */
+    transform: translateX(calc(-1 * var(--sidebar-panel-width))); /* Start hidden */
+    transition: transform 0.3s ease-in-out;
+    box-shadow: 3px 0 6px rgba(0, 0, 0, 0.15);
+    border-right: 1px solid #dee2e6;
+    display: flex; /* Use flex for panel content wrapper */
+    flex-direction: column;
 }
+
+#sidebar-panels-container.open {
+    transform: translateX(var(--sidebar-icon-width)); /* Slide into view next to icon bar */
+}
+
+/* --- Individual Sidebar Panels --- */
+.sidebar-panel {
+    display: none; /* Hidden by default */
+    width: 100%;
+    height: 100%;
+    position: absolute; /* Position within the container */
+    top: 0;
+    left: 0;
+    flex-direction: column; /* Ensure vertical layout */
+    background-color: #f8f9fa; /* Match container background */
+}
+
+.sidebar-panel.active {
+    display: flex; /* Show active panel as flex container */
+}
+
+/* Panel Content Structure */
+.panel-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden; /* Prevent wrapper from scrolling */
+}
+
+.panel-header {
+    padding: 0.5rem 0.75rem;
+    padding-right: 40px; /* Space for close button */
+    background-color: #e9ecef; /* Header background */
+    border-bottom: 1px solid #dee2e6;
+    font-weight: bold;
+    color: #495057;
+    flex-shrink: 0; /* Prevent header shrinking */
+    position: sticky; /* Make header sticky */
+    top: 0; /* Stick to top */
+    z-index: 10; /* Above scrolling content */
+}
+/* Adjust header padding if it contains input */
+.panel-header input.form-control {
+    margin-bottom: 0; /* Remove default margin if needed */
+}
+
+
+.panel-scrollable-content {
+    flex-grow: 1; /* Allow content to take remaining space */
+    overflow-y: auto; /* Enable scrolling for the content area */
+    padding: 5px; /* Add padding to scrollable area */
+}
+/* Remove padding for layer list */
+#layersPanel .panel-scrollable-content {
+    padding: 0;
+}
+#uploadPanel .panel-scrollable-content {
+    padding: 0.75rem; /* Restore padding for upload */
+}
+
+
+/* Close Button */
+.close-panel-btn {
+    position: absolute;
+    top: 8px; /* Adjust as needed */
+    right: 8px; /* Adjust as needed */
+    z-index: 15; /* Above panel header */
+    padding: 0.25rem 0.5rem;
+    background-color: transparent;
+    border: none;
+    opacity: 0.6;
+}
+.close-panel-btn:hover {
+    opacity: 1;
+}
+
 
 /* --- Item Grids (General) --- */
 .item-grid {
     display: grid;
-    /* Default grid, can be overridden */
     grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    /* UPDATED: Reduced gap */
     gap: 5px;
-    padding: 5px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* --- Template and Cover Specific Grid --- */
 #templateList.item-grid,
 #coverList.item-grid {
     grid-template-columns: repeat(2, 1fr);
-    justify-items: center; /* Center items within their grid cell */
+    justify-items: center;
 }
 
-/* --- Element and Overlay Specific Grid --- NEW: Added #overlayList --- */
+/* --- Element and Overlay Specific Grid--- */
 #elementList.item-grid,
 #overlayList.item-grid {
     grid-template-columns: repeat(2, 1fr);
-    justify-items: center; /* Center items within their grid cell */
+    justify-items: center;
 }
 
 
 /* --- Item Thumbnails (General) --- */
 .item-grid .item-thumbnail {
-    position: relative; /* Needed for absolute positioning of the spinner */
+    position: relative;
     border: 1px solid #ddd;
     padding: 3px;
     cursor: pointer;
@@ -121,29 +207,17 @@ body {
     margin-bottom: 0;
 }
 
-/* --- Template Thumbnail Specific Background --- */
-#templateList .item-thumbnail {
-    background-color: #fff; /* Base color */
-    /* Checkered pattern */
-    background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
-    linear-gradient(-45deg, #eee 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #eee 75%),
-    linear-gradient(-45deg, transparent 75%, #eee 75%);
-    background-size: 16px 16px; /* Size of the squares */
-    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
-}
-
+/* --- Template/Element Thumbnail Specific Background --- */
+#templateList .item-thumbnail,
 #elementList .item-thumbnail,
 #overlayList .item-thumbnail {
     background-color: #fff; /* Base color */
     /* Checkered pattern */
-    background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
-    linear-gradient(-45deg, #eee 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #eee 75%),
-    linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
     background-size: 16px 16px; /* Size of the squares */
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
+
 
 .item-grid .item-thumbnail:hover {
     border-color: #0d6efd;
@@ -178,26 +252,24 @@ body {
 .item-grid .thumbnail-spinner-overlay {
     position: absolute;
     top: 3px; /* Match padding */
-    left: 3px; /* Match padding */
-    right: 3px; /* Match padding */
+    left: 3px;
+    right: 3px;
     height: 200px; /* Match image max-height */
     background: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2; /* Above the initially hidden image */
-    border-radius: 3px; /* Slightly smaller than container */
+    z-index: 2;
+    border-radius: 3px;
     transition: opacity 0.3s ease-in-out;
     opacity: 0; /* Hidden by default */
-    pointer-events: none; /* Don't block dragging */
+    pointer-events: none;
 }
 
-#elementList .item-thumbnail .thumbnail-spinner-overlay {
-    height: calc(100% - 6px);
-    top: 3px;
-    left: 3px;
-    right: 3px;
-    bottom: 3px;
+#elementList .item-thumbnail .thumbnail-spinner-overlay,
+#overlayList .item-thumbnail .thumbnail-spinner-overlay {
+    height: calc(100% - 6px); /* Fill square */
+    top: 3px; left: 3px; right: 3px; bottom: 3px;
 }
 
 .item-grid .item-thumbnail.loading .thumbnail-spinner-overlay {
@@ -221,6 +293,7 @@ body {
     overflow: auto;
     cursor: grab;
     flex-grow: 1;
+    /*height: 100%; !* Fill height *!*/
 }
 
 #canvas-area.panning {
@@ -371,18 +444,29 @@ body {
 /* Allow text selection when editing (future enhancement) */
 /* .canvas-element.editing .text-content { user-select: text; } */
 
-/* --- Layers Panel --- */
+/* --- Layers Panel (Inside Sliding Panel) --- */
+#layerList {
+    /* Remove background/border, handled by panel */
+    background-color: transparent;
+}
+
 #layerList .list-group-item {
     padding: 0.5rem 0.75rem;
     cursor: pointer;
     user-select: none;
-    background-color: #fff;
-    border-bottom: 1px solid #eee;
+    background-color: transparent; /* Inherit from panel */
+    border: none; /* Remove individual borders */
+    border-bottom: 1px solid #eee; /* Keep bottom separator */
     transition: background-color 0.15s ease-in-out;
+    color: #212529; /* Default text color */
 }
 
 #layerList .list-group-item:first-child {
-    border-top: 1px solid #eee;
+    border-top: none; /* No top border */
+}
+
+#layerList .list-group-item:last-child {
+    border-bottom: none; /* No bottom border on last */
 }
 
 #layerList .list-group-item:hover:not(.active) {
@@ -581,14 +665,44 @@ body {
 }
 
 
+/* --- Inspector Panel (Right Side) --- */
 .inspector-panel {
-    width: 300px; /* Adjust width as needed */
-    flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    right: 0; /* Position on the right */
+    width: var(--inspector-panel-width);
+    height: 100%; /* Fill height of parent (.main-content) */
     background-color: #f8f9fa;
     border-left: 1px solid #dee2e6;
-    height: 100%; /* Fill parent height */
-    overflow-y: auto; /* Allow scrolling */
-    font-size: 0.85rem; /* Smaller text in inspector */
+    overflow-y: auto;
+    font-size: 0.85rem;
+    z-index: 1045; /* Same as left panels, above canvas */
+    transform: translateX(var(--inspector-panel-width)); /* Start hidden off-screen */
+    transition: transform 0.3s ease-in-out;
+    box-shadow: -3px 0 6px rgba(0, 0, 0, 0.15); /* Shadow on the left */
+    /* Remove flex-shrink if it was there */
+    display: flex; /* Use flex for internal layout */
+    flex-direction: column; /* Stack sections vertically */
+}
+
+.inspector-panel.open {
+    transform: translateX(0); /* Slide into view */
+}
+
+/* Inspector Close Button */
+.close-inspector-btn {
+    position: absolute;
+    top: 8px; /* Adjust as needed */
+    right: 8px; /* Adjust as needed */
+    z-index: 15; /* Above panel header */
+    padding: 0.25rem 0.5rem;
+    background-color: transparent;
+    border: none;
+    opacity: 0.6;
+}
+
+.close-inspector-btn:hover {
+    opacity: 1;
 }
 
 .inspector-panel .section-header {

@@ -10,11 +10,9 @@ class SidebarItemManager {
 		this.$addImageBtn = $(options.addImageBtnSelector);
 		this.$overlayList = $(options.overlaysListSelector);
 		this.$overlaySearch = $(options.overlaysSearchSelector);
-		this.$sidebarContent = $(options.sidebarContentSelector);
-		//
-		// this.$overlayList = $('#overlayList'); // Added
-		// this.$overlaySearch = $('#overlaySearch'); // Added
-		// this.$sidebarContent = this.$coverList.closest('.sidebar-content');
+		
+		this.$coverScrollArea = this.$coverList.closest('.panel-scrollable-content');
+		this.$overlayScrollArea = this.$overlayList.closest('.panel-scrollable-content');
 		
 		// Callbacks & Dependencies
 		this.applyTemplate = options.applyTemplate;
@@ -109,6 +107,7 @@ class SidebarItemManager {
 			}
 			this.displayMoreCovers(true); // Initial display
 			
+			// Search listener
 			this.$coverSearch.on('input', () => {
 				clearTimeout(this.searchTimeout);
 				this.searchTimeout = setTimeout(() => {
@@ -118,29 +117,7 @@ class SidebarItemManager {
 				}, this.searchDelay);
 			});
 			
-			// Scroll listener remains the same, but logic inside needs update
-			this.$sidebarContent.on('scroll', () => {
-				const container = this.$sidebarContent[0];
-				const threshold = 200; // Pixels from bottom to trigger load
-				
-				// Check if Covers panel is active and needs loading
-				if ($('#coversPanel').hasClass('show') && !this.isLoadingCovers) {
-					if (container.scrollTop + container.clientHeight >= container.scrollHeight - threshold) {
-						if (this.currentlyDisplayedCovers < this.filteredCoversData.length) {
-							this.displayMoreCovers();
-						}
-					}
-				}
-				// --- NEW: Check if Overlays panel is active and needs loading ---
-				else if ($('#overlaysPanel').hasClass('show') && !this.isLoadingOverlays) {
-					if (container.scrollTop + container.clientHeight >= container.scrollHeight - threshold) {
-						if (this.currentlyDisplayedOverlays < this.filteredOverlaysData.length) {
-							this.displayMoreOverlays();
-						}
-					}
-				}
-				// --- END NEW ---
-			});
+			this.initializeScrollListener('covers');
 			
 		} catch (error) {
 			console.error("Error loading or parsing covers data:", error);
@@ -169,6 +146,7 @@ class SidebarItemManager {
 		if (reset) {
 			this.$coverList.empty();
 			this.currentlyDisplayedCovers = 0;
+			this.$coverList.closest('.panel-scrollable-content').scrollTop(0);
 		}
 		
 		const coversToRender = this.filteredCoversData.slice(
@@ -185,11 +163,11 @@ class SidebarItemManager {
 			this.isLoadingCovers = false;
 			return;
 		}
+		
 		if (coversToRender.length === 0 && !reset) {
 			this.isLoadingCovers = false;
 			return; // No more covers to load
 		}
-		
 		
 		const $newThumbs = $();
 		const self = this;
@@ -240,6 +218,7 @@ class SidebarItemManager {
 						if (newLayer) {
 							self.layerManager.moveLayer(newLayer.id, 'back');
 							self.layerManager.toggleLockLayer(newLayer.id, false);
+							
 							self.layerManager.selectLayer(null);
 							self.saveState();
 						}
@@ -256,6 +235,7 @@ class SidebarItemManager {
 		this.$coverList.append($newThumbs);
 		this._setupImageLoading($newThumbs);
 		this.currentlyDisplayedCovers += coversToRender.length;
+		
 		setTimeout(() => { this.isLoadingCovers = false; }, 100); // Short delay to prevent rapid re-triggering
 	}
 	
@@ -325,18 +305,16 @@ class SidebarItemManager {
 		}
 	}
 	
-	// --- Overlays --- START NEW ---
+	// --- Overlays
 	loadOverlays() {
 		try {
 			const overlayDataElement = document.getElementById('overlayData');
 			this.allOverlaysData = JSON.parse(overlayDataElement.textContent || '[]');
 			this.filteredOverlaysData = this.allOverlaysData;
-			
 			if (this.allOverlaysData.length === 0) {
 				this.$overlayList.html('<p class="text-muted p-2">No overlays found.</p>');
 				return;
 			}
-			
 			this.displayMoreOverlays(true); // Initial display
 			
 			// Search listener
@@ -349,12 +327,69 @@ class SidebarItemManager {
 				}, this.searchDelay);
 			});
 			
-			// Scroll listener is already set up in loadCovers, just need the logic inside it
-			
+			this.initializeScrollListener('overlays');
 		} catch (error) {
 			console.error("Error loading or parsing overlays data:", error);
 			this.$overlayList.html('<p class="text-danger p-2">Error loading overlays.</p>');
 		}
+	}
+	
+	initializeScrollListener(type) {
+		let $scrollArea;
+		let checkLoadingFlag;
+		let displayMoreFn;
+		let currentlyDisplayedCount;
+		let filteredData;
+		
+		// Determine which scroll area and functions to use based on type
+		if (type === 'covers') {
+			$scrollArea = this.$coverScrollArea;
+			checkLoadingFlag = () => this.isLoadingCovers;
+			displayMoreFn = () => this.displayMoreCovers();
+			currentlyDisplayedCount = () => this.currentlyDisplayedCovers;
+			filteredData = () => this.filteredCoversData;
+		} else if (type === 'overlays') {
+			$scrollArea = this.$overlayScrollArea;
+			checkLoadingFlag = () => this.isLoadingOverlays;
+			displayMoreFn = () => this.displayMoreOverlays();
+			currentlyDisplayedCount = () => this.currentlyDisplayedOverlays;
+			filteredData = () => this.filteredOverlaysData;
+		} else {
+			console.error("Invalid type passed to initializeScrollListener:", type);
+			return;
+		}
+		
+		if (!$scrollArea || !$scrollArea.length) {
+			console.error(`SidebarItemManager: ${type} scroll area not found.`);
+			return;
+		}
+		
+		console.log(`Initializing scroll listener for: ${type}`); // Debug log
+		
+		// Use 'this' context of the manager instance
+		const self = this;
+		
+		// Attach listener directly to the specific scrollable div
+		$scrollArea.off('scroll.sidebarLoader').on('scroll.sidebarLoader', function() { // Use namespace
+			const scrolledElement = this; // 'this' is the .panel-scrollable-content div
+			const threshold = 200; // Pixels from bottom
+			
+			// Check if loading is already in progress for this type
+			if (checkLoadingFlag()) {
+				return;
+			}
+			
+			// Check scroll position
+			if (scrolledElement.scrollTop + scrolledElement.clientHeight >= scrolledElement.scrollHeight - threshold) {
+				// Check if there are more items to load
+				if (currentlyDisplayedCount() < filteredData().length) {
+					// console.log(`Scrolling near bottom of ${type} - loading more`); // Debug log
+					displayMoreFn(); // Call the appropriate display function
+				} else {
+					// console.log(`Scrolling near bottom of ${type} - no more items to load.`); // Debug log
+				}
+			}
+		});
 	}
 	
 	filterOverlays() {
@@ -378,6 +413,7 @@ class SidebarItemManager {
 		if (reset) {
 			this.$overlayList.empty();
 			this.currentlyDisplayedOverlays = 0;
+			this.$overlayList.closest('.panel-scrollable-content').scrollTop(0);
 		}
 		
 		const overlaysToRender = this.filteredOverlaysData.slice(

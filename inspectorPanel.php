@@ -1,4 +1,6 @@
-<div id="inspectorPanel" class="inspector-panel d-none">
+<div id="inspectorPanel" class="inspector-panel closed">
+
+	<button type="button" class="btn-close close-inspector-btn" aria-label="Close"></button>
 
 	<div class="inspector-section" id="inspector-alignment">
 		<h6 class="section-header">Alignment</h6>

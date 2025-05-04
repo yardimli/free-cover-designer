@@ -10,9 +10,16 @@ align text layer top, bottom, left, right, center, middle ......................
 use llm to add tags and title to images put it in the filename ............................OK
 add search for images .....................................................................OK
 add image filters to the inspector to change color and blend mode .........................OK
+add overlays to cover .....................................................................OK
+add rotate and scale to layers ............................................................OK
+find transparent png images for elements, load them from folder instead of json ...........OK
+add vertical alignment to text layers
+move lock, delete, move up/down layers to the inspector
+update elements to load lazy like covers with search from json file
 add new text layer
 duplicate text layer
-find transparent png images for elements, load them from folder instead of json ...........OK
 make ui look like polotno
+add dark/light mode to ui
 make responsive ui
 add magnetic lines when moving elements and snap to grid
+fix rulers to start from canvas position on top and left

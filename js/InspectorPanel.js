@@ -3,13 +3,14 @@
 class InspectorPanel {
 	constructor(options) {
 		this.$panel = $('#inspectorPanel');
+		this.$closeBtn = this.$panel.find('.close-inspector-btn');
 		this.layerManager = options.layerManager;
 		this.historyManager = options.historyManager;
-		this.canvasManager = options.canvasManager; // For layer alignment
+		this.canvasManager = options.canvasManager;
 		this.currentLayer = null;
 		this.googleFontsList = options.googleFontsList || [];
-		this.filterUpdateTimeout = null; // For debouncing filter updates
-		this.filterUpdateDelay = 150; // ms delay for filter slider updates
+		this.filterUpdateTimeout = null;
+		this.filterUpdateDelay = 150;
 		this.init();
 	}
 	
@@ -59,9 +60,13 @@ class InspectorPanel {
 			}
 		};
 		
+		this.$closeBtn.on('click', () => {
+			this.hide();
+		});
+		
 		// --- Helper to update layer and potentially schedule history save ---
 		const updateLayer = (prop, value, saveNow = false, saveDebounced = true) => {
-			if (this.currentLayer && !this.currentLayer.locked) {
+			if (this.currentLayer) {
 				let updateData = {};
 				// --- Handle nested filter update ---
 				if (prop.startsWith('filters.')) {
@@ -81,6 +86,8 @@ class InspectorPanel {
 				this.layerManager.updateLayerData(this.currentLayer.id, updateData);
 				
 				if (saveNow) {
+					clearTimeout(this.textareaChangeTimeout);
+					historySaveScheduled = false;
 					this.historyManager.saveState();
 				} else if (saveDebounced) {
 					scheduleHistorySave();
@@ -96,7 +103,7 @@ class InspectorPanel {
 			const $opacityValue = $(`#inspector-${groupId}-opacity-value`);
 			
 			const updateFromPickerOrHex = (sourceValue, isPicker = false) => {
-				if (!this.currentLayer || this.currentLayer.locked) return;
+				if (!this.currentLayer) return;
 				let tiny = tinycolor(sourceValue);
 				if (!tiny.isValid()) return;
 				
@@ -133,7 +140,7 @@ class InspectorPanel {
 			$hex.on('input', () => updateFromPickerOrHex('#' + $hex.val(), false));
 			
 			$opacitySlider.on('input', () => {
-				if (!this.currentLayer || this.currentLayer.locked) return;
+				if (!this.currentLayer) return;
 				const opacity = parseFloat($opacitySlider.val());
 				$opacityValue.text(`${Math.round(opacity * 100)}%`);
 				
@@ -204,15 +211,15 @@ class InspectorPanel {
 		this.$panel.find('#inspector-opacity').on('input', (e) => {
 			const val = parseFloat($(e.target).val());
 			$('#inspector-opacity-value').text(`${Math.round(val * 100)}%`);
-			updateLayer('opacity', val);
+			updateLayer('opacity', val, false, true); // Debounce save
 		}).on('change', () => this.historyManager.saveState());
 		
-		bindRangeAndNumber('inspector-rotation', 'inspector-rotation-value', 'rotation', 0, 360, 1, '°');
-		
-		bindRangeAndNumber('inspector-scale', 'inspector-scale-value', 'scale', 1, 500, 1, '%');
+		// Rotation & Scale
+		bindRangeAndNumber('inspector-rotation', 'inspector-rotation-value', 'rotation', 0, 360, 1, '°', true);
+		bindRangeAndNumber('inspector-scale', 'inspector-scale-value', 'scale', 1, 500, 1, '%', true);
 		
 		// Border Weight
-		bindRangeAndNumber('inspector-border-weight', 'inspector-border-weight-value', 'strokeWidth', 0, 50, 0.5);
+		bindRangeAndNumber('inspector-border-weight', 'inspector-border-weight-value', 'strokeWidth', 0, 50, 0.5, '', true);
 		
 		// Text Size
 		this.$panel.find('#inspector-font-size').on('input', (e) => {
@@ -282,7 +289,7 @@ class InspectorPanel {
 		const $textContentArea = this.$panel.find('#inspector-text-content');
 		
 		$textContentArea.on('input', () => {
-			if (this.currentLayer && this.currentLayer.type === 'text' && !this.currentLayer.locked) {
+			if (this.currentLayer && this.currentLayer.type === 'text') {
 				const newContent = $textContentArea.val();
 				// Update layer data immediately (live update)
 				// Don't save history on every keystroke, let 'change' handle it
@@ -317,9 +324,9 @@ class InspectorPanel {
 			console.log("Alignment: Layer fetched for alignment:", layer);
 			// --- END FETCH ---
 			
-			// 4. Check if the layer exists and is not locked
-			if (!layer || layer.locked) {
-				console.log("Alignment: Layer not found or is locked.");
+			// 4. Check if the layer exists
+			if (!layer) {
+				console.log("Alignment: Layer not found.");
 				return;
 			}
 			
@@ -416,7 +423,7 @@ class InspectorPanel {
 	
 	toggleStyle(property, activeValue, inactiveValue) {
 		// ... (toggleStyle code remains the same)
-		if (this.currentLayer && this.currentLayer.type === 'text' && !this.currentLayer.locked) {
+		if (this.currentLayer && this.currentLayer.type === 'text') {
 			const currentValue = this.currentLayer[property];
 			const newValue = (currentValue === activeValue) ? inactiveValue : activeValue;
 			this._updateLayer(property, newValue, true); // Save immediately for toggles
@@ -424,8 +431,7 @@ class InspectorPanel {
 	}
 	
 	_updateLayer(property, value, saveNow = false) {
-		// ... (_updateLayer code remains the same)
-		if (this.currentLayer && !this.currentLayer.locked) {
+		if (this.currentLayer) {
 			// Store previous value to compare
 			const previousValue = this.currentLayer[property];
 			this.layerManager.updateLayerData(this.currentLayer.id, { [property]: value });
@@ -433,32 +439,30 @@ class InspectorPanel {
 			if (saveNow) {
 				this.historyManager.saveState();
 			}
-			// Re-populate only if the value actually changed to avoid potential issues/loops
-			// And avoid re-populating if the change came FROM populate itself (difficult to track perfectly here)
-			// A simple check for value change is usually sufficient
+
 			const updatedLayer = this.layerManager.getLayerById(this.currentLayer.id);
 			if(updatedLayer && updatedLayer[property] !== previousValue) {
-				// Delay populate slightly to prevent potential issues with rapid updates (e.g. color picker)
-				// setTimeout(() => this.populate(updatedLayer), 50);
-				// Or just populate directly - test which works best
 				this.populate(updatedLayer);
 			}
 		}
 	}
 	
 	show(layerData) {
-		this.currentLayer = layerData;
 		if (!layerData) {
 			this.hide();
 			return;
 		}
+		this.currentLayer = layerData;
 		this.populate(layerData);
-		this.$panel.removeClass('d-none');
+		this.$panel.addClass('open');
 	}
 	
 	hide() {
-		this.currentLayer = null;
-		this.$panel.addClass('d-none');
+		if (this.$panel.hasClass('open')) {
+			this.currentLayer = null;
+			this.$panel.removeClass('open');
+			// console.log("Inspector hide called");
+		}
 	}
 	
 	_populateColorInputGroup(groupId, colorValue, opacityValue = 1) {
@@ -513,10 +517,10 @@ class InspectorPanel {
 			this.hide();
 			return;
 		}
+		
 		this.currentLayer = layerData; // Update internal reference
-		const isLocked = layerData.locked;
 		const isText = layerData.type === 'text';
-		const isImage = layerData.type === 'image'; // Added for clarity
+		const isImage = layerData.type === 'image';
 		
 		// --- Enable/Disable Panel Sections ---
 		this.$panel.find('#inspector-text').toggle(isText);
@@ -532,14 +536,6 @@ class InspectorPanel {
 		this.$panel.find('#inspector-alignment').show();
 		this.$panel.find('#inspector-layer').show();
 		
-		// Disable all controls if locked
-		this.$panel.find('input, select, button, textarea').prop('disabled', isLocked);
-		this.$panel.find('#inspector-font-family').next('.fp-button').prop('disabled', isLocked);
-		
-		// Re-enable alignment buttons if not locked
-		if (!isLocked) {
-			this.$panel.find('#inspector-alignment button').prop('disabled', false);
-		}
 		
 		
 		// --- Populate Common Controls ---
@@ -628,12 +624,6 @@ class InspectorPanel {
 			
 			// Populate Blend Mode
 			$('#inspector-blend-mode').val(layerData.blendMode || 'normal');
-		}
-		
-		// Ensure locked state disables controls again after populating
-		if (isLocked) {
-			this.$panel.find('input, select, button, textarea').prop('disabled', true);
-			this.$panel.find('#inspector-font-family').next('.fp-button').prop('disabled', true);
 		}
 		
 	} // End populate

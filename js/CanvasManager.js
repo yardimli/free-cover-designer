@@ -14,7 +14,6 @@ class CanvasManager {
 		}); // Callback for UI updates
 		
 		// State
-		this.rulers = null;
 		this.currentZoom = 0.3;
 		this.MIN_ZOOM = 0.1; // Min zoom level
 		this.MAX_ZOOM = 5.0; // Max zoom level
@@ -38,7 +37,6 @@ class CanvasManager {
 			console.warn("CanvasManager: $canvasArea not found during initialization for setting CSS variable.");
 		}
 		
-		this.initializeRulers();
 		this.initializePan();
 		this.initializeZoomControls();
 		this.setZoom(this.currentZoom, false);
@@ -55,9 +53,6 @@ class CanvasManager {
 		});
 		this.updateWrapperSize();
 		this.centerCanvas();
-		if (this.rulers) {
-			this.rulers.updateRulers();
-		}
 	}
 	
 	updateWrapperSize() {
@@ -70,35 +65,6 @@ class CanvasManager {
 			transform: `scale(${this.currentZoom})`,
 			transformOrigin: 'top left'
 		});
-	}
-	
-	initializeRulers() {
-		// Ensure rulers are initialized *after* the wrapper structure is set up
-		if (this.canvasAreaDiv && typeof DivRulers !== 'undefined') {
-			// Destroy existing rulers if any
-			if (this.rulers) {
-				this.rulers.destroy();
-			}
-			// Pass the canvas-area div as the target for rulers
-			this.rulers = new DivRulers(this.canvasAreaDiv, {
-				rulerSize: 25,
-				tickMajor: 100, // Based on unzoomed canvas pixels
-				tickMinor: 50,
-				tickMicro: 10,
-				indicatorColor: 'rgba(0, 100, 255, 0.8)',
-				arrowStyle: 'line',
-				showLabel: true,
-				labelColor: '#333',
-				tickColor: '#888',
-				rulerBgColor: 'rgba(240, 240, 240, 0.95)'
-			});
-			
-			
-			// Set initial zoom for rulers
-			this.rulers.setZoom(this.currentZoom);
-		} else {
-			console.error("Canvas area element not found or DivRulers class not loaded.");
-		}
 	}
 	
 	initializePan() {
@@ -148,11 +114,6 @@ class CanvasManager {
 			// 2. Using middle mouse (isMiddleMouse is true)
 			// 3. Clicking a LOCKED layer (isClickOnLockedLayer is true)
 			if (isBackgroundClick || isMiddleMouse || isClickOnLockedLayer) {
-				
-				// Prevent panning if clicking on a ruler
-				if ($(e.target).closest('.ruler').length > 0) {
-					return;
-				}
 				
 				// --- Start Panning ---
 				this.isPanning = true;
@@ -273,12 +234,6 @@ class CanvasManager {
 		this.$canvasArea.scrollLeft(newScrollLeft);
 		this.$canvasArea.scrollTop(newScrollTop);
 		
-		// Update rulers zoom factor and redraw them based on new scroll/zoom
-		if (this.rulers) {
-			this.rulers.setZoom(this.currentZoom);
-			this.rulers.updateRulers(); // Essential after scroll/zoom changes
-		}
-		
 		// Update UI (via callback)
 		if (triggerCallbacks) {
 			this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
@@ -325,11 +280,6 @@ class CanvasManager {
 			// Apply the scroll position
 			this.$canvasArea.scrollLeft(scrollLeft);
 			this.$canvasArea.scrollTop(scrollTop);
-			
-			// Rulers need update after scroll changes
-			if (this.rulers) {
-				this.rulers.updateRulers();
-			}
 		});
 	}
 	
@@ -765,12 +715,6 @@ class CanvasManager {
 			if ($(this).hasClass('ui-resizable')) $(this).resizable('destroy');
 		});
 		
-		
-		// Destroy rulers
-		if (this.rulers) {
-			this.rulers.destroy();
-			this.rulers = null;
-		}
 		
 		// Nullify references
 		this.$canvasArea = null;
