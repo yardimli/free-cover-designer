@@ -7,3 +7,6 @@
 error_log.txt
 composer.lock
 /vendors/modern-screenshot-4.6.0
+/new-overlays
+/overlays
+/shapes

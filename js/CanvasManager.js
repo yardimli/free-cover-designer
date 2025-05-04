@@ -432,89 +432,208 @@ class CanvasManager {
 		});
 	}
 	
+	_isGoogleFont(fontFamily) {
+		if (!fontFamily) return false;
+		const knownLocal = ['arial', 'verdana', 'times new roman', 'georgia', 'courier new', 'serif', 'sans-serif', 'monospace', 'helvetica neue', 'system-ui'];
+		const lowerFont = fontFamily.toLowerCase().replace(/['"]/g, '');
+		return !knownLocal.includes(lowerFont) && /^[a-z0-9\s]+$/i.test(lowerFont);
+	}
+	
 	// --- Export ---
-	exportCanvas(format = 'png') {
-		this.layerManager.selectLayer(null); // Deselect elements
+	async _getEmbeddedFontsCss(layersData) {
+		const uniqueGoogleFonts = new Set();
+		layersData.forEach(layer => {
+			if (layer.type === 'text' && layer.fontFamily && this._isGoogleFont(layer.fontFamily)) {
+				// Encode font name for URL, request common weights/styles
+				uniqueGoogleFonts.add(`family=${encodeURIComponent(layer.fontFamily.trim())}:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900`);
+			}
+		});
 		
-		// Store original state (transform, wrapper size, scroll)
+		if (uniqueGoogleFonts.size === 0) {
+			return ''; // No Google Fonts to embed
+		}
+		
+		// Construct the Google Fonts API URL
+		const fontFamiliesParam = Array.from(uniqueGoogleFonts).join('&');
+		// IMPORTANT: Request specific user agent (like Chrome) to get WOFF2 URLs reliably
+		const fontUrl = `https://fonts.googleapis.com/css2?${fontFamiliesParam}&display=swap`;
+		let originalCss = '';
+		
+		try {
+			console.log("Fetching Google Fonts CSS:", fontUrl);
+			const cssResponse = await fetch(fontUrl, {
+				headers: { // Mimic a common browser to get WOFF2
+					'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+				}
+			});
+			if (!cssResponse.ok) {
+				throw new Error(`CSS fetch failed! status: ${cssResponse.status}`);
+			}
+			originalCss = await cssResponse.text();
+			console.log("Successfully fetched Google Fonts CSS definitions.");
+			
+			// --- Find font URLs and fetch/embed them ---
+			const fontUrls = originalCss.match(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g);
+			if (!fontUrls || fontUrls.length === 0) {
+				console.warn("No font file URLs found in the fetched CSS.");
+				return originalCss; // Return original CSS if no URLs found
+			}
+			
+			// Extract clean URLs
+			const urlsToFetch = fontUrls.map(match => match.substring(4, match.length - 1));
+			console.log(`Found ${urlsToFetch.length} font files to fetch and embed.`);
+			
+			// Fetch all font files concurrently
+			const fontFetchPromises = urlsToFetch.map(async (url) => {
+				try {
+					const fontResponse = await fetch(url);
+					if (!fontResponse.ok) {
+						throw new Error(`Font fetch failed! status: ${fontResponse.status} for ${url}`);
+					}
+					const blob = await fontResponse.blob();
+					const base64 = await this._blobToBase64(blob);
+					const mimeType = blob.type || 'font/woff2'; // Use blob type or default to woff2
+					return { url, base64, mimeType };
+				} catch (fontError) {
+					console.error(`Failed to fetch or encode font: ${url}`, fontError);
+					return { url, error: true }; // Mark as error
+				}
+			});
+			
+			const embeddedFontsData = await Promise.all(fontFetchPromises);
+			
+			// Replace URLs in the original CSS
+			let embeddedCss = originalCss;
+			embeddedFontsData.forEach(fontData => {
+				if (!fontData.error) {
+					const dataUri = `data:${fontData.mimeType};base64,${fontData.base64}`;
+					// Escape parentheses in the URL for regex replacement
+					const escapedUrl = fontData.url.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+					const regex = new RegExp(`url\\(${escapedUrl}\\)`, 'g');
+					embeddedCss = embeddedCss.replace(regex, `url(${dataUri})`);
+				}
+			});
+			
+			console.log("Finished embedding font data into CSS.");
+			// console.log("Embedded CSS:", embeddedCss); // DEBUG: Log the final CSS
+			return embeddedCss;
+			
+		} catch (error) {
+			console.error("Error processing Google Fonts for embedding:", error);
+			alert("Warning: Could not process Google Font definitions for export. Export might use fallback fonts.");
+			return ''; // Return empty string on error
+		}
+	}
+	
+	// --- Helper to convert Blob to Base64 ---
+	_blobToBase64(blob) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				// Remove the prefix "data:...;base64,"
+				const base64String = reader.result.split(',')[1];
+				resolve(base64String);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(blob);
+		});
+	}
+	
+	
+	// --- Export ---
+	async exportCanvas(format = 'png') { // Still async
+		this.layerManager.selectLayer(null);
+		
+		// Store original state... (same as before)
 		const originalTransform = this.$canvas.css('transform');
 		const originalWrapperWidth = this.$canvasWrapper.css('width');
 		const originalWrapperHeight = this.$canvasWrapper.css('height');
 		const originalScrollLeft = this.$canvasArea.scrollLeft();
 		const originalScrollTop = this.$canvasArea.scrollTop();
 		
-		// Temporarily reset zoom and scroll for accurate capture
+		// Temporarily reset zoom and scroll... (same as before)
 		this.$canvas.css('transform', 'scale(1.0)');
 		this.$canvasWrapper.css({
 			width: this.currentCanvasWidth + 'px',
 			height: this.currentCanvasHeight + 'px'
 		});
-		// Ensure the canvas is scrolled into view within the area for capture
 		const wrapperPos = this.$canvasWrapper.position();
 		this.$canvasArea.scrollLeft(wrapperPos.left);
 		this.$canvasArea.scrollTop(wrapperPos.top);
 		
+		// Get layer data... (same as before)
+		const layersData = this.layerManager.getLayers();
+		const defaultFilters = this.layerManager.defaultFilters;
+		const defaultTransform = this.layerManager.defaultTransform;
 		
-		// --- Get current layer data BEFORE calling screenshot ---
-		const layersData = this.layerManager.getLayers(); // Get fresh data
-		const defaultFilters = this.layerManager.defaultFilters; // Get default filters
-		
-		// Temporarily make all layers visible for export
+		// Temporarily make all layers visible... (same as before)
 		const hiddenLayerIds = layersData.filter(l => !l.visible).map(l => l.id);
 		hiddenLayerIds.forEach(id => $(`#${id}`).show());
 		
-		const canvasElement = this.$canvas[0]; // The DOM node to capture
+		const canvasElement = this.$canvas[0];
 		const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-		const quality = format === 'jpeg' ? 0.92 : undefined; // Quality only for JPEG
+		const quality = format === 'jpeg' ? 0.92 : undefined;
 		const filename = `book-cover-export.${format}`;
+		
+		// --- NEW: Get the CSS with embedded fonts ---
+		const embeddedFontCss = await this._getEmbeddedFontsCss(layersData);
+		// --- END NEW ---
 		
 		// --- Options for modern-screenshot ---
 		const screenshotOptions = {
 			width: this.currentCanvasWidth,
 			height: this.currentCanvasHeight,
 			scale: 1,
-			backgroundColor: '#ffffff', // Or null/omit for transparency in PNG
-			quality: quality, // Will be ignored by toPng
+			backgroundColor: '#ffffff',
+			quality: quality,
 			fetch: {
-				// Add fetch options if needed, e.g., for CORS handling
-				// mode: 'cors', // Example
+				// mode: 'cors', // Generally not needed now fonts are embedded
 			},
 			onCloneNode: (clonedNode) => {
-				// This function receives the cloned version of canvasElement
 				if (!clonedNode || clonedNode.id !== 'canvas') {
 					console.warn("onCloneNode did not receive the expected #canvas clone.");
 					return;
 				}
 				
-				clonedNode.style.transform = 'scale(1.0)'; // Ensure no transform on clone
+				// --- Inject the EMBEDDED Font CSS ---
+				if (embeddedFontCss) {
+					const style = document.createElement('style');
+					style.textContent = embeddedFontCss;
+					clonedNode.prepend(style); // Prepend to ensure it's available early
+					console.log("Injected EMBEDDED Google Fonts CSS into cloned node.");
+				}
+				// --- END Inject ---
 				
-				// Remove selection borders
+				clonedNode.style.transform = 'scale(1.0)';
+				
+				// Remove selection borders, show hidden layers, remove handles... (same as before)
 				clonedNode.querySelectorAll('.canvas-element.selected').forEach(el => el.classList.remove('selected'));
-				
-				// Ensure originally hidden layers are visible in clone
 				hiddenLayerIds.forEach(id => {
 					const el = clonedNode.querySelector(`#${id}`);
 					if (el) el.style.display = 'block';
 				});
-				
-				// Remove resize handles
 				clonedNode.querySelectorAll('.ui-resizable-handle').forEach(h => h.style.display = 'none');
 				
-				// *** Re-apply Filters and Blend Modes to Cloned Elements ***
+				// Re-apply Filters, Blend Modes, Transforms, Text Styles... (SAME AS PREVIOUS VERSION)
 				layersData.forEach(layer => {
 					const clonedElement = clonedNode.querySelector(`#${layer.id}`);
-					if (!clonedElement) return; // Skip if element not found in clone
+					if (!clonedElement) return;
 					
-					// Apply Blend Mode to the container element
+					// Blend Mode
 					clonedElement.style.mixBlendMode = layer.blendMode || 'normal';
 					
-					// Apply Filters specifically to the IMG tag if it's an image layer
+					// Transform
+					const rotation = layer.rotation || defaultTransform.rotation;
+					const scale = (layer.scale || defaultTransform.scale) / 100;
+					clonedElement.style.transform = `rotate(${rotation}deg) scale(${scale})`;
+					clonedElement.style.transformOrigin = 'center center';
+					
+					// Image Filters
 					if (layer.type === 'image') {
 						const clonedImg = clonedElement.querySelector('img');
 						if (clonedImg) {
 							const filters = layer.filters || defaultFilters;
 							let filterString = '';
-							// Build filter string (same logic as before)
 							if (filters.brightness !== 100) filterString += `brightness(${filters.brightness}%) `;
 							if (filters.contrast !== 100) filterString += `contrast(${filters.contrast}%) `;
 							if (filters.saturation !== 100) filterString += `saturate(${filters.saturation}%) `;
@@ -522,21 +641,19 @@ class CanvasManager {
 							if (filters.sepia !== 0) filterString += `sepia(${filters.sepia}%) `;
 							if (filters.hueRotate !== 0) filterString += `hue-rotate(${filters.hueRotate}deg) `;
 							if (filters.blur !== 0) filterString += `blur(${filters.blur}px) `;
-							
 							clonedImg.style.filter = filterString.trim() || 'none';
 						}
 					}
 					
-					// Re-apply text styles (Optional but recommended for robustness)
+					// Text Styles (Crucial: Ensure font-family is applied correctly)
 					if (layer.type === 'text') {
 						const clonedTextContent = clonedElement.querySelector('.text-content');
 						if (clonedTextContent) {
-							// Re-apply necessary text styles directly
 							let fontFamily = layer.fontFamily || 'Arial';
 							if (fontFamily.includes(' ') && !fontFamily.startsWith("'") && !fontFamily.startsWith('"')) {
 								fontFamily = `"${fontFamily}"`;
 							}
-							clonedTextContent.style.fontFamily = fontFamily;
+							clonedTextContent.style.fontFamily = fontFamily; // Apply potentially quoted name
 							clonedTextContent.style.fontSize = (layer.fontSize || 16) + 'px';
 							clonedTextContent.style.fontWeight = layer.fontWeight || 'normal';
 							clonedTextContent.style.fontStyle = layer.fontStyle || 'normal';
@@ -555,6 +672,7 @@ class CanvasManager {
 							} else {
 								clonedTextContent.style.textShadow = 'none';
 							}
+							
 							// Text Stroke
 							const strokeWidth = parseFloat(layer.strokeWidth) || 0;
 							if (strokeWidth > 0 && layer.stroke) {
@@ -569,17 +687,15 @@ class CanvasManager {
 								clonedTextContent.style.textStrokeWidth = '0';
 							}
 							
-							// Re-apply parent background if enabled
+							// Parent Background
 							if (layer.backgroundEnabled && layer.backgroundColor) {
 								let bgColor = layer.backgroundColor;
 								const bgOpacity = layer.backgroundOpacity ?? 1;
 								if (bgOpacity < 1) {
 									try {
 										let tiny = tinycolor(bgColor);
-										if (tiny.isValid()) {
-											bgColor = tiny.setAlpha(bgOpacity).toRgbString();
-										}
-									} catch(e) {/* ignore */}
+										if (tiny.isValid()) { bgColor = tiny.setAlpha(bgOpacity).toRgbString(); }
+									} catch (e) { /* ignore */ }
 								}
 								clonedElement.style.backgroundColor = bgColor;
 								clonedElement.style.borderRadius = (layer.backgroundCornerRadius || 0) + 'px';
@@ -591,49 +707,45 @@ class CanvasManager {
 							}
 						}
 					}
-				});
-				// *** END Re-apply ***
-			}
-		};
+				}); // *** END Re-apply ***
+			} // End onCloneNode
+		}; // End screenshotOptions
 		
-		// --- Choose the correct function based on format ---
+		// --- Choose format and handle promise --- (same as before)
 		let screenshotPromise;
 		if (format === 'jpeg') {
 			screenshotPromise = modernScreenshot.domToJpeg(canvasElement, screenshotOptions);
-		} else { // Default to PNG
+		} else {
 			screenshotPromise = modernScreenshot.domToPng(canvasElement, screenshotOptions);
 		}
 		
-		// --- Handle the promise ---
-		screenshotPromise.then(dataUrl => {
+		// --- Handle the promise with try...finally for restoration --- (same as before)
+		try {
+			const dataUrl = await screenshotPromise;
 			const a = document.createElement('a');
 			a.href = dataUrl;
 			a.download = filename;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
-		}).catch(err => {
+		} catch (err) {
 			console.error(`Error exporting canvas with modernScreenshot (.${format}):`, err);
-			alert(`Error exporting canvas as ${format.toUpperCase()}. Check console. CORS issues or complex CSS might be the cause.`);
-		}).finally(() => {
-			// --- Restore original state ---
+			alert(`Error exporting canvas as ${format.toUpperCase()}. Check console. Embedded font processing might have failed.`);
+		} finally {
+			// --- Restore original state --- (same as before)
 			hiddenLayerIds.forEach(id => {
 				const layer = this.layerManager.getLayerById(id);
-				if (layer && !layer.visible) {
-					$(`#${id}`).hide();
-				}
+				if (layer && !layer.visible) { $(`#${id}`).hide(); }
 			});
 			this.$canvas.css('transform', originalTransform);
-			this.$canvasWrapper.css({width: originalWrapperWidth, height: originalWrapperHeight});
+			this.$canvasWrapper.css({ width: originalWrapperWidth, height: originalWrapperHeight });
 			this.$canvasArea.scrollLeft(originalScrollLeft);
 			this.$canvasArea.scrollTop(originalScrollTop);
-			// Re-apply selected class if a layer was selected before export
 			const selectedLayer = this.layerManager.getSelectedLayer();
-			if (selectedLayer) {
-				$(`#${selectedLayer.id}`).addClass('selected');
-			}
-		});
-	}
+			if (selectedLayer) { $(`#${selectedLayer.id}`).addClass('selected'); }
+			console.log("Export process finished, restored original state.");
+		}
+	} // End exportCanvas
 	
 	
 	saveDesign() {

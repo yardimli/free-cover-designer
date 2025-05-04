@@ -153,13 +153,6 @@ class InspectorPanel {
 						updateLayer('backgroundColor', tiny.toHexString(), false, false); // Keep hex color
 						updateLayer('backgroundOpacity', opacity, false, true); // Update opacity, debounce save
 					}
-					
-					// Handle separate opacity properties if they exist (Redundant with above?)
-					// Maybe just keep the logic within the 'backgroundColor' condition
-					// const opacityProp = layerPropPrefix + 'Opacity';
-					// if (this.currentLayer.hasOwnProperty(opacityProp)) {
-					//     updateLayer(opacityProp, opacity, false, true); // Debounce save
-					// }
 				}
 			});
 			
@@ -179,7 +172,6 @@ class InspectorPanel {
 		const bindRangeAndNumber =(rangeId, displayId, layerProp, min, max, step, unit = '', saveDebounced = true, isFilter = false, skipUpdateLayer = false) => {
 			const $range = $(`#${rangeId}`);
 			const $display = $(`#${displayId}`);
-			const self = this;
 			
 			const updateDisplayAndLayer = () => {
 				const val = parseFloat($range.val());
@@ -204,8 +196,6 @@ class InspectorPanel {
 				const finalVal = parseFloat($range.val());
 				if (!isNaN(finalVal)) {
 					updateLayer(layerProp, finalVal, true); // Save immediately
-				} else {
-					self.historyManager.saveState();
 				}
 			});
 		};
@@ -216,6 +206,10 @@ class InspectorPanel {
 			$('#inspector-opacity-value').text(`${Math.round(val * 100)}%`);
 			updateLayer('opacity', val);
 		}).on('change', () => this.historyManager.saveState());
+		
+		bindRangeAndNumber('inspector-rotation', 'inspector-rotation-value', 'rotation', 0, 360, 1, '°');
+		
+		bindRangeAndNumber('inspector-scale', 'inspector-scale-value', 'scale', 1, 500, 1, '%');
 		
 		// Border Weight
 		bindRangeAndNumber('inspector-border-weight', 'inspector-border-weight-value', 'strokeWidth', 0, 50, 0.5);
@@ -497,14 +491,21 @@ class InspectorPanel {
 	}
 	
 	
-	_populateRangeAndNumber(rangeId, numberId, value, fallback = 0) {
+	_populateRangeAndNumber(rangeId, displayId, value, fallback = 0, unit = '') {
 		const numValue = parseFloat(value);
 		const finalValue = isNaN(numValue) ? fallback : numValue;
-		// Check if elements exist before trying to set value
+		
 		const $range = $(`#${rangeId}`);
-		const $number = $(`#${numberId}`);
+		const $display = $(`#${displayId}`);
+		
 		if ($range.length) $range.val(finalValue);
-		if ($number.length) $number.val(finalValue);
+		
+		// Update display text with unit
+		if ($display.length) {
+			const step = parseFloat($range.attr('step')) || 1; // Get step for formatting
+			const displayValue = (step < 1) ? finalValue.toFixed(1) : Math.round(finalValue);
+			$display.text(`${displayValue}${unit}`);
+		}
 	}
 	
 	populate(layerData) {
@@ -545,6 +546,10 @@ class InspectorPanel {
 		const opacity = layerData.opacity ?? 1;
 		$('#inspector-opacity').val(opacity);
 		$('#inspector-opacity-value').text(`${Math.round(opacity * 100)}%`);
+		const rotation = layerData.rotation ?? 0;
+		this._populateRangeAndNumber('inspector-rotation', 'inspector-rotation-value', rotation, 0, '°');
+		const scale = layerData.scale ?? 100;
+		this._populateRangeAndNumber('inspector-scale', 'inspector-scale-value', scale, 100, '%');
 		
 		// --- Populate Text Controls (if Text Layer) ---
 		if (isText) {

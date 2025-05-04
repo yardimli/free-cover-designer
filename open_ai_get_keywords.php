@@ -201,6 +201,7 @@
 
 			// 5. Define prompts
 			$captionPrompt = 'Describe this image concisely for use as an alt text or short caption. Focus on the main visual elements and mood. Don\'t include or describe any text visible on the image. Maximum 140 characters.';
+			$coverCategoryPrompt = 'Categorize this book cover image into 1-3 categories of the following genres: Mystery; Thriller & Suspense, fantasy, science fiction, horror, romance, erotica, children, Action & Adventure, chick lit, historical, literary fiction, teen & young adult, royal romance, western, surreal, paranormal & urban, apocalyptica, nature, poetry, travel, religion & spirituality, business, self-improvement & self-help, education, health; mind & body, cookbooks; food & wine, environment & ecology, politics; law & society, family & parenting, abstract, medical, health; dieting & fitness, sports & fitness, science & nature, music.Do not include any text written on the cover. Output only a comma-separated list.';
 			$keywordsPrompt = 'Generate a list of 20 relevant keywords for this book cover image, suitable for search or tagging. Include single words and relevant two-word phrases (e.g., "dark forest", "fantasy novel"). Focus on visual elements, genre, and mood. Do not include any text written on the cover. Output only a comma-separated list.';
 
 			// 6. Generate Caption
@@ -252,12 +253,50 @@
 				local_log("Empty keyword response for $filename");
 			}
 
+			// 7. Generate Categories
+			echo "Generating Categories...\n<br>";
+			$categories_raw = generateByImageBase64($coverCategoryPrompt, $base64Image, 'image/jpeg');
+			$generatedCategories = [];
+
+			if (strpos($categories_raw, "Error:") === 0) {
+				echo "<span style='color:red;'>Category Generation Failed: " . htmlspecialchars($categories_raw) . "</span>\n<br>";
+				local_log("Category generation failed for $filename: $categories_raw");
+				$errorCount++;
+				continue;
+			} elseif (!empty($categories_raw)) {
+				$pattern = '/(^[\s*-]+)/m';
+				$categories_cleaned = preg_replace($pattern, '', $categories_raw);
+
+				if ($categories_cleaned === null) {
+					local_log("preg_replace returned null for categories_raw: " . $categories_raw);
+					$categories_cleaned = ''; // Default to empty string on error
+				}
+
+				$categories_cleaned = trim((string)$categories_cleaned, " \n\r\t\v\0.,\"'");
+
+				if (!empty($categories_cleaned)) { // Check if anything remains after cleaning
+					$generatedCategories = array_map('trim', explode(',', $categories_cleaned));
+					$generatedCategories = array_filter($generatedCategories); // Remove empty elements
+					$generatedCategories = array_unique($generatedCategories); // Remove duplicates
+					$generatedCategories = array_values($generatedCategories); // Re-index array
+					echo "Generated Categories: " . htmlspecialchars(implode(", ", $generatedCategories)) . "\n<br>";
+				} else {
+					echo "<span style='color:orange;'>Warning: Category response became empty after cleaning. Original: '" . htmlspecialchars($categories_raw) . "'</span>\n<br>";
+					local_log("Empty categories after cleaning for $filename. Original: $categories_raw");
+				}
+			} else {
+				echo "<span style='color:orange;'>Warning: Received empty category response.</span>\n<br>";
+				local_log("Empty category response for $filename");
+			}
+
 			$currentCaption = (strpos($caption, "Error:") === 0) ? null : $caption;
 			$currentKeywords = (strpos($keywords_raw, "Error:") === 0 || empty($generatedKeywords)) ? [] : $generatedKeywords;
+			$currentCategories = (strpos($categories_raw, "Error:") === 0 || empty($generatedCategories)) ? [] : $generatedCategories;
 
 			$resultsData[$filename] = [
 				'caption' => $currentCaption,
 				'keywords' => $currentKeywords,
+				'categories' => $currentCategories,
 				'processed_at' => date('Y-m-d H:i:s'),
 				'caption_error' => (strpos($caption, "Error:") === 0) ? $caption : null,
 				'keywords_error' => (strpos($keywords_raw, "Error:") === 0) ? $keywords_raw : null,

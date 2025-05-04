@@ -28,6 +28,11 @@ class LayerManager {
 			hueRotate: 0,
 			blur: 0,
 		};
+		
+		this.defaultTransform = {
+			rotation: 0, // degrees
+			scale: 100, // percentage
+		};
 	}
 	
 	_isGoogleFont(fontFamily) {
@@ -137,6 +142,8 @@ class LayerManager {
 			width: type === 'text' ? 200 : 150,
 			height: type === 'text' ? 'auto' : 100,
 			zIndex: initialZIndex,
+			rotation: this.defaultTransform.rotation,
+			scale: this.defaultTransform.scale,
 			// Text specific defaults
 			content: type === 'text' ? 'New Text' : '',
 			fontSize: 24,
@@ -182,6 +189,8 @@ class LayerManager {
 		layerData.height = layerData.height === 'auto' ? 'auto' : (parseFloat(layerData.height) || defaultProps.height);
 		layerData.opacity = parseFloat(layerData.opacity) ?? 1;
 		layerData.zIndex = parseInt(layerData.zIndex) || initialZIndex;
+		layerData.rotation = parseFloat(layerData.rotation) || this.defaultTransform.rotation;
+		layerData.scale = parseFloat(layerData.scale) || this.defaultTransform.scale;
 		
 		if (type === 'text') {
 			layerData.fontSize = Math.max(1, parseFloat(layerData.fontSize) || defaultProps.fontSize);
@@ -290,10 +299,13 @@ class LayerManager {
 				}
 				
 				// Parse/Validate specific properties (same as before)
-				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundPadding', 'backgroundCornerRadius', 'backgroundOpacity'].includes(key)) {
+				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundPadding', 'backgroundCornerRadius', 'backgroundOpacity', 'rotation', 'scale'].includes(key)) {
 					value = value === 'auto' ? 'auto' : parseFloat(value);
-					if (key === 'opacity' || key === 'backgroundOpacity') value = Math.max(0, Math.min(1, isNaN(value) ? 1 : value)); // Ensure value is number before clamp
+					
+					if (key === 'opacity' || key === 'backgroundOpacity') value = Math.max(0, Math.min(1, isNaN(value) ? 1 : value));
 					if (key === 'fontSize' && isNaN(value)) value = currentLayer.fontSize;
+					if (key === 'scale' && (isNaN(value) || value <= 0)) value = currentLayer.scale || 100;
+					if (key === 'rotation' && isNaN(value)) value = currentLayer.rotation || 0;
 					
 				} else if (['zIndex'].includes(key)) {
 					value = parseInt(value) || currentLayer.zIndex;
@@ -346,6 +358,10 @@ class LayerManager {
 			$element.toggleClass('locked', updatedLayer.locked);
 			this._updateElementInteractivity($element, updatedLayer);
 		}
+		if (newData.rotation !== undefined || newData.scale !== undefined) {
+			this._applyTransform($element, updatedLayer);
+		}
+		
 		
 		
 		// Type-specific updates
@@ -607,6 +623,15 @@ class LayerManager {
 		});
 	}
 	
+	_applyTransform($element, layerData) {
+		const rotation = layerData.rotation || 0;
+		const scale = (layerData.scale || 100) / 100; // Convert percentage to decimal
+		$element.css({
+			'transform': `rotate(${rotation}deg) scale(${scale})`,
+			'transform-origin': 'center center' // Ensure rotation/scale happens around the center
+		});
+	}
+	
 	// --- Rendering & Interaction ---
 	_renderLayer(layerData) { /* ... Update slightly ... */
 		const $element = $(`<div class="canvas-element" id="${layerData.id}"></div>`)
@@ -628,14 +653,11 @@ class LayerManager {
 		if (layerData.type === 'text') {
 			this._ensureGoogleFontLoaded(layerData.fontFamily);
 			const $textContent = $('<div class="text-content"></div>');
-			// Initial text application (full styling done by _applyTextStyles)
+
 			$textContent.text(layerData.content || '');
 			$element.append($textContent);
-			
-			// Apply all styles (including background on parent)
 			this._applyTextStyles($textContent, layerData);
 			
-			// Ensure parent height is auto if text height is auto
 			if (layerData.height === 'auto') $element.css('height', 'auto');
 			
 		} else if (layerData.type === 'image') {
@@ -648,18 +670,17 @@ class LayerManager {
 					objectFit: 'cover', // Or 'contain' depending on desired default
 					userSelect: 'none',
 					'-webkit-user-drag': 'none',
-					pointerEvents: 'none', // Image itself shouldn't capture pointer events
-					// Filters applied in _applyStyles
+					pointerEvents: 'none',
 				})
 				.on('error', function () {
 					console.error("Failed to load image:", layerData.content);
-					// Optionally display a placeholder or error indicator
 					$(this).parent().addClass('load-error'); // Add class to parent
 				});
-
+			
 			$element.append($img);
 			this._applyStyles($element, layerData);
 		}
+		this._applyTransform($element, layerData);
 		
 		this.$canvas.append($element);
 		this._makeElementInteractive($element, layerData);
