@@ -95,20 +95,37 @@ class LayerManager {
 			}
 			return 'Text Layer'; // Default if empty
 		} else if (layerData.type === 'image') {
+			// --- ADDED Case for Overlay ---
+			if (layerData.layerSubType === 'overlay') {
+				const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
+				return `Overlay ${numericIdPart}`;
+			}
+			// --- END ADDED Case ---
+			if (layerData.layerSubType === 'cover') {
+				const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
+				return `Cover ${numericIdPart}`;
+			}
+			if (layerData.layerSubType === 'element') {
+				const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
+				return `Element ${numericIdPart}`;
+			}
+			if (layerData.layerSubType === 'upload') {
+				const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
+				return `Upload ${numericIdPart}`;
+			}
+			
+			// Fallback for other image types (try filename)
 			try {
-				// Try to extract filename from URL
-				const url = new URL(layerData.content, window.location.href); // Provide base URL for relative paths
+				const url = new URL(layerData.content, window.location.href);
 				const pathParts = url.pathname.split('/');
-				const filename = decodeURIComponent(pathParts[pathParts.length - 1]); // Decode URI component
+				const filename = decodeURIComponent(pathParts[pathParts.length - 1]);
 				if (filename) {
-					// Remove extension for cleaner name (optional)
 					const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
 					return nameWithoutExt.substring(0, 30) + (nameWithoutExt.length > 30 ? '...' : '');
 				}
-			} catch (e) {
-				// Ignore errors (e.g., base64 data URI)
-			}
-			// Fallback name
+			} catch (e) { /* Ignore errors */ }
+			
+			// Final fallback name
 			const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
 			return `Image ${numericIdPart}`;
 		}

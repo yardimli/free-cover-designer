@@ -44,6 +44,9 @@ $(document).ready(function () {
 		uploadPreviewSelector: '#uploadPreview',
 		uploadInputSelector: '#imageUploadInput',
 		addImageBtnSelector: '#addImageFromUpload',
+		overlaysListSelector: '#overlayList',
+		overlaysSearchSelector: '#overlaySearch',
+		sidebarContentSelector: '#sidebarContent',
 		elementsUrl: 'data/elements.json',
 		applyTemplate: (jsonPath) => {
 			// Delete existing text layers BEFORE loading the template design
