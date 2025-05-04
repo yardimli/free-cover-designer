@@ -1,19 +1,5 @@
 class SidebarItemManager {
 	constructor(options) {
-		// Selectors
-		this.$templateList = $(options.templateListSelector);
-		this.$coverList = $(options.coverListSelector);
-		this.$coverSearch = $(options.coverSearchSelector);
-		this.$elementList = $(options.elementListSelector);
-		this.$uploadPreview = $(options.uploadPreviewSelector);
-		this.$uploadInput = $(options.uploadInputSelector);
-		this.$addImageBtn = $(options.addImageBtnSelector);
-		this.$overlayList = $(options.overlaysListSelector);
-		this.$overlaySearch = $(options.overlaysSearchSelector);
-		
-		this.$coverScrollArea = this.$coverList.closest('.panel-scrollable-content');
-		this.$overlayScrollArea = this.$overlayList.closest('.panel-scrollable-content');
-		
 		// Callbacks & Dependencies
 		this.applyTemplate = options.applyTemplate;
 		this.addLayer = options.addLayer;
@@ -21,272 +7,195 @@ class SidebarItemManager {
 		this.layerManager = options.layerManager;
 		this.canvasManager = options.canvasManager;
 		
-		// State
+		// Upload specific elements (handled separately)
+		this.$uploadPreview = $(options.uploadPreviewSelector);
+		this.$uploadInput = $(options.uploadInputSelector);
+		this.$addImageBtn = $(options.addImageBtnSelector);
 		this.uploadedFile = null;
-		// Cover State
-		this.allCoversData = [];
-		this.filteredCoversData = [];
-		this.coversToShow = 12;
-		this.currentlyDisplayedCovers = 0;
-		this.isLoadingCovers = false;
-		this.currentSearchTerm = '';
-		this.searchTimeout = null;
-		this.searchDelay = 300;
 		
-		// Overlay State
-		this.allOverlaysData = [];
-		this.filteredOverlaysData = [];
-		this.overlaysToShow = 12;
-		this.currentlyDisplayedOverlays = 0;
-		this.isLoadingOverlays = false;
-		this.currentOverlaySearchTerm = '';
-		this.overlaySearchTimeout = null;
-	}
-	
-	loadAll() {
-		this.loadTemplates();
-		this.loadCovers();
-		this.loadElements();
-		this.loadOverlays();
-		this.initializeUpload();
-	}
-	
-	// --- Templates ---
-	loadTemplates() {
-		try {
-			const templateDataElement = document.getElementById('templateData');
-			const templates = JSON.parse(templateDataElement.textContent || '[]');
-			this.$templateList.empty();
-			if (templates.length === 0) {
-				this.$templateList.html('<p class="text-muted p-2">No templates found.</p>');
-				return;
-			}
-			const $newThumbs = $();
-			const self = this;
-			templates.forEach(template => {
-				const $thumb = $(`
-                    <div class="item-thumbnail template-thumbnail loading" title="${template.name}">
+		// Configuration for different item types
+		this.itemTypesConfig = {
+			templates: {
+				type: 'templates',
+				dataElementId: 'templateData',
+				listSelector: '#templateList',
+				searchSelector: null, // No search for templates currently
+				scrollAreaSelector: '#templatesPanel .panel-scrollable-content',
+				itemsToShow: 20, // Show more templates at once, less likely to scroll
+				allData: [],
+				filteredData: [],
+				currentlyDisplayed: 0,
+				isLoading: false,
+				searchTerm: '',
+				searchTimeout: null,
+				searchDelay: 300,
+				thumbnailClass: 'template-thumbnail',
+				gridColumns: 2, // Specific grid style for templates
+				createThumbnail: (item) => `
+                    <div class="item-thumbnail ${this.itemTypesConfig.templates.thumbnailClass} loading" title="${item.name}">
                         <div class="thumbnail-spinner-overlay">
                             <div class="spinner-border spinner-border-sm text-secondary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
-                        <img src="${template.thumbnailPath}" alt="${template.name}">
-                        <span>${template.name}</span>
+                        <img src="${item.thumbnailPath}" alt="${item.name}">
+                        <span>${item.name}</span>
                     </div>
-                `);
-				$thumb.data('templateJsonPath', template.jsonPath);
-				$thumb.on('click', function() {
-					const jsonPath = $(this).data('templateJsonPath');
-					if (jsonPath && self.applyTemplate) {
-						console.log("Template clicked:", jsonPath);
-						self.applyTemplate(jsonPath);
+                `,
+				handleClick: (itemData, manager) => {
+					if (itemData.jsonPath && manager.applyTemplate) {
+						console.log("Template clicked:", itemData.jsonPath);
+						manager.applyTemplate(itemData.jsonPath);
+						this.closeSidebarPanel();
 					} else {
 						console.error("Missing jsonPath or applyTemplate callback for template click.");
 					}
-				});
-				$newThumbs.push($thumb[0]);
-			});
-			this.$templateList.append($newThumbs);
-			this._setupImageLoading($newThumbs);
-		} catch (error) {
-			console.error("Error loading templates:", error);
-			this.$templateList.html('<p class="text-danger p-2">Error loading templates.</p>');
-		}
-	}
-	
-	// --- Covers ---
-	loadCovers() {
-		try {
-			const coverDataElement = document.getElementById('coverData');
-			this.allCoversData = JSON.parse(coverDataElement.textContent || '[]');
-			this.filteredCoversData = this.allCoversData;
-			if (this.allCoversData.length === 0) {
-				this.$coverList.html('<p class="text-muted p-2">No covers found.</p>');
-				return;
-			}
-			this.displayMoreCovers(true); // Initial display
-			
-			// Search listener
-			this.$coverSearch.on('input', () => {
-				clearTimeout(this.searchTimeout);
-				this.searchTimeout = setTimeout(() => {
-					this.currentSearchTerm = this.$coverSearch.val().toLowerCase().trim();
-					this.filterCovers();
-					this.displayMoreCovers(true); // Reset display on new search
-				}, this.searchDelay);
-			});
-			
-			this.initializeScrollListener('covers');
-			
-		} catch (error) {
-			console.error("Error loading or parsing covers data:", error);
-			this.$coverList.html('<p class="text-danger p-2">Error loading covers.</p>');
-		}
-	}
-	
-	filterCovers() {
-		if (!this.currentSearchTerm) {
-			this.filteredCoversData = this.allCoversData;
-			return;
-		}
-		const searchKeywords = this.currentSearchTerm.split(/\s+/).filter(Boolean);
-		this.filteredCoversData = this.allCoversData.filter(cover => {
-			const coverKeywordsLower = cover.keywords.map(k => k.toLowerCase());
-			return searchKeywords.every(searchTerm =>
-				coverKeywordsLower.some(coverKeyword => coverKeyword.includes(searchTerm)) // Use includes for partial match
-			);
-		});
-	}
-	
-	displayMoreCovers(reset = false) {
-		if (this.isLoadingCovers && !reset) return;
-		this.isLoadingCovers = true;
-		
-		if (reset) {
-			this.$coverList.empty();
-			this.currentlyDisplayedCovers = 0;
-			this.$coverList.closest('.panel-scrollable-content').scrollTop(0);
-		}
-		
-		const coversToRender = this.filteredCoversData.slice(
-			this.currentlyDisplayedCovers,
-			this.currentlyDisplayedCovers + this.coversToShow
-		);
-		
-		if (coversToRender.length === 0 && reset) {
-			if (this.currentSearchTerm) {
-				this.$coverList.html('<p class="text-muted p-2">No covers match your search.</p>');
-			} else if (this.allCoversData.length === 0) {
-				this.$coverList.html('<p class="text-muted p-2">No covers found.</p>');
-			}
-			this.isLoadingCovers = false;
-			return;
-		}
-		
-		if (coversToRender.length === 0 && !reset) {
-			this.isLoadingCovers = false;
-			return; // No more covers to load
-		}
-		
-		const $newThumbs = $();
-		const self = this;
-		coversToRender.forEach(cover => {
-			const title = cover.caption ? `${cover.name} - ${cover.caption}` : cover.name;
-			const $thumb = $(`
-                <div class="item-thumbnail cover-thumbnail loading" title="${title}">
-                     <div class="thumbnail-spinner-overlay">
-                        <div class="spinner-border spinner-border-sm text-secondary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                    <img src="${cover.thumbnailPath}" alt="${cover.name}">
-                    <span>${cover.name}</span>
-                </div>
-            `);
-			$thumb.data('coverSrc', cover.imagePath);
-			$thumb.on('click', function() {
-				const imgSrc = $(this).data('coverSrc');
-				if (imgSrc && self.addLayer && self.canvasManager && self.layerManager) {
-					console.log("Cover clicked:", imgSrc);
-					// Remove existing cover layers
-					console.log("Applying cover, removing existing cover layers...");
-					const existingLayers = self.layerManager.getLayers();
-					const coverLayerIdsToDelete = existingLayers
-						.filter(layer => layer.type === 'image' && layer.layerSubType === 'cover')
-						.map(layer => layer.id);
-					if (coverLayerIdsToDelete.length > 0) {
-						coverLayerIdsToDelete.forEach(id => self.layerManager.deleteLayer(id, false));
-						console.log(`Removed ${coverLayerIdsToDelete.length} cover layers.`);
-					} else {
-						console.log("No existing cover layers found to remove.");
-					}
-					
-					const img = new Image();
-					img.onload = () => {
-						const canvasWidth = self.canvasManager.currentCanvasWidth;
-						const canvasHeight = self.canvasManager.currentCanvasHeight;
-						const newLayer = self.addLayer('image', {
-							content: imgSrc,
-							x: 0,
-							y: 0,
-							width: canvasWidth,
-							height: canvasHeight,
-							name: `Cover ${self.layerManager.uniqueIdCounter}`,
-							layerSubType: 'cover'
-						});
-						if (newLayer) {
-							self.layerManager.moveLayer(newLayer.id, 'back');
-							self.layerManager.toggleLockLayer(newLayer.id, false);
-							
-							self.layerManager.selectLayer(null);
-							self.saveState();
-						}
-					};
-					img.onerror = () => console.error("Failed to load cover image for clicking:", imgSrc);
-					img.src = imgSrc;
-				} else {
-					console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for cover click.");
+				},
+				filterFn: (item, term) => {
+					if (!term) return true;
+					// Simple name filter for templates
+					return item.name.toLowerCase().includes(term);
 				}
-			});
-			$newThumbs.push($thumb[0]);
-		});
-		
-		this.$coverList.append($newThumbs);
-		this._setupImageLoading($newThumbs);
-		this.currentlyDisplayedCovers += coversToRender.length;
-		
-		setTimeout(() => { this.isLoadingCovers = false; }, 100); // Short delay to prevent rapid re-triggering
-	}
-	
-	// --- Elements ---
-	loadElements() {
-		try {
-			const elementDataElement = document.getElementById('elementData');
-			const elements = JSON.parse(elementDataElement.textContent || '[]');
-			this.$elementList.empty();
-			if (elements.length === 0) {
-				this.$elementList.html('<p class="text-muted p-2">No elements found.</p>');
-				return;
-			}
-			const $newThumbs = $();
-			const self = this;
-			elements.forEach(element => {
-				const $thumb = $(`
-                    <div class="item-thumbnail element-thumbnail loading" title="${element.name}">
+			},
+			covers: {
+				type: 'covers',
+				dataElementId: 'coverData',
+				listSelector: '#coverList',
+				searchSelector: '#coverSearch',
+				scrollAreaSelector: '#coversPanel .panel-scrollable-content',
+				itemsToShow: 12,
+				allData: [],
+				filteredData: [],
+				currentlyDisplayed: 0,
+				isLoading: false,
+				searchTerm: '',
+				searchTimeout: null,
+				searchDelay: 300,
+				thumbnailClass: 'cover-thumbnail',
+				gridColumns: 2, // Specific grid style for covers
+				createThumbnail: (item) => {
+					const title = item.caption ? `${item.name} - ${item.caption}` : item.name;
+					return `
+                        <div class="item-thumbnail ${this.itemTypesConfig.covers.thumbnailClass} loading" title="${title}">
+                            <div class="thumbnail-spinner-overlay">
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <img src="${item.thumbnailPath}" alt="${item.name}">
+                            <span>${item.name}</span>
+                        </div>
+                    `;
+				},
+				handleClick: (itemData, manager) => {
+					const imgSrc = itemData.imagePath;
+					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager) {
+						console.log("Cover clicked:", imgSrc);
+						// Remove existing cover layers
+						console.log("Applying cover, removing existing cover layers...");
+						const existingLayers = manager.layerManager.getLayers();
+						const coverLayerIdsToDelete = existingLayers
+							.filter(layer => layer.type === 'image' && layer.layerSubType === 'cover')
+							.map(layer => layer.id);
+						if (coverLayerIdsToDelete.length > 0) {
+							coverLayerIdsToDelete.forEach(id => manager.layerManager.deleteLayer(id, false));
+							console.log(`Removed ${coverLayerIdsToDelete.length} cover layers.`);
+						} else {
+							console.log("No existing cover layers found to remove.");
+						}
+						
+						const img = new Image();
+						img.onload = () => {
+							const canvasWidth = manager.canvasManager.currentCanvasWidth;
+							const canvasHeight = manager.canvasManager.currentCanvasHeight;
+							const newLayer = manager.addLayer('image', {
+								content: imgSrc,
+								x: 0,
+								y: 0,
+								width: canvasWidth,
+								height: canvasHeight,
+								name: `Cover ${manager.layerManager.uniqueIdCounter}`, // Use manager's counter
+								layerSubType: 'cover'
+							});
+							if (newLayer) {
+								manager.layerManager.moveLayer(newLayer.id, 'back');
+								manager.layerManager.toggleLockLayer(newLayer.id, false); // Don't save history yet
+								manager.layerManager.selectLayer(null);
+								manager.saveState(); // Save history once after all changes
+								this.closeSidebarPanel();
+							}
+						};
+						img.onerror = () => console.error("Failed to load cover image for clicking:", imgSrc);
+						img.src = imgSrc;
+					} else {
+						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for cover click.");
+					}
+				},
+				filterFn: (item, term) => {
+					if (!term) return true;
+					const searchKeywords = term.split(/\s+/).filter(Boolean);
+					const itemKeywordsLower = item.keywords.map(k => k.toLowerCase());
+					const nameLower = item.name.toLowerCase();
+					return searchKeywords.every(searchTermPart =>
+						itemKeywordsLower.some(itemKeyword => itemKeyword.includes(searchTermPart)) ||
+						nameLower.includes(searchTermPart) // Also search in name
+					);
+				}
+			},
+			elements: {
+				type: 'elements',
+				dataElementId: 'elementData',
+				listSelector: '#elementList',
+				searchSelector: '#elementSearch', // Now exists in HTML
+				scrollAreaSelector: '#elementsPanel .panel-scrollable-content',
+				itemsToShow: 12,
+				allData: [],
+				filteredData: [],
+				currentlyDisplayed: 0,
+				isLoading: false,
+				searchTerm: '',
+				searchTimeout: null,
+				searchDelay: 300,
+				thumbnailClass: 'element-thumbnail',
+				gridColumns: 2, // Specific grid style for elements
+				createThumbnail: (item) => `
+                    <div class="item-thumbnail ${this.itemTypesConfig.elements.thumbnailClass} loading" title="${item.name}">
                         <div class="thumbnail-spinner-overlay">
                             <div class="spinner-border spinner-border-sm text-secondary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
-                        <img src="${element.image}" alt="${element.name}">
+                        <img src="${item.image}" alt="${item.name}">
                         <!-- No span for name below element -->
                     </div>
-                `);
-				$thumb.data('elementSrc', element.image);
-				$thumb.on('click', function() {
-					const imgSrc = $(this).data('elementSrc');
-					if (imgSrc && self.addLayer && self.canvasManager && self.layerManager) {
+                `,
+				handleClick: (itemData, manager) => {
+					const imgSrc = itemData.image;
+					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager) {
 						console.log("Element clicked:", imgSrc);
 						const img = new Image();
 						img.onload = () => {
-							const elemWidth = Math.min(img.width, 150);
+							const elemWidth = Math.min(img.width, 150); // Default size
 							const elemHeight = (img.height / img.width) * elemWidth;
-							const canvasWidth = self.canvasManager.currentCanvasWidth;
-							const canvasHeight = self.canvasManager.currentCanvasHeight;
+							const canvasWidth = manager.canvasManager.currentCanvasWidth;
+							const canvasHeight = manager.canvasManager.currentCanvasHeight;
+							// Center the element
 							const finalX = Math.max(0, (canvasWidth / 2) - (elemWidth / 2));
 							const finalY = Math.max(0, (canvasHeight / 2) - (elemHeight / 2));
-							const newLayer = self.addLayer('image', {
+							
+							const newLayer = manager.addLayer('image', {
 								content: imgSrc,
 								x: finalX,
 								y: finalY,
 								width: elemWidth,
 								height: elemHeight,
-								layerSubType: 'element'
+								layerSubType: 'element',
+								name: `${itemData.name} ${manager.layerManager.uniqueIdCounter}` // Use element name + counter
 							});
 							if (newLayer) {
-								self.layerManager.selectLayer(newLayer.id);
-								self.saveState();
+								manager.layerManager.selectLayer(newLayer.id);
+								manager.saveState();
+								this.closeSidebarPanel();
 							}
 						};
 						img.onerror = () => console.error("Failed to load element image for clicking:", imgSrc);
@@ -294,97 +203,330 @@ class SidebarItemManager {
 					} else {
 						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for element click.");
 					}
-				});
-				$newThumbs.push($thumb[0]);
-			});
-			this.$elementList.append($newThumbs);
-			this._setupImageLoading($newThumbs);
+				},
+				filterFn: (item, term) => {
+					if (!term) return true;
+					// Simple name filter for elements
+					return item.name.toLowerCase().includes(term);
+				}
+			},
+			overlays: {
+				type: 'overlays',
+				dataElementId: 'overlayData',
+				listSelector: '#overlayList',
+				searchSelector: '#overlaySearch',
+				scrollAreaSelector: '#overlaysPanel .panel-scrollable-content',
+				itemsToShow: 12,
+				allData: [],
+				filteredData: [],
+				currentlyDisplayed: 0,
+				isLoading: false,
+				searchTerm: '',
+				searchTimeout: null,
+				searchDelay: 300,
+				thumbnailClass: 'overlay-thumbnail',
+				gridColumns: 2, // Specific grid style for overlays
+				createThumbnail: (item) => `
+                    <div class="item-thumbnail ${this.itemTypesConfig.overlays.thumbnailClass} loading" title="${item.name}">
+                        <div class="thumbnail-spinner-overlay">
+                            <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <img src="${item.thumbnailPath}" alt="${item.name}">
+                        <!-- No span for name below overlay -->
+                    </div>
+                `,
+				handleClick: (itemData, manager) => {
+					const imgSrc = itemData.imagePath; // Use the actual image path
+					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager) {
+						console.log("Overlay clicked:", imgSrc);
+						
+						// --- Confirmation Logic ---
+						const existingLayers = manager.layerManager.getLayers();
+						const existingOverlayIds = existingLayers
+							.filter(layer => layer.type === 'image' && layer.layerSubType === 'overlay')
+							.map(layer => layer.id);
+						
+						let deleteConfirmed = true; // Assume deletion if none exist
+						if (existingOverlayIds.length > 0) {
+							deleteConfirmed = confirm("Remove existing overlay layer(s) before adding this one?");
+							if (deleteConfirmed) {
+								console.log(`Removing ${existingOverlayIds.length} existing overlay layers.`);
+								existingOverlayIds.forEach(id => manager.layerManager.deleteLayer(id, false)); // Don't save history yet
+							} else {
+								console.log("Keeping existing overlay layers.");
+							}
+						}
+						// --- End Confirmation ---
+						
+						const img = new Image();
+						img.onload = () => {
+							const canvasWidth = manager.canvasManager.currentCanvasWidth;
+							const canvasHeight = manager.canvasManager.currentCanvasHeight;
+							const imgWidth = img.width;
+							const imgHeight = img.height;
+							
+							// Calculate centered position
+							const finalX = (canvasWidth - imgWidth) / 2;
+							const finalY = (canvasHeight - imgHeight) / 2;
+							
+							const newLayer = manager.addLayer('image', {
+								content: imgSrc,
+								x: finalX,
+								y: finalY,
+								width: imgWidth,
+								height: imgHeight,
+								blendMode: 'overlay', // Default blend mode for overlays
+								layerSubType: 'overlay',
+								name: `Overlay ${manager.layerManager.uniqueIdCounter}`
+							});
+							
+							if (newLayer) {
+								// --- Positioning Logic (Place above highest cover layer) ---
+								const allLayers = manager.layerManager.getLayers(); // Get layers *after* adding
+								const coverLayers = allLayers.filter(l => l.type === 'image' && l.layerSubType === 'cover');
+								const coverZIndex = coverLayers.length > 0 ? Math.max(...coverLayers.map(l => l.zIndex || 0)) : 0;
+								const targetZIndex = coverZIndex + 1; // Place just above the highest cover layer
+								
+								console.log(`Positioning new overlay ${newLayer.id} at zIndex ${targetZIndex}`);
+								
+								// Update zIndex values in the LayerManager's internal array
+								const addedLayerInData = manager.layerManager.layers.find(l => l.id === newLayer.id);
+								if (addedLayerInData) {
+									// Shift other layers up to make space
+									manager.layerManager.layers.forEach(layer => {
+										if (layer.zIndex >= targetZIndex && layer.id !== newLayer.id) {
+											layer.zIndex++;
+										}
+									});
+									// Set the target zIndex for the new layer
+									addedLayerInData.zIndex = targetZIndex;
+								} else {
+									console.error("Could not find newly added layer in internal array for zIndex update.");
+								}
+								
+								// Apply the updated z-indices to the DOM elements and update the list
+								manager.layerManager._updateZIndices();
+								manager.layerManager.updateList();
+								// --- End Positioning ---
+								
+								manager.layerManager.selectLayer(newLayer.id); // Select the new layer
+								manager.saveState(); // Save history after all changes
+								this.closeSidebarPanel();
+							}
+						};
+						img.onerror = () => console.error("Failed to load overlay image for clicking:", imgSrc);
+						img.src = imgSrc; // Load the actual image to get dimensions
+					} else {
+						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for overlay click.");
+					}
+				},
+				filterFn: (item, term) => {
+					if (!term) return true;
+					const searchKeywords = term.split(/\s+/).filter(Boolean);
+					const itemKeywordsLower = item.keywords.map(k => k.toLowerCase());
+					const nameLower = item.name.toLowerCase();
+					return searchKeywords.every(searchTermPart =>
+						itemKeywordsLower.some(itemKeyword => itemKeyword.includes(searchTermPart)) ||
+						nameLower.includes(searchTermPart) // Also search in name
+					);
+				}
+			}
+		};
+	}
+	
+	closeSidebarPanel() {
+		const $sidebarPanelsContainer = $('#sidebar-panels-container');
+		const $sidebarNavLinks = $('.sidebar-nav .nav-link[data-panel-target]');
+		
+		$sidebarPanelsContainer.removeClass('open');
+		$sidebarNavLinks.removeClass('active');
+	}
+	
+	
+	loadAll() {
+		Object.keys(this.itemTypesConfig).forEach(type => {
+			this.loadItems(type);
+		});
+		this.initializeUpload();
+	}
+	
+	// --- Generic Item Loading and Display ---
+	
+	loadItems(type) {
+		const config = this.itemTypesConfig[type];
+		if (!config) {
+			console.error(`Invalid item type "${type}" requested for loading.`);
+			return;
+		}
+		
+		const $list = $(config.listSelector);
+		if (!$list.length) {
+			console.error(`List container not found for type "${type}": ${config.listSelector}`);
+			return;
+		}
+		
+		try {
+			const dataElement = document.getElementById(config.dataElementId);
+			if (!dataElement) {
+				throw new Error(`Data element not found: #${config.dataElementId}`);
+			}
+			config.allData = JSON.parse(dataElement.textContent || '[]');
+			config.filteredData = config.allData; // Initially, all data is filtered data
+			
+			if (config.allData.length === 0) {
+				$list.html(`<p class="text-muted p-2">No ${type} found.</p>`);
+				return;
+			}
+			
+			// Set grid columns if specified
+			if (config.gridColumns) {
+				$list.css('grid-template-columns', `repeat(${config.gridColumns}, 1fr)`);
+			}
+			
+			this.displayMoreItems(type, true); // Initial display
+			
+			// Initialize search if a selector is provided
+			if (config.searchSelector) {
+				this.initializeSearchListener(type);
+			}
+			
+			// Initialize infinite scroll
+			this.initializeScrollListener(type);
+			
 		} catch (error) {
-			console.error("Error loading elements:", error);
-			this.$elementList.html('<p class="text-danger p-2">Error loading elements.</p>');
+			console.error(`Error loading or parsing ${type} data:`, error);
+			$list.html(`<p class="text-danger p-2">Error loading ${type}.</p>`);
 		}
 	}
 	
-	// --- Overlays
-	loadOverlays() {
-		try {
-			const overlayDataElement = document.getElementById('overlayData');
-			this.allOverlaysData = JSON.parse(overlayDataElement.textContent || '[]');
-			this.filteredOverlaysData = this.allOverlaysData;
-			if (this.allOverlaysData.length === 0) {
-				this.$overlayList.html('<p class="text-muted p-2">No overlays found.</p>');
-				return;
-			}
-			this.displayMoreOverlays(true); // Initial display
-			
-			// Search listener
-			this.$overlaySearch.on('input', () => {
-				clearTimeout(this.overlaySearchTimeout);
-				this.overlaySearchTimeout = setTimeout(() => {
-					this.currentOverlaySearchTerm = this.$overlaySearch.val().toLowerCase().trim();
-					this.filterOverlays();
-					this.displayMoreOverlays(true); // Reset display on new search
-				}, this.searchDelay);
-			});
-			
-			this.initializeScrollListener('overlays');
-		} catch (error) {
-			console.error("Error loading or parsing overlays data:", error);
-			this.$overlayList.html('<p class="text-danger p-2">Error loading overlays.</p>');
+	filterItems(type) {
+		const config = this.itemTypesConfig[type];
+		if (!config || !config.filterFn) return;
+		
+		if (!config.searchTerm) {
+			config.filteredData = config.allData;
+		} else {
+			const term = config.searchTerm.toLowerCase();
+			config.filteredData = config.allData.filter(item => config.filterFn(item, term));
 		}
+	}
+	
+	displayMoreItems(type, reset = false) {
+		const config = this.itemTypesConfig[type];
+		if (!config) return;
+		
+		if (config.isLoading && !reset) return;
+		config.isLoading = true;
+		
+		const $list = $(config.listSelector);
+		const $scrollArea = $list.closest('.panel-scrollable-content');
+		
+		if (reset) {
+			$list.empty();
+			config.currentlyDisplayed = 0;
+			if ($scrollArea.length) {
+				$scrollArea.scrollTop(0); // Reset scroll position
+			}
+		}
+		
+		const itemsToRender = config.filteredData.slice(
+			config.currentlyDisplayed,
+			config.currentlyDisplayed + config.itemsToShow
+		);
+		
+		if (itemsToRender.length === 0) {
+			if (reset) { // Only show message if it's a fresh display (search result or initial load)
+				if (config.searchTerm) {
+					$list.html(`<p class="text-muted p-2">No ${type} match your search.</p>`);
+				} else if (config.allData.length === 0) {
+					// Message already handled in loadItems
+				} else {
+					// This case shouldn't happen if allData has items and searchTerm is empty
+					$list.html(`<p class="text-muted p-2">No more ${type} to display.</p>`);
+				}
+			}
+			config.isLoading = false;
+			return; // No more items to load or none found
+		}
+		
+		const $newThumbs = $();
+		const self = this; // Reference to SidebarItemManager instance
+		
+		itemsToRender.forEach(itemData => {
+			const $thumb = $(config.createThumbnail(itemData));
+			$thumb.data('itemData', itemData); // Store the full item data
+			
+			$thumb.on('click', function() {
+				const clickedItemData = $(this).data('itemData');
+				if (config.handleClick) {
+					config.handleClick(clickedItemData, self); // Pass item data and manager instance
+				}
+			});
+			$newThumbs.push($thumb[0]);
+		});
+		
+		$list.append($newThumbs);
+		this._setupImageLoading($newThumbs); // Handle loading spinners/opacity
+		
+		config.currentlyDisplayed += itemsToRender.length;
+		
+		// Use setTimeout to prevent rapid re-triggering during scroll momentum
+		setTimeout(() => {
+			config.isLoading = false;
+		}, 100);
+	}
+	
+	initializeSearchListener(type) {
+		const config = this.itemTypesConfig[type];
+		if (!config || !config.searchSelector) return;
+		
+		const $search = $(config.searchSelector);
+		if (!$search.length) {
+			console.warn(`Search input not found for type "${type}": ${config.searchSelector}`);
+			return;
+		}
+		
+		$search.on('input', () => {
+			clearTimeout(config.searchTimeout);
+			config.searchTimeout = setTimeout(() => {
+				config.searchTerm = $search.val().toLowerCase().trim();
+				this.filterItems(type);
+				this.displayMoreItems(type, true); // Reset display on new search
+			}, config.searchDelay);
+		});
 	}
 	
 	initializeScrollListener(type) {
-		let $scrollArea;
-		let checkLoadingFlag;
-		let displayMoreFn;
-		let currentlyDisplayedCount;
-		let filteredData;
+		const config = this.itemTypesConfig[type];
+		if (!config || !config.scrollAreaSelector) return;
 		
-		// Determine which scroll area and functions to use based on type
-		if (type === 'covers') {
-			$scrollArea = this.$coverScrollArea;
-			checkLoadingFlag = () => this.isLoadingCovers;
-			displayMoreFn = () => this.displayMoreCovers();
-			currentlyDisplayedCount = () => this.currentlyDisplayedCovers;
-			filteredData = () => this.filteredCoversData;
-		} else if (type === 'overlays') {
-			$scrollArea = this.$overlayScrollArea;
-			checkLoadingFlag = () => this.isLoadingOverlays;
-			displayMoreFn = () => this.displayMoreOverlays();
-			currentlyDisplayedCount = () => this.currentlyDisplayedOverlays;
-			filteredData = () => this.filteredOverlaysData;
-		} else {
-			console.error("Invalid type passed to initializeScrollListener:", type);
+		const $scrollArea = $(config.scrollAreaSelector);
+		if (!$scrollArea.length) {
+			console.error(`Scroll area not found for type "${type}": ${config.scrollAreaSelector}`);
 			return;
 		}
-		
-		if (!$scrollArea || !$scrollArea.length) {
-			console.error(`SidebarItemManager: ${type} scroll area not found.`);
-			return;
-		}
-		
-		console.log(`Initializing scroll listener for: ${type}`); // Debug log
 		
 		// Use 'this' context of the manager instance
 		const self = this;
 		
-		// Attach listener directly to the specific scrollable div
-		$scrollArea.off('scroll.sidebarLoader').on('scroll.sidebarLoader', function() { // Use namespace
+		// Attach namespaced listener
+		$scrollArea.off(`scroll.${type}Loader`).on(`scroll.${type}Loader`, function() {
 			const scrolledElement = this; // 'this' is the .panel-scrollable-content div
 			const threshold = 200; // Pixels from bottom
 			
 			// Check if loading is already in progress for this type
-			if (checkLoadingFlag()) {
+			if (config.isLoading) {
 				return;
 			}
 			
 			// Check scroll position
 			if (scrolledElement.scrollTop + scrolledElement.clientHeight >= scrolledElement.scrollHeight - threshold) {
 				// Check if there are more items to load
-				if (currentlyDisplayedCount() < filteredData().length) {
+				if (config.currentlyDisplayed < config.filteredData.length) {
 					// console.log(`Scrolling near bottom of ${type} - loading more`); // Debug log
-					displayMoreFn(); // Call the appropriate display function
+					self.displayMoreItems(type); // Call the generic display function
 				} else {
 					// console.log(`Scrolling near bottom of ${type} - no more items to load.`); // Debug log
 				}
@@ -392,163 +534,7 @@ class SidebarItemManager {
 		});
 	}
 	
-	filterOverlays() {
-		if (!this.currentOverlaySearchTerm) {
-			this.filteredOverlaysData = this.allOverlaysData;
-			return;
-		}
-		const searchKeywords = this.currentOverlaySearchTerm.split(/\s+/).filter(Boolean);
-		this.filteredOverlaysData = this.allOverlaysData.filter(overlay => {
-			const overlayKeywordsLower = overlay.keywords.map(k => k.toLowerCase());
-			return searchKeywords.every(searchTerm =>
-				overlayKeywordsLower.some(overlayKeyword => overlayKeyword.includes(searchTerm)) // Use includes for partial match
-			);
-		});
-	}
-	
-	displayMoreOverlays(reset = false) {
-		if (this.isLoadingOverlays && !reset) return;
-		this.isLoadingOverlays = true;
-		
-		if (reset) {
-			this.$overlayList.empty();
-			this.currentlyDisplayedOverlays = 0;
-			this.$overlayList.closest('.panel-scrollable-content').scrollTop(0);
-		}
-		
-		const overlaysToRender = this.filteredOverlaysData.slice(
-			this.currentlyDisplayedOverlays,
-			this.currentlyDisplayedOverlays + this.overlaysToShow
-		);
-		
-		if (overlaysToRender.length === 0 && reset) {
-			if (this.currentOverlaySearchTerm) {
-				this.$overlayList.html('<p class="text-muted p-2">No overlays match your search.</p>');
-			} else if (this.allOverlaysData.length === 0) {
-				this.$overlayList.html('<p class="text-muted p-2">No overlays found.</p>');
-			}
-			this.isLoadingOverlays = false;
-			return;
-		}
-		if (overlaysToRender.length === 0 && !reset) {
-			this.isLoadingOverlays = false;
-			return; // No more overlays to load
-		}
-		
-		const $newThumbs = $();
-		const self = this;
-		overlaysToRender.forEach(overlay => {
-			const $thumb = $(`
-                <div class="item-thumbnail overlay-thumbnail loading" title="${overlay.name}">
-                     <div class="thumbnail-spinner-overlay">
-                        <div class="spinner-border spinner-border-sm text-secondary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                    <img src="${overlay.thumbnailPath}" alt="${overlay.name}">
-                    <!-- No span for name below overlay -->
-                </div>
-            `);
-			// Store the ACTUAL image path (not the thumbnail)
-			$thumb.data('overlaySrc', overlay.imagePath);
-			
-			$thumb.on('click', function() {
-				const imgSrc = $(this).data('overlaySrc');
-				if (imgSrc && self.addLayer && self.canvasManager && self.layerManager) {
-					console.log("Overlay clicked:", imgSrc);
-					
-					// --- Confirmation Logic ---
-					const existingLayers = self.layerManager.getLayers();
-					const existingOverlayIds = existingLayers
-						.filter(layer => layer.type === 'image' && layer.layerSubType === 'overlay')
-						.map(layer => layer.id);
-					
-					let deleteConfirmed = true; // Assume deletion if none exist
-					if (existingOverlayIds.length > 0) {
-						deleteConfirmed = confirm("Remove existing overlay layer(s) before adding this one?");
-						if (deleteConfirmed) {
-							console.log(`Removing ${existingOverlayIds.length} existing overlay layers.`);
-							existingOverlayIds.forEach(id => self.layerManager.deleteLayer(id, false)); // Don't save history yet
-						} else {
-							console.log("Keeping existing overlay layers.");
-						}
-					}
-					
-					const img = new Image();
-					img.onload = () => {
-						const canvasWidth = self.canvasManager.currentCanvasWidth;
-						const canvasHeight = self.canvasManager.currentCanvasHeight;
-						const imgWidth = img.width;
-						const imgHeight = img.height;
-						
-						// Calculate centered position
-						const finalX = (canvasWidth - imgWidth) / 2;
-						const finalY = (canvasHeight - imgHeight) / 2;
-						
-						const newLayer = self.addLayer('image', {
-							content: imgSrc,
-							x: finalX,
-							y: finalY,
-							width: imgWidth,
-							height: imgHeight,
-							blendMode: 'overlay', // Set blend mode
-							layerSubType: 'overlay', // Set subtype
-							name: `Overlay ${self.layerManager.uniqueIdCounter}` // Generate name
-						});
-						
-						if (newLayer) {
-							// --- Positioning Logic ---
-							const allLayers = self.layerManager.getLayers(); // Get layers *after* adding
-							const coverLayers = allLayers.filter(l => l.type === 'image' && l.layerSubType === 'cover');
-							const coverZIndex = coverLayers.length > 0 ? Math.max(...coverLayers.map(l => l.zIndex || 0)) : 0;
-							const targetZIndex = coverZIndex + 1; // Place just above the highest cover layer
-							
-							console.log(`Positioning new overlay ${newLayer.id} at zIndex ${targetZIndex}`);
-							
-							// Update zIndex values in the LayerManager's internal array
-							// Find the actual layer object in the manager's array
-							const addedLayerInData = self.layerManager.layers.find(l => l.id === newLayer.id);
-							if (addedLayerInData) {
-								// Shift other layers up to make space
-								self.layerManager.layers.forEach(layer => {
-									if (layer.zIndex >= targetZIndex && layer.id !== newLayer.id) {
-										layer.zIndex++;
-									}
-								});
-								// Set the target zIndex for the new layer
-								addedLayerInData.zIndex = targetZIndex;
-							} else {
-								console.error("Could not find newly added layer in internal array for zIndex update.");
-							}
-							
-							// Apply the updated z-indices to the DOM elements and update the list
-							self.layerManager._updateZIndices();
-							self.layerManager.updateList();
-							// --- End Positioning ---
-							
-							self.layerManager.selectLayer(newLayer.id); // Select the new layer
-							self.saveState(); // Save history after all changes
-						}
-					};
-					img.onerror = () => console.error("Failed to load overlay image for clicking:", imgSrc);
-					img.src = imgSrc; // Load the actual image to get dimensions
-				} else {
-					console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for overlay click.");
-				}
-			});
-			// --- END CLICK HANDLER ---
-			
-			$newThumbs.push($thumb[0]);
-		});
-		
-		this.$overlayList.append($newThumbs);
-		this._setupImageLoading($newThumbs); // Reuse existing image loading logic
-		this.currentlyDisplayedOverlays += overlaysToRender.length;
-		setTimeout(() => { this.isLoadingOverlays = false; }, 100); // Short delay
-	}
-	// --- Overlays --- END NEW ---
-	
-	
+	// --- Image Loading Helper (Unchanged) ---
 	_setupImageLoading($thumbnails) {
 		$thumbnails.each(function() {
 			const $thumb = $(this);
@@ -581,7 +567,6 @@ class SidebarItemManager {
 				$img.on('load', onImageLoad);
 				$img.on('error', onImageError);
 				// Double-check completion status after attaching listeners
-				// in case it loaded between the check and listener attachment
 				if (img.complete) {
 					onImageLoad();
 					$img.off('load', onImageLoad); // Clean up listeners
@@ -591,7 +576,7 @@ class SidebarItemManager {
 		});
 	}
 	
-	// --- Upload ---
+	// --- Upload (Unchanged) ---
 	initializeUpload() {
 		const self = this;
 		this.$uploadInput.on('change', (event) => {
@@ -621,6 +606,7 @@ class SidebarItemManager {
 					img.onload = () => {
 						const canvasWidth = self.canvasManager.currentCanvasWidth;
 						const canvasHeight = self.canvasManager.currentCanvasHeight;
+						// Calculate initial size (fit within 80% of canvas, max 300px wide)
 						const maxWidth = Math.min(canvasWidth * 0.8, 300);
 						let layerWidth = Math.min(img.width, maxWidth);
 						const aspectRatio = img.height / img.width;
@@ -630,15 +616,18 @@ class SidebarItemManager {
 							layerHeight = maxHeight;
 							layerWidth = layerHeight / aspectRatio;
 						}
+						// Center the uploaded image
 						const layerX = Math.max(0, (canvasWidth - layerWidth) / 2);
 						const layerY = Math.max(0, (canvasHeight - layerHeight) / 2);
+						
 						const newLayer = self.addLayer('image', {
-							content: e.target.result,
+							content: e.target.result, // Use data URL from reader
 							x: layerX,
 							y: layerY,
 							width: layerWidth,
 							height: layerHeight,
-							layerSubType: 'upload'
+							layerSubType: 'upload',
+							name: `Upload ${self.layerManager.uniqueIdCounter}`
 						});
 						if (newLayer) {
 							self.layerManager.selectLayer(newLayer.id);

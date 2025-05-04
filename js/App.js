@@ -8,7 +8,6 @@ $(document).ready(function () {
 	const $inspectorPanelElement = $('#inspectorPanel'); // Reference the panel element itself
 	
 	// Sidebar Panel References
-	const $sidebarNav = $('.sidebar-nav');
 	const $sidebarPanelsContainer = $('#sidebar-panels-container');
 	const $sidebarPanels = $('.sidebar-panel');
 	const $sidebarNavLinks = $('.sidebar-nav .nav-link[data-panel-target]');
@@ -69,8 +68,6 @@ $(document).ready(function () {
 				console.log("No existing text layers found to remove.");
 			}
 			canvasManager.loadDesign(jsonPath, true); // Load as template
-			closeSidebarPanel(); // Close left panel after applying
-			// Don't explicitly save history here, loadDesign(true) handles it
 		},
 		addLayer: (type, props) => layerManager.addLayer(type, props),
 		saveState: () => historyManager.saveState(),
@@ -171,8 +168,6 @@ $(document).ready(function () {
 	function closeSidebarPanel() {
 		$sidebarPanelsContainer.removeClass('open');
 		$sidebarNavLinks.removeClass('active');
-		// Don't hide panels immediately, let the container slide out first
-		// $sidebarPanels.removeClass('active');
 	}
 	// --- END Sidebar Panel Logic ---
 	

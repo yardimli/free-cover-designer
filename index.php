@@ -234,7 +234,9 @@
 			<div id="templatesPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
 				<div class="panel-content-wrapper">
-					<div class="panel-header">Templates</div>
+					<div class="panel-header">
+						<input type="search" id="templateSearch" class="form-control form-control-sm" placeholder="Search templates...">
+					</div>
 					<div id="templateList" class="item-grid panel-scrollable-content"><p>Loading templates...</p></div>
 				</div>
 			</div>
@@ -243,7 +245,9 @@
 			<div id="elementsPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
 				<div class="panel-content-wrapper">
-					<div class="panel-header">Elements</div>
+					<div class="panel-header">
+						<input type="search" id="elementSearch" class="form-control form-control-sm" placeholder="Search elements...">
+					</div>
 					<div id="elementList" class="item-grid panel-scrollable-content"><p>Loading elements...</p></div>
 				</div>
 			</div>

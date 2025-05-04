@@ -14,9 +14,9 @@ add overlays to cover ..........................................................
 add rotate and scale to layers ............................................................OK
 find transparent png images for elements, load them from folder instead of json ...........OK
 add vertical alignment to text layers
+add layer name to inspector
 move lock, delete, move up/down layers to the inspector
 update elements to load lazy like covers with search from json file
-add new text layer
 duplicate text layer
 make ui look like polotno
 add dark/light mode to ui

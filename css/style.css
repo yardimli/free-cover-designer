@@ -25,7 +25,7 @@ body {
     background-color: #343a40; /* Darker background for icon bar */
     padding-top: 0.5rem;
     flex-shrink: 0; /* Prevent shrinking */
-    z-index: 1030; /* Below panels and inspector */
+    z-index: 1050; /* Below panels and inspector */
     height: 100%; /* Fill height */
     border-right: 1px solid #495057; /* Separator */
 }
@@ -105,6 +105,7 @@ body {
     top: 0; /* Stick to top */
     z-index: 10; /* Above scrolling content */
 }
+
 /* Adjust header padding if it contains input */
 .panel-header input.form-control {
     margin-bottom: 0; /* Remove default margin if needed */
@@ -116,10 +117,12 @@ body {
     overflow-y: auto; /* Enable scrolling for the content area */
     padding: 5px; /* Add padding to scrollable area */
 }
+
 /* Remove padding for layer list */
 #layersPanel .panel-scrollable-content {
     padding: 0;
 }
+
 #uploadPanel .panel-scrollable-content {
     padding: 0.75rem; /* Restore padding for upload */
 }
@@ -136,6 +139,7 @@ body {
     border: none;
     opacity: 0.6;
 }
+
 .close-panel-btn:hover {
     opacity: 1;
 }
@@ -183,34 +187,35 @@ body {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-#templateList .item-thumbnail,
-#coverList .item-thumbnail {
-    width: 155px;
-    min-height: 236px;
-    min-width: 148px;
+.item-grid .template-thumbnail,
+.item-grid .cover-thumbnail {
+    /* width: 155px; */ /* Already set by general rule */
+    min-height: 236px; /* Taller for templates/covers */
+    min-width: 148px; /* Ensure minimum width */
 }
 
-/* --- Element Thumbnail Specific Styles --- */
-#elementList .item-thumbnail,
-#overlayList .item-thumbnail {
+.item-grid .element-thumbnail,
+.item-grid .overlay-thumbnail {
     width: 155px;
-    height: 155px;
-    padding: 5px;
-    justify-content: center;
+    min-height: 155px; /* Ensure min-height matches height */
+    padding: 5px; /* Slightly more padding */
+    justify-content: center; /* Center content vertically in the square */
 }
 
-#elementList .item-thumbnail img,
-#overlayList .item-thumbnail img {
+/* Center image within element/overlay thumbs */
+.item-grid .element-thumbnail img,
+.item-grid .overlay-thumbnail img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    margin-bottom: 0;
+    margin-bottom: 0; /* Remove margin if name span is removed */
 }
 
-/* --- Template/Element Thumbnail Specific Background --- */
-#templateList .item-thumbnail,
-#elementList .item-thumbnail,
-#overlayList .item-thumbnail {
+/* --- Template/Element/Overlay Thumbnail Specific Background --- */
+/* Apply checkered background to types that might have transparency */
+.item-grid .template-thumbnail,
+.item-grid .element-thumbnail,
+.item-grid .overlay-thumbnail {
     background-color: #fff; /* Base color */
     /* Checkered pattern */
     background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
@@ -218,7 +223,7 @@ body {
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
-
+/* --- General Thumbnail Hover/Active States --- */
 .item-grid .item-thumbnail:hover {
     border-color: #0d6efd;
     transform: translateY(-2px);
@@ -228,63 +233,87 @@ body {
     border-color: #0a58ca;
 }
 
+/* --- Thumbnail Image Styling & Loading --- */
 .item-grid .item-thumbnail img {
-    width: 100%;
-    height: auto;
-    object-fit: contain;
-    margin-bottom: 3px;
+    width: 100%; /* Make image fill width */
+    height: auto; /* Adjust height automatically */
+    max-height: 200px; /* Max height for taller thumbs (templates/covers) */
+    object-fit: contain; /* Ensure whole image is visible */
+    margin-bottom: 3px; /* Space for name span */
     display: block;
-
     transition: opacity 0.3s ease-in-out;
-    opacity: 0;
-    position: relative;
+    opacity: 0; /* Hidden until loaded */
+    position: relative; /* Needed for z-index */
     z-index: 1;
 }
+
+/* Override max-height for square thumbs */
+.item-grid .element-thumbnail img,
+.item-grid .overlay-thumbnail img {
+    max-height: 100%; /* Allow filling the square */
+}
+
 
 .item-grid .item-thumbnail.loaded img {
     opacity: 1;
 }
 
 .item-grid .item-thumbnail.loading img {
-    opacity: 0 !important;
+    opacity: 0 !important; /* Force hide image while loading */
 }
 
+/* --- Thumbnail Spinner --- */
 .item-grid .thumbnail-spinner-overlay {
     position: absolute;
     top: 3px; /* Match padding */
     left: 3px;
     right: 3px;
-    height: 200px; /* Match image max-height */
+    height: 200px; /* Match image max-height for taller thumbs */
     background: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2;
-    border-radius: 3px;
+    z-index: 2; /* Above the image */
+    border-radius: 3px; /* Slightly rounded corners */
     transition: opacity 0.3s ease-in-out;
     opacity: 0; /* Hidden by default */
-    pointer-events: none;
+    pointer-events: none; /* Don't block clicks */
 }
 
-#elementList .item-thumbnail .thumbnail-spinner-overlay,
-#overlayList .item-thumbnail .thumbnail-spinner-overlay {
-    height: calc(100% - 6px); /* Fill square */
-    top: 3px; left: 3px; right: 3px; bottom: 3px;
+/* Adjust spinner height for square thumbs */
+.item-grid .element-thumbnail .thumbnail-spinner-overlay,
+.item-grid .overlay-thumbnail .thumbnail-spinner-overlay {
+    height: calc(100% - 10px); /* Fill square, accounting for padding */
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
 }
+
 
 .item-grid .item-thumbnail.loading .thumbnail-spinner-overlay {
-    opacity: 1;
+    opacity: 1; /* Show spinner when loading */
 }
 
+/* --- Thumbnail Name Span --- */
 .item-grid .item-thumbnail span {
     font-size: 0.75rem;
-    margin-top: 3px;
+    margin-top: auto; /* Push name to bottom if flex-start is used */
+    padding-top: 3px; /* Add a little space above name */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%;
+    width: calc(100% - 6px); /* Prevent overflow */
     color: #495057;
+    line-height: 1.2;
 }
+
+/* Hide span if parent is element or overlay thumb */
+.item-grid .element-thumbnail span,
+.item-grid .overlay-thumbnail span {
+    display: none;
+}
+
 
 /* --- Canvas Area --- */
 #canvas-area {
