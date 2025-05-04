@@ -10,10 +10,12 @@ class SidebarItemManager {
 		this.$addImageBtn = $(options.addImageBtnSelector);
 		this.$sidebarContent = this.$coverList.closest('.sidebar-content'); // Get the scrollable container
 		
-		// Callbacks
-		this.applyTemplate = options.applyTemplate;
-		this.addLayer = options.addLayer;
-		this.saveState = options.saveState;
+		// Callbacks & Dependencies (ADDED layerManager and canvasManager)
+		this.applyTemplate = options.applyTemplate; // Function provided by App.js
+		this.addLayer = options.addLayer;           // Function provided by App.js (points to layerManager.addLayer)
+		this.saveState = options.saveState;         // Function provided by App.js (points to historyManager.saveState)
+		this.layerManager = options.layerManager;   // Instance of LayerManager
+		this.canvasManager = options.canvasManager; // Instance of CanvasManager
 		
 		// State
 		this.uploadedFile = null;
@@ -34,7 +36,7 @@ class SidebarItemManager {
 		this.initializeUpload();
 	}
 	
-	// --- Templates --- (Keep existing method)
+	// --- Templates ---
 	loadTemplates() {
 		try {
 			const templateDataElement = document.getElementById('templateData');
@@ -44,10 +46,10 @@ class SidebarItemManager {
 				this.$templateList.html('<p class="text-muted p-2">No templates found.</p>');
 				return;
 			}
-			
 			const $newThumbs = $();
+			const self = this; // For click handler context
+			
 			templates.forEach(template => {
-				// Add loading class and spinner overlay div
 				const $thumb = $(`
                     <div class="item-thumbnail template-thumbnail loading" title="${template.name}">
                         <div class="thumbnail-spinner-overlay">
@@ -60,13 +62,23 @@ class SidebarItemManager {
                     </div>
                 `);
 				$thumb.data('templateJsonPath', template.jsonPath);
+				
+				// --- CLICK HANDLER ---
+				$thumb.on('click', function() {
+					const jsonPath = $(this).data('templateJsonPath');
+					if (jsonPath && self.applyTemplate) {
+						console.log("Template clicked:", jsonPath);
+						self.applyTemplate(jsonPath); // Call the function passed from App.js
+					} else {
+						console.error("Missing jsonPath or applyTemplate callback for template click.");
+					}
+				});
+				// --- END CLICK HANDLER ---
+				
 				$newThumbs.push($thumb[0]);
 			});
-			
 			this.$templateList.append($newThumbs);
-			this._makeDraggable($newThumbs, { type: 'template' });
-			this._setupImageLoading($newThumbs); // Setup loading state
-			
+			this._setupImageLoading($newThumbs);
 		} catch (error) {
 			console.error("Error loading templates:", error);
 			this.$templateList.html('<p class="text-danger p-2">Error loading templates.</p>');
@@ -79,37 +91,32 @@ class SidebarItemManager {
 			const coverDataElement = document.getElementById('coverData');
 			this.allCoversData = JSON.parse(coverDataElement.textContent || '[]');
 			this.filteredCoversData = this.allCoversData;
-			
 			if (this.allCoversData.length === 0) {
 				this.$coverList.html('<p class="text-muted p-2">No covers found.</p>');
 				return;
 			}
-			
 			this.displayMoreCovers(true); // Initial display
 			
-			// Debounced Search Listener
 			this.$coverSearch.on('input', () => {
 				clearTimeout(this.searchTimeout);
 				this.searchTimeout = setTimeout(() => {
 					this.currentSearchTerm = this.$coverSearch.val().toLowerCase().trim();
 					this.filterCovers();
-					this.displayMoreCovers(true); // Reset and display filtered
+					this.displayMoreCovers(true);
 				}, this.searchDelay);
 			});
 			
-			// Infinite Scroll Listener
 			this.$sidebarContent.on('scroll', () => {
-				if ($('#coversPanel').hasClass('show') && !this.isLoadingCovers) { // Use isLoadingCovers for scroll throttling
+				if ($('#coversPanel').hasClass('show') && !this.isLoadingCovers) {
 					const container = this.$sidebarContent[0];
 					const threshold = 200;
 					if (container.scrollTop + container.clientHeight >= container.scrollHeight - threshold) {
 						if (this.currentlyDisplayedCovers < this.filteredCoversData.length) {
-							this.displayMoreCovers(); // Load next batch
+							this.displayMoreCovers();
 						}
 					}
 				}
 			});
-			
 		} catch (error) {
 			console.error("Error loading or parsing covers data:", error);
 			this.$coverList.html('<p class="text-danger p-2">Error loading covers.</p>');
@@ -121,12 +128,9 @@ class SidebarItemManager {
 			this.filteredCoversData = this.allCoversData;
 			return;
 		}
-		
 		const searchKeywords = this.currentSearchTerm.split(/\s+/).filter(Boolean);
-		
 		this.filteredCoversData = this.allCoversData.filter(cover => {
 			const coverKeywordsLower = cover.keywords.map(k => k.toLowerCase());
-			
 			return searchKeywords.every(searchTerm =>
 				coverKeywordsLower.some(coverKeyword => coverKeyword.startsWith(searchTerm))
 			);
@@ -134,12 +138,8 @@ class SidebarItemManager {
 	}
 	
 	displayMoreCovers(reset = false) {
-		// Use isLoadingCovers to prevent multiple scroll triggers firing this
 		if (this.isLoadingCovers && !reset) return;
 		this.isLoadingCovers = true;
-		
-		// REMOVE old spinner logic
-		// this.removeSpinner();
 		
 		if (reset) {
 			this.$coverList.empty();
@@ -151,32 +151,29 @@ class SidebarItemManager {
 			this.currentlyDisplayedCovers + this.coversToShow
 		);
 		
-		// Handle no results message *only on reset*
 		if (coversToRender.length === 0 && reset) {
 			if (this.currentSearchTerm) {
 				this.$coverList.html('<p class="text-muted p-2">No covers match your search.</p>');
 			} else if (this.allCoversData.length === 0) {
 				this.$coverList.html('<p class="text-muted p-2">No covers found.</p>');
 			}
-			// If not reset and no covers, we just reached the end of infinite scroll.
-			this.isLoadingCovers = false; // Reset flag
+			this.isLoadingCovers = false;
 			return;
 		}
-		// If no covers left to render in this batch (scrolled to end)
+		
 		if (coversToRender.length === 0 && !reset) {
-			this.isLoadingCovers = false; // Reset flag
+			this.isLoadingCovers = false;
 			return;
 		}
 		
-		
-		const $newThumbs = $(); // Create an empty jQuery object
+		const $newThumbs = $();
+		const self = this; // For click handler context
 		
 		coversToRender.forEach(cover => {
 			const title = cover.caption ? `${cover.name} - ${cover.caption}` : cover.name;
-			// Add loading class and spinner overlay div
 			const $thumb = $(`
                 <div class="item-thumbnail cover-thumbnail loading" title="${title}">
-                     <div class="thumbnail-spinner-overlay">
+                    <div class="thumbnail-spinner-overlay">
                         <div class="spinner-border spinner-border-sm text-secondary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
@@ -186,16 +183,65 @@ class SidebarItemManager {
                 </div>
             `);
 			$thumb.data('coverSrc', cover.imagePath);
+			
+			// --- CLICK HANDLER ---
+			$thumb.on('click', function() {
+				const imgSrc = $(this).data('coverSrc');
+				if (imgSrc && self.addLayer && self.canvasManager && self.layerManager) {
+					console.log("Cover clicked:", imgSrc);
+					
+					// --- Remove existing cover layers ---
+					console.log("Applying cover, removing existing cover layers...");
+					const existingLayers = self.layerManager.getLayers();
+					const coverLayerIdsToDelete = existingLayers
+						.filter(layer => layer.type === 'image' && layer.layerSubType === 'cover')
+						.map(layer => layer.id);
+					if (coverLayerIdsToDelete.length > 0) {
+						coverLayerIdsToDelete.forEach(id => self.layerManager.deleteLayer(id, false)); // Delete without saving history yet
+						console.log(`Removed ${coverLayerIdsToDelete.length} cover layers.`);
+					} else {
+						console.log("No existing cover layers found to remove.");
+					}
+					// --- End Remove ---
+					
+					const img = new Image();
+					img.onload = () => {
+						const canvasWidth = self.canvasManager.currentCanvasWidth;
+						const canvasHeight = self.canvasManager.currentCanvasHeight;
+						
+						const newLayer = self.addLayer('image', {
+							content: imgSrc,
+							x: 0,
+							y: 0,
+							width: canvasWidth,
+							height: canvasHeight,
+							name: `Cover ${self.layerManager.uniqueIdCounter}`, // Use LayerManager's counter
+							layerSubType: 'cover'
+						});
+						
+						if (newLayer) {
+							self.layerManager.moveLayer(newLayer.id, 'back');
+							self.layerManager.toggleLockLayer(newLayer.id, false); // Don't save history yet
+							self.layerManager.selectLayer(null);
+							// self.layerManager.selectLayer(newLayer.id);
+							self.saveState(); // Save history once at the end
+						}
+					};
+					img.onerror = () => console.error("Failed to load cover image for clicking:", imgSrc);
+					img.src = imgSrc;
+				} else {
+					console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for cover click.");
+				}
+			});
+			// --- END CLICK HANDLER ---
+			
 			$newThumbs.push($thumb[0]);
 		});
 		
 		this.$coverList.append($newThumbs);
-		this._makeDraggable($newThumbs, { type: 'cover' });
-		this._setupImageLoading($newThumbs); // Setup loading state for new images
-		
+		this._setupImageLoading($newThumbs);
 		this.currentlyDisplayedCovers += coversToRender.length;
 		
-		// Reset flag slightly later to allow DOM updates and prevent rapid re-trigger
 		setTimeout(() => {
 			this.isLoadingCovers = false;
 		}, 100);
@@ -206,62 +252,49 @@ class SidebarItemManager {
 			const $thumb = $(this);
 			const $img = $thumb.find('img');
 			const $spinnerOverlay = $thumb.find('.thumbnail-spinner-overlay');
-			
 			if ($img.length === 0) {
-				$thumb.removeClass('loading').addClass('loaded'); // No image, treat as loaded
+				$thumb.removeClass('loading').addClass('loaded');
 				$spinnerOverlay.hide();
 				return;
 			}
-			
 			const img = $img[0];
-			
 			const onImageLoad = () => {
-				$spinnerOverlay.hide(); // Hide spinner
-				$thumb.removeClass('loading').addClass('loaded'); // Add loaded class (triggers img opacity)
+				$spinnerOverlay.hide();
+				$thumb.removeClass('loading').addClass('loaded');
 			};
-			
 			const onImageError = () => {
 				console.error("Failed to load image:", img.src);
-				$spinnerOverlay.html('<i class="fas fa-exclamation-triangle text-danger"></i>'); // Show error icon
-				// Keep overlay visible with error icon
-				$thumb.removeClass('loading').addClass('error'); // Add error class
+				$spinnerOverlay.html('<i class="fas fa-exclamation-triangle text-danger"></i>');
+				$thumb.removeClass('loading').addClass('error');
 			}
-			
-			// Check if image is already loaded (e.g., from cache)
 			if (img.complete) {
 				onImageLoad();
 			} else {
 				$img.on('load', onImageLoad);
 				$img.on('error', onImageError);
-				// Double-check completion state after attaching listeners,
-				// in case it loaded between the check and listener attachment.
 				if (img.complete) {
 					onImageLoad();
-					$img.off('load', onImageLoad); // Remove listener if already complete
+					$img.off('load', onImageLoad);
 					$img.off('error', onImageError);
 				}
 			}
 		});
 	}
 	
-
-	// --- Elements --- (Keep existing method)
+	// --- Elements ---
 	loadElements() {
 		try {
-			// Read data embedded by PHP
 			const elementDataElement = document.getElementById('elementData');
 			const elements = JSON.parse(elementDataElement.textContent || '[]');
-			
 			this.$elementList.empty();
 			if (elements.length === 0) {
 				this.$elementList.html('<p class="text-muted p-2">No elements found.</p>');
 				return;
 			}
-			
 			const $newThumbs = $();
+			const self = this; // For click handler context
+			
 			elements.forEach(element => {
-				// Add loading class and spinner overlay div
-				// REMOVED the <span> element
 				const $thumb = $(`
                     <div class="item-thumbnail element-thumbnail loading" title="${element.name}">
                         <div class="thumbnail-spinner-overlay">
@@ -272,108 +305,61 @@ class SidebarItemManager {
                         <img src="${element.image}" alt="${element.name}">
                     </div>
                 `);
-				$thumb.data('elementSrc', element.image); // Store the path to the actual image
+				$thumb.data('elementSrc', element.image);
+				
+				// --- CLICK HANDLER ---
+				$thumb.on('click', function() {
+					const imgSrc = $(this).data('elementSrc');
+					if (imgSrc && self.addLayer && self.canvasManager && self.layerManager) {
+						console.log("Element clicked:", imgSrc);
+						const img = new Image();
+						img.onload = () => {
+							const elemWidth = Math.min(img.width, 150); // Default size
+							const elemHeight = (img.height / img.width) * elemWidth;
+							const canvasWidth = self.canvasManager.currentCanvasWidth;
+							const canvasHeight = self.canvasManager.currentCanvasHeight;
+							
+							// Calculate center position
+							const finalX = Math.max(0, (canvasWidth / 2) - (elemWidth / 2));
+							const finalY = Math.max(0, (canvasHeight / 2) - (elemHeight / 2));
+							
+							const newLayer = self.addLayer('image', {
+								content: imgSrc,
+								x: finalX,
+								y: finalY,
+								width: elemWidth,
+								height: elemHeight,
+								layerSubType: 'element'
+								// Name will be generated by addLayer if not provided
+							});
+							if (newLayer) {
+								self.layerManager.selectLayer(newLayer.id);
+								self.saveState();
+							}
+						};
+						img.onerror = () => console.error("Failed to load element image for clicking:", imgSrc);
+						img.src = imgSrc;
+					} else {
+						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for element click.");
+					}
+				});
+				// --- END CLICK HANDLER ---
+				
 				$newThumbs.push($thumb[0]);
 			});
-			
 			this.$elementList.append($newThumbs);
-			this._makeDraggable($newThumbs, { type: 'element' });
-			this._setupImageLoading($newThumbs); // Setup loading state
-			
+			// REMOVED: this._makeDraggable($newThumbs, { type: 'element' });
+			this._setupImageLoading($newThumbs);
 		} catch (error) {
 			console.error("Error loading elements:", error);
 			this.$elementList.html('<p class="text-danger p-2">Error loading elements.</p>');
 		}
 	}
 	
-	// --- Draggable Helper --- (Keep existing method)
-	_makeDraggable($items, options) {
-		// options might contain type or other info if needed later
-		$items.draggable({
-			helper: 'clone',
-			appendTo: 'body',
-			zIndex: 1100,
-			revert: 'invalid',
-			cursor: 'grabbing',
-			start: function(event, ui) {
-				const $helper = $(ui.helper);
-				const $img = $helper.find('img');
-				const imgElement = $img[0]; // Get the raw DOM element
-				
-				let targetWidth = 100; // Default width if natural dimensions fail
-				let targetHeight = 'auto'; // Default height
-				const maxWidth = 150; // Max width for helper clone
-				
-				// Use naturalWidth/Height if available (best for aspect ratio)
-				if (imgElement && imgElement.naturalWidth && imgElement.naturalWidth > 0) {
-					const naturalWidth = imgElement.naturalWidth;
-					const naturalHeight = imgElement.naturalHeight;
-					const aspectRatio = naturalHeight / naturalWidth;
-					
-					if (naturalWidth > maxWidth) {
-						targetWidth = maxWidth;
-						targetHeight = targetWidth * aspectRatio;
-					} else {
-						// Use natural size if it's smaller than maxWidth
-						targetWidth = naturalWidth;
-						targetHeight = naturalHeight;
-					}
-				} else if ($img.width() > 0) {
-					// Fallback to rendered dimensions if natural dimensions aren't ready/available
-					// console.warn("Using rendered dimensions for draggable helper, aspect ratio might be slightly off if image wasn't fully loaded.");
-					const currentWidth = $img.width();
-					const currentHeight = $img.height();
-					if (currentWidth > 0) { // Ensure width is not zero
-						const aspectRatio = currentHeight / currentWidth;
-						if (currentWidth > maxWidth) {
-							targetWidth = maxWidth;
-							targetHeight = targetWidth * aspectRatio;
-						} else {
-							targetWidth = currentWidth;
-							targetHeight = currentHeight;
-						}
-					}
-				}
-				// If both fail, the default 100/auto is used.
-				
-				// Apply styles to the helper container
-				$helper.css({
-					'width': targetWidth + 'px',
-					'height': targetHeight === 'auto' ? 'auto' : targetHeight + 'px',
-					'opacity': 0.9, // Slightly increased opacity
-					'background': '#fff',
-					'border': '1px dashed #aaa', // Slightly darker border
-					'padding': '5px',
-					'text-align': 'center',
-					'overflow': 'hidden' // Prevent content spill
-				});
-				
-				// Style the image within the helper to fit nicely
-				$img.css({
-					'display': 'block', // Remove potential extra space below image
-					'max-width': '100%',
-					'max-height': '100%', // Ensure it doesn't exceed helper bounds
-					'width': 'auto', // Let dimensions scale based on container
-					'height': 'auto', // Let dimensions scale based on container
-					'object-fit': 'contain', // Ensure entire image is visible within bounds
-					'margin': '0 auto' // Center the image horizontally
-				});
-				
-				// Style the text
-				$helper.find('span').css({
-					'display': 'block', // Ensure it takes its own line
-					'font-size': '0.7rem',
-					'white-space': 'nowrap', // Prevent wrapping
-					'overflow': 'hidden', // Hide overflow
-					'text-overflow': 'ellipsis', // Add ellipsis if text is too long
-					'margin-top': '3px' // Add a little space above text
-				});
-			}
-		});
-	}
-	
-	// --- Upload --- (Keep existing method)
+	// --- Upload ---
 	initializeUpload() {
+		const self = this; // For click handler context
+		
 		this.$uploadInput.on('change', (event) => {
 			const file = event.target.files[0];
 			if (file && file.type.startsWith('image/')) {
@@ -392,35 +378,58 @@ class SidebarItemManager {
 			}
 		});
 		
+		// --- MODIFIED CLICK HANDLER for "Add to Canvas" button ---
 		this.$addImageBtn.on('click', () => {
-			if (this.uploadedFile) {
+			if (this.uploadedFile && self.addLayer && self.canvasManager && self.layerManager) {
+				console.log("Add Uploaded Image clicked");
 				const reader = new FileReader();
 				reader.onload = (e) => {
 					const img = new Image();
 					img.onload = () => {
-						// Add layer centered or at a default position
-						const canvasWidth = $('#canvas').width();
-						const canvasHeight = $('#canvas').height();
-						const layerWidth = Math.min(img.width, canvasWidth * 0.8); // Scale down if too large
+						// Add layer centered
+						const canvasWidth = self.canvasManager.currentCanvasWidth;
+						const canvasHeight = self.canvasManager.currentCanvasHeight;
+						
+						// Calculate default size (e.g., 80% of canvas width, max 300px)
+						const maxWidth = Math.min(canvasWidth * 0.8, 300);
+						let layerWidth = Math.min(img.width, maxWidth);
 						const aspectRatio = img.height / img.width;
-						const layerHeight = layerWidth * aspectRatio;
+						let layerHeight = layerWidth * aspectRatio;
+						
+						// Ensure height doesn't exceed canvas bounds significantly
+						const maxHeight = canvasHeight * 0.8;
+						if (layerHeight > maxHeight) {
+							layerHeight = maxHeight;
+							layerWidth = layerHeight / aspectRatio;
+						}
+						
+						// Calculate center position
 						const layerX = Math.max(0, (canvasWidth - layerWidth) / 2);
 						const layerY = Math.max(0, (canvasHeight - layerHeight) / 2);
 						
-						this.addLayer('image', {
-							content: e.target.result,
+						const newLayer = self.addLayer('image', {
+							content: e.target.result, // Base64 data URL
 							x: layerX,
 							y: layerY,
 							width: layerWidth,
 							height: layerHeight,
 							layerSubType: 'upload'
+							// Name will be generated by addLayer
 						});
-						this.saveState();
+						
+						if (newLayer) {
+							self.layerManager.selectLayer(newLayer.id);
+							self.saveState();
+						}
 					};
-					img.src = e.target.result;
+					img.onerror = () => console.error("Failed to load uploaded image data for adding to canvas.");
+					img.src = e.target.result; // Use the base64 data URL
 				}
 				reader.readAsDataURL(this.uploadedFile);
+			} else {
+				console.error("Missing uploadedFile, addLayer, canvasManager, or layerManager for upload button click.");
 			}
 		});
+		// --- END MODIFIED CLICK HANDLER ---
 	}
 }

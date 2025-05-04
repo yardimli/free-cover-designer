@@ -5,7 +5,7 @@ $(document).ready(function () {
 	const $canvasArea = $('#canvas-area');
 	const $canvasWrapper = $('#canvas-wrapper');
 	const $loadDesignInput = $('#loadDesignInput');
-	const $inspectorPanel = $('#inspectorPanel'); // Added
+	const $inspectorPanel = $('#inspectorPanel');
 	
 	// --- Instantiate Managers ---
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
@@ -45,9 +45,27 @@ $(document).ready(function () {
 		uploadInputSelector: '#imageUploadInput',
 		addImageBtnSelector: '#addImageFromUpload',
 		elementsUrl: 'data/elements.json',
-		applyTemplate: (jsonPath) => canvasManager.loadDesign(jsonPath, true), // Pass template flag
+		applyTemplate: (jsonPath) => {
+			// Delete existing text layers BEFORE loading the template design
+			console.log("Applying template via click, removing existing text layers...");
+			const existingLayers = layerManager.getLayers(); // Use the layerManager instance
+			const textLayerIdsToDelete = existingLayers
+				.filter(layer => layer.type === 'text')
+				.map(layer => layer.id);
+			
+			if (textLayerIdsToDelete.length > 0) {
+				textLayerIdsToDelete.forEach(id => layerManager.deleteLayer(id, false)); // Delete without saving history yet
+				console.log(`Removed ${textLayerIdsToDelete.length} text layers.`);
+			} else {
+				console.log("No existing text layers found to remove.");
+			}
+			// Now call loadDesign, which will add template layers and save history
+			canvasManager.loadDesign(jsonPath, true);
+		},
 		addLayer: (type, props) => layerManager.addLayer(type, props),
-		saveState: () => historyManager.saveState()
+		saveState: () => historyManager.saveState(), // Pass saveState function
+		layerManager: layerManager,                   // Pass LayerManager instance
+		canvasManager: canvasManager                  // Pass CanvasManager instance
 	});
 	
 	// Set cross-dependencies (already done for LM/CM)
@@ -81,7 +99,6 @@ $(document).ready(function () {
 		// Check if the updated layer is the one currently shown in the inspector
 		if (inspectorPanel.currentLayer && inspectorPanel.currentLayer.id === updatedLayer.id) {
 			// console.log('Refreshing inspector for updated layer:', updatedLayer.id);
-			// Re-populate the inspector with the fresh data
 			inspectorPanel.populate(updatedLayer);
 		}
 		// Optionally update other UI elements if needed based on layer data changes
@@ -89,7 +106,6 @@ $(document).ready(function () {
 	}
 	
 	function handleZoomChange(currentZoom, minZoom, maxZoom) {
-		// Update zoom display and button states (keep this logic)
 		$('#zoom-percentage-toggle').text(`${Math.round(currentZoom * 100)}%`);
 		$('#zoom-in').prop('disabled', currentZoom >= maxZoom);
 		$('#zoom-out').prop('disabled', currentZoom <= minZoom);
@@ -100,12 +116,15 @@ $(document).ready(function () {
 		// Layer Actions
 		$('#deleteBtn').on('click', () => layerManager.deleteSelectedLayer());
 		$('#lockBtn').on('click', () => layerManager.toggleSelectedLayerLock());
+		
 		// History Actions
 		$('#undoBtn').on('click', () => historyManager.undo());
 		$('#redoBtn').on('click', () => historyManager.redo());
+		
 		// Layer Order Actions
 		$('#bringToFrontBtn').on('click', () => layerManager.moveSelectedLayer('front'));
 		$('#sendToBackBtn').on('click', () => layerManager.moveSelectedLayer('back'));
+		
 		// File Menu Actions
 		$('#saveDesign').on('click', () => canvasManager.saveDesign());
 		$('#loadDesign').on('click', () => $loadDesignInput.click());
@@ -116,9 +135,11 @@ $(document).ready(function () {
 			}
 			$(event.target).val(''); // Reset input
 		});
+		
 		// Export Actions
 		$('#exportPng').on('click', () => canvasManager.exportCanvas('png'));
 		$('#exportJpg').on('click', () => canvasManager.exportCanvas('jpeg'));
+		
 		// Main Download Button
 		$('#downloadBtn').on('click', () => canvasManager.exportCanvas('png')); // Default to PNG
 	}
