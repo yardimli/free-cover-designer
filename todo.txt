@@ -13,12 +13,12 @@ add image filters to the inspector to change color and blend mode ..............
 add overlays to cover .....................................................................OK
 add rotate and scale to layers ............................................................OK
 find transparent png images for elements, load them from folder instead of json ...........OK
+add layer name to inspector ...............................................................OK
+move lock, delete, move up/down layers to the inspector ...................................OK
 add vertical alignment to text layers
-add layer name to inspector
-move lock, delete, move up/down layers to the inspector
+change moving elements to something with guides and snapping
 update elements to load lazy like covers with search from json file
 duplicate text layer
-make ui look like polotno
 add dark/light mode to ui
 make responsive ui
 add magnetic lines when moving elements and snap to grid

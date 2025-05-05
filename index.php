@@ -45,6 +45,7 @@
 					} elseif (file_exists($target_png_path)) {
 						$target_image_path = $target_png_path;
 					}
+
 					if (file_exists($thumbnail_path) && $target_image_path) {
 						$covers_data[] = [
 							'name' => ucwords(str_replace(['-', '_'], ' ', $base_name)),
@@ -107,6 +108,7 @@
 					}
 					$thumbnail_path = $overlays_dir . '/' . $preview_filename;
 					$target_png_path = $overlays_dir . '/' . $base_name . '.png';
+
 					if (file_exists($thumbnail_path) && file_exists($target_png_path)) {
 						$overlays_data[] = [
 							'name' => ucwords(str_replace(['-', '_'], ' ', $base_name)),
@@ -150,71 +152,40 @@
 </head>
 <body>
 <div class="app-container d-flex flex-column vh-100">
-	<!-- Top Toolbar (No changes needed here) -->
-	<nav class="navbar navbar-expand-sm navbar-dark bg-dark top-toolbar">
-		<div class="container-fluid" style="min-height:55px;">
-			<span class="navbar-brand mb-0 h1">Designer</span>
-			<div class="ms-auto d-flex align-items-center">
-				<!-- File Menu -->
-				<div class="dropdown me-2">
-					<button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="fileMenuButton"
-					        data-bs-toggle="dropdown" aria-expanded="false">
-						<i class="fas fa-file"></i> File
-					</button>
-					<ul class="dropdown-menu dropdown-menu-end" style="z-index:9999" aria-labelledby="fileMenuButton">
-						<li><a class="dropdown-item" href="#" id="loadDesign"><i class="fas fa-folder-open fa-fw me-2"></i>Load
-								Design (.json)</a></li>
-						<li><a class="dropdown-item" href="#" id="saveDesign"><i class="fas fa-save fa-fw me-2"></i>Save Design
-								(.json)</a></li>
-						<li>
-							<hr class="dropdown-divider">
-						</li>
-						<li><a class="dropdown-item" href="#" id="exportPng"><i class="fas fa-image fa-fw me-2"></i>Export as
-								PNG</a></li>
-						<li><a class="dropdown-item" href="#" id="exportJpg"><i class="fas fa-image fa-fw me-2"></i>Export as
-								JPG</a></li>
-					</ul>
-				</div>
-				<input type="file" id="loadDesignInput" accept=".json" style="display: none;">
-				<!-- History -->
-				<button class="btn btn-outline-secondary btn-sm me-2" id="undoBtn" title="Undo"><i class="fas fa-undo"></i>
-				</button>
-				<button class="btn btn-outline-secondary btn-sm me-2" id="redoBtn" title="Redo"><i class="fas fa-redo"></i>
-				</button>
-				<!-- Layer Order & Actions -->
-				<button class="btn btn-outline-secondary btn-sm me-1" id="sendToBackBtn" title="Send to Back"><i
-						class="fas fa-angle-double-down"></i></button>
-				<button class="btn btn-outline-secondary btn-sm me-2" id="bringToFrontBtn" title="Bring to Front"><i
-						class="fas fa-angle-double-up"></i></button>
-				<button class="btn btn-outline-danger btn-sm me-2" id="deleteBtn" title="Delete Selected"><i
-						class="fas fa-trash"></i></button>
-				<button class="btn btn-outline-secondary btn-sm me-2" id="lockBtn" title="Lock/Unlock Selected"><i
-						class="fas fa-lock"></i></button>
-				<!-- Download -->
-				<button class="btn btn-primary btn-sm" id="downloadBtn" title="Download Image"><i class="fas fa-download"></i>
-					Download
-				</button>
-			</div>
+	<!-- Top Toolbar (Simplified) -->
+	<nav class="navbar navbar-expand-sm navbar-dark bg-dark top-toolbar" style="padding: 0px 0px;">
+		<div class="container-fluid">
+			<span class="navbar-brand mb-0 h1">Free Cover Designer</span>
+			<!-- Removed buttons and menu from here -->
 		</div>
 	</nav>
+
+	<!-- Hidden input for loading designs -->
+	<input type="file" id="loadDesignInput" accept=".json" style="display: none;">
 
 	<!-- Main Content Area -->
 	<div class="d-flex flex-grow-1 overflow-hidden main-content position-relative">
 
 		<!-- Icon Bar (Fixed Width) -->
 		<ul class="nav nav-pills flex-column text-center sidebar-nav flex-shrink-0">
-			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#coversPanel" title="Covers"><i
-						class="fas fa-book-open fa-lg"></i></a></li>
-			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#templatesPanel" title="Templates"><i
-						class="fas fa-th-large fa-lg"></i></a></li>
-			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#elementsPanel" title="Elements"><i
-						class="fas fa-shapes fa-lg"></i></a></li>
-			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#overlaysPanel" title="Overlays"><i
-						class="fas fa-clone fa-lg"></i></a></li>
-			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#uploadPanel" title="Upload"><i
-						class="fas fa-upload fa-lg"></i></a></li>
-			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#layersPanel" title="Layers"><i
-						class="fas fa-layer-group fa-lg"></i></a></li>
+			<!-- Panel Toggles -->
+			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#coversPanel" title="Covers"><i class="fas fa-book-open fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#templatesPanel" title="Templates"><i class="fas fa-th-large fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#elementsPanel" title="Elements"><i class="fas fa-shapes fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#overlaysPanel" title="Overlays"><i class="fas fa-clone fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#uploadPanel" title="Upload"><i class="fas fa-upload fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" data-panel-target="#layersPanel" title="Layers"><i class="fas fa-layer-group fa-lg"></i></a></li>
+
+			<!-- Separator (Optional) -->
+			<hr class="mx-2" style="border-top: 1px solid #495057;">
+
+			<!-- Action Buttons -->
+			<li class="nav-item"><a class="nav-link" href="#" id="loadDesignIconBtn" title="Load Design (.json)"><i class="fas fa-folder-open fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" id="saveDesign" title="Save Design (.json)"><i class="fas fa-save fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" id="undoBtn" title="Undo"><i class="fas fa-undo fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" id="redoBtn" title="Redo"><i class="fas fa-redo fa-lg"></i></a></li>
+			<li class="nav-item"><a class="nav-link" href="#" id="downloadBtn" title="Download Image (PNG)"><i class="fas fa-download fa-lg"></i></a></li>
+			<!-- Removed Export PNG/JPG as separate buttons, Download defaults to PNG -->
 		</ul>
 
 		<!-- Sliding Panels Container (Absolute Position) -->
@@ -229,7 +200,6 @@
 					<div id="coverList" class="item-grid panel-scrollable-content"><p>Loading covers...</p></div>
 				</div>
 			</div>
-
 			<!-- Templates Panel -->
 			<div id="templatesPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
@@ -240,7 +210,6 @@
 					<div id="templateList" class="item-grid panel-scrollable-content"><p>Loading templates...</p></div>
 				</div>
 			</div>
-
 			<!-- Elements Panel -->
 			<div id="elementsPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
@@ -251,19 +220,16 @@
 					<div id="elementList" class="item-grid panel-scrollable-content"><p>Loading elements...</p></div>
 				</div>
 			</div>
-
 			<!-- Overlays Panel -->
 			<div id="overlaysPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
 				<div class="panel-content-wrapper">
 					<div class="panel-header"> <!-- Sticky Header -->
-						<input type="search" id="overlaySearch" class="form-control form-control-sm"
-						       placeholder="Search overlays...">
+						<input type="search" id="overlaySearch" class="form-control form-control-sm" placeholder="Search overlays...">
 					</div>
 					<div id="overlayList" class="item-grid panel-scrollable-content"><p>Loading overlays...</p></div>
 				</div>
 			</div>
-
 			<!-- Upload Panel -->
 			<div id="uploadPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
@@ -276,7 +242,6 @@
 					</div>
 				</div>
 			</div>
-
 			<!-- Layers Panel -->
 			<div id="layersPanel" class="sidebar-panel">
 				<button type="button" class="btn-close close-panel-btn" aria-label="Close"></button>
@@ -299,12 +264,10 @@
 				</div>
 			</div>
 			<!-- Zoom Controls (No changes needed) -->
-			<div id="zoom-controls" class="position-fixed rounded shadow-sm p-1 m-2 bg-dark d-flex align-items-center"
-			     style="bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 1060;">
+			<div id="zoom-controls" class="position-fixed rounded shadow-sm p-1 m-2 bg-dark d-flex align-items-center" style="bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 1060;">
 				<button id="zoom-out" class="btn btn-sm me-1" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
 				<div class="dropup mx-1">
-					<button class="btn btn-sm dropdown-toggle zoom-percentage-display" type="button" id="zoom-percentage-toggle"
-					        data-bs-toggle="dropdown" aria-expanded="false">
+					<button class="btn btn-sm dropdown-toggle zoom-percentage-display" type="button" id="zoom-percentage-toggle" data-bs-toggle="dropdown" aria-expanded="false">
 						100%
 					</button>
 					<ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="zoom-percentage-toggle" id="zoom-options-menu">
@@ -315,9 +278,7 @@
 						<li><a class="dropdown-item zoom-option" href="#" data-zoom="1.5">150%</a></li>
 						<li><a class="dropdown-item zoom-option" href="#" data-zoom="2.0">200%</a></li>
 						<li><a class="dropdown-item zoom-option" href="#" data-zoom="3.0">300%</a></li>
-						<li>
-							<hr class="dropdown-divider">
-						</li>
+						<li><hr class="dropdown-divider"></li>
 						<li><a class="dropdown-item zoom-option" href="#" data-zoom="fit">Fit</a></li>
 					</ul>
 				</div>
@@ -330,6 +291,16 @@
 
 	</div> <!-- End Main Content Area -->
 </div> <!-- End App Container -->
+
+<!-- Export Overlay -->
+<div id="export-overlay" style="display: none;">
+	<div class="export-spinner-content">
+		<div class="spinner-border text-light" role="status">
+			<span class="visually-hidden">Loading...</span>
+		</div>
+		<p class="mt-2 text-light">Exporting your cover...</p>
+	</div>
+</div>
 
 <!-- Embed data (No changes needed) -->
 <script id="templateData" type="application/json"><?php echo $templates_json; ?></script>
@@ -344,11 +315,13 @@
 <script src="vendors/jsfontpicker/dist/jquery.fontpicker.min.js"></script>
 <script type="module" src="vendors/modern-screenshot.js"></script>
 <script src="vendors/tinycolor-min.js"></script>
+
 <script src="js/LayerManager.js"></script>
 <script src="js/HistoryManager.js"></script>
 <script src="js/CanvasManager.js"></script>
 <script src="js/InspectorPanel.js"></script>
 <script src="js/SidebarItemManager.js"></script>
 <script src="js/App.js"></script>
+
 </body>
 </html>

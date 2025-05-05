@@ -93,25 +93,22 @@ $(document).ready(function () {
 	
 	// --- UI Update Callbacks ---
 	
-	// MODIFIED: Only show inspector, don't hide on deselect
 	function handleLayerSelectionChange(selectedLayer) {
 		if (selectedLayer) {
-			// If a layer is selected, show the inspector panel
 			inspectorPanel.show(selectedLayer);
 		} else {
-			// If no layer is selected (deselected), DO NOTHING to the inspector.
-			// It stays open/closed based on user action (close button).
+			if ($inspectorPanelElement.hasClass('open')) {
+				inspectorPanel.populate(null);
+			}
 		}
-		updateActionButtons(); // Update buttons based on selection state
+		updateActionButtons();
 	}
 	
 	function handleLayerDataUpdate(updatedLayer) {
-		// If the inspector is currently open and showing the layer that was updated,
-		// re-populate the inspector with the fresh data.
 		if (inspectorPanel.currentLayer && inspectorPanel.currentLayer.id === updatedLayer.id && $inspectorPanelElement.hasClass('open')) {
 			inspectorPanel.populate(updatedLayer);
 		}
-		// updateActionButtons(); // Might be needed if update changes lock state etc.
+		updateActionButtons();
 	}
 	
 	function handleZoomChange(currentZoom, minZoom, maxZoom) {
@@ -174,6 +171,17 @@ $(document).ready(function () {
 	
 	// --- Global Action Button Setup & Updates ---
 	function initializeGlobalActions() {
+		
+		// --- Helper to prevent action on disabled links ---
+		const preventDisabled = (e, actionFn) => {
+			e.preventDefault(); // Always prevent default for links
+			if ($(e.currentTarget).hasClass('disabled')) {
+				console.log("Action prevented: Button disabled", e.currentTarget.id);
+				return;
+			}
+			actionFn(); // Execute the action
+		};
+		
 		// Layer Actions
 		$('#deleteBtn').on('click', () => layerManager.deleteSelectedLayer());
 		$('#lockBtn').on('click', () => layerManager.toggleSelectedLayerLock());
@@ -187,9 +195,13 @@ $(document).ready(function () {
 		$('#sendToBackBtn').on('click', () => layerManager.moveSelectedLayer('back'));
 		
 		// File Menu Actions
-		$('#saveDesign').on('click', () => canvasManager.saveDesign());
-		$('#loadDesign').on('click', () => $loadDesignInput.click());
-		$loadDesignInput.on('change', (event) => {
+		$('#saveDesign').on('click', (e) => preventDisabled(e, () => canvasManager.saveDesign()));
+		$('#loadDesignIconBtn').on('click', (e) => { // New listener for the icon
+			e.preventDefault();
+			// No disabled check needed for load
+			$loadDesignInput.click();
+		});
+		$loadDesignInput.on('change', (event) => { // Keep the change listener
 			const file = event.target.files[0];
 			if (file) {
 				canvasManager.loadDesign(file, false); // Load full design
@@ -198,11 +210,7 @@ $(document).ready(function () {
 		});
 		
 		// Export Actions
-		$('#exportPng').on('click', () => canvasManager.exportCanvas('png'));
-		$('#exportJpg').on('click', () => canvasManager.exportCanvas('jpeg'));
-		
-		// Main Download Button
-		$('#downloadBtn').on('click', () => canvasManager.exportCanvas('png')); // Default to PNG
+		$('#downloadBtn').on('click', (e) => preventDisabled(e, () => canvasManager.exportCanvas('png'))); // Default to PNG
 	}
 	
 	function updateActionButtons() {

@@ -2,6 +2,23 @@
 
 	<button type="button" class="btn-close close-inspector-btn" aria-label="Close"></button>
 
+	<div class="inspector-section" id="inspector-layer-info-actions">
+		<h6 class="section-header mb-0 pb-1 pt-1">
+			<span id="inspector-layer-name" class="text-truncate" title="Selected Layer Name">No Layer Selected</span>
+		</h6>
+		<div class="section-content pt-2 pb-2 d-flex justify-content-start">
+			<!-- Moved Buttons Here -->
+			<div class="btn-group btn-group-sm me-2" role="group" aria-label="Layer Order">
+				<button class="btn btn-outline-secondary" id="sendToBackBtn" title="Send to Back"><i class="fas fa-angle-double-down"></i></button>
+				<button class="btn btn-outline-secondary" id="bringToFrontBtn" title="Bring to Front"><i class="fas fa-angle-double-up"></i></button>
+			</div>
+			<div class="btn-group btn-group-sm" role="group" aria-label="Layer Actions">
+				<button class="btn btn-outline-secondary" id="lockBtn" title="Lock/Unlock Selected"><i class="fas fa-lock"></i></button>
+				<button class="btn btn-outline-danger" id="deleteBtn" title="Delete Selected"><i class="fas fa-trash"></i></button>
+			</div>
+		</div>
+	</div>
+
 	<div class="inspector-section" id="inspector-alignment">
 		<h6 class="section-header">Alignment</h6>
 		<div class="section-content d-flex justify-content-between alignment-icons">

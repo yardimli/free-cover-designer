@@ -24,10 +24,10 @@ body {
     width: var(--sidebar-icon-width);
     background-color: #343a40; /* Darker background for icon bar */
     padding-top: 0.5rem;
-    flex-shrink: 0; /* Prevent shrinking */
-    z-index: 1050; /* Below panels and inspector */
-    height: 100%; /* Fill height */
-    border-right: 1px solid #495057; /* Separator */
+    flex-shrink: 0;
+    z-index: 1050;
+    height: 100%;
+    border-right: 1px solid #495057;
 }
 
 .sidebar-nav .nav-link {
@@ -39,13 +39,21 @@ body {
 }
 
 .sidebar-nav .nav-link.active {
-    background-color: #0d6efd; /* Bootstrap primary */
+    background-color: #0d6efd;
     color: #fff;
 }
 
 .sidebar-nav .nav-link:hover:not(.active) {
-    background-color: #495057; /* Slightly lighter dark */
+    background-color: #495057;
     color: #f8f9fa;
+}
+
+.sidebar-nav .nav-link.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    background-color: transparent !important;
+    color: #6c757d !important;
 }
 
 /* --- Sliding Panels Container --- */
@@ -695,6 +703,7 @@ body {
 
 
 /* --- Inspector Panel (Right Side) --- */
+
 .inspector-panel {
     position: absolute;
     top: 0;
@@ -760,6 +769,13 @@ body {
 .inspector-panel .form-select,
 .inspector-panel .btn {
     font-size: 0.8rem;
+}
+
+.inspector-panel .btn.disabled,
+.inspector-panel .btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
 }
 
 .inspector-panel .input-group-text {
@@ -833,4 +849,61 @@ body {
 .inspector-shading-preset img {
     max-width: 100%;
     display: block;
+}
+
+#inspector-layer-info-actions .section-header {
+    border-bottom: none; /* Remove bottom border if header only contains name */
+    padding-bottom: 0;
+    padding-top: 0.5rem; /* Adjust padding */
+}
+
+#inspector-layer-name {
+    font-size: 0.95rem; /* Slightly larger */
+    font-weight: bold;
+    color: #343a40; /* Darker color */
+    display: block; /* Ensure it takes full width for truncation */
+    max-width: calc(var(--inspector-panel-width) - 3rem); /* Prevent overflow */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 1rem;
+}
+
+#inspector-layer-info-actions .section-content {
+    border-bottom: 1px solid #e9ecef; /* Add separator below buttons */
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+#inspector-layer-info-actions .btn-group .btn {
+    padding: 0.25rem 0.5rem; /* Slightly smaller padding */
+    font-size: 0.8rem; /* Match other inspector controls */
+}
+
+#export-overlay {
+    position: fixed; /* Cover the entire viewport */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
+    z-index: 9999; /* Ensure it's on top of everything */
+    display: flex; /* Use flexbox for centering */
+    align-items: center; /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
+    cursor: wait; /* Indicate processing */
+}
+
+#export-overlay .export-spinner-content {
+    text-align: center;
+}
+
+#export-overlay .spinner-border {
+    width: 3rem; /* Make spinner larger */
+    height: 3rem;
+}
+
+#export-overlay p {
+    font-size: 1.1rem;
+    margin-top: 1rem; /* Space between spinner and text */
 }

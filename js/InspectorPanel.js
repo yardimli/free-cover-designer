@@ -449,7 +449,22 @@ class InspectorPanel {
 	
 	show(layerData) {
 		if (!layerData) {
-			this.hide();
+			// If showing with no layer, still open the panel but populate with 'No Layer' state
+			this.currentLayer = null;
+			this.populate(null); // Populate will handle the 'No Layer Selected' text
+			this.$panel.addClass('open');
+			// Hide sections that require a layer
+			this.$panel.find('#inspector-layer-info-actions').hide(); // Hide actions if no layer
+			this.$panel.find('#inspector-alignment').hide();
+			this.$panel.find('#inspector-layer').hide();
+			this.$panel.find('#inspector-text').hide();
+			this.$panel.find('#inspector-text-shading').hide();
+			this.$panel.find('#inspector-text-background').hide();
+			this.$panel.find('#inspector-color').hide();
+			this.$panel.find('#inspector-border').hide();
+			this.$panel.find('#inspector-image-filters').hide();
+			this.$panel.find('#inspector-image-blend-mode').hide();
+			$('#inspector-layer-name').text('No Layer Selected').attr('title', 'No Layer Selected'); // Explicitly set here too
 			return;
 		}
 		this.currentLayer = layerData;
@@ -513,12 +528,18 @@ class InspectorPanel {
 	}
 	
 	populate(layerData) {
+		const $layerNameDisplay = $('#inspector-layer-name');
+		
 		if (!layerData) {
 			this.hide();
 			return;
 		}
 		
 		this.currentLayer = layerData; // Update internal reference
+		
+		const layerName = layerData.name || `Layer ${layerData.id}`;
+		$layerNameDisplay.text(layerName).attr('title', layerName);
+		
 		const isText = layerData.type === 'text';
 		const isImage = layerData.type === 'image';
 		
@@ -534,6 +555,7 @@ class InspectorPanel {
 		
 		// Generic sections always visible (or based on layer type if needed later)
 		this.$panel.find('#inspector-alignment').show();
+		this.$panel.find('#inspector-layer').show();
 		this.$panel.find('#inspector-layer').show();
 		
 		

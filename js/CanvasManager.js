@@ -6,6 +6,7 @@ class CanvasManager {
 		this.$canvasWrapper = $canvasWrapper;
 		this.$canvas = $canvas;
 		this.canvasAreaDiv = $canvasArea[0]; // Keep reference to the DOM element
+		this.$exportOverlay = $('#export-overlay');
 		
 		// Dependencies
 		this.layerManager = options.layerManager; // Should be passed in App.js
@@ -42,6 +43,10 @@ class CanvasManager {
 		this.setZoom(this.currentZoom, false);
 		this.centerCanvas();
 		this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
+		
+		if (this.$exportOverlay) {
+			this.$exportOverlay.hide();
+		}
 	}
 	
 	setCanvasSize(width, height) {
@@ -393,6 +398,10 @@ class CanvasManager {
 	
 	// --- Export ---
 	async exportCanvas(format = 'png') { // Still async
+		
+		if (this.$exportOverlay) {
+			this.$exportOverlay.show();
+		}
 		this.layerManager.selectLayer(null);
 		
 		// Store original state... (same as before)
@@ -426,9 +435,8 @@ class CanvasManager {
 		const quality = format === 'jpeg' ? 0.92 : undefined;
 		const filename = `book-cover-export.${format}`;
 		
-		// --- NEW: Get the CSS with embedded fonts ---
+		// --- Get the CSS with embedded fonts ---
 		const embeddedFontCss = await this._getEmbeddedFontsCss(layersData);
-		// --- END NEW ---
 		
 		// --- Options for modern-screenshot ---
 		const screenshotOptions = {
@@ -594,6 +602,11 @@ class CanvasManager {
 			this.$canvasArea.scrollTop(originalScrollTop);
 			const selectedLayer = this.layerManager.getSelectedLayer();
 			if (selectedLayer) { $(`#${selectedLayer.id}`).addClass('selected'); }
+			
+			if (this.$exportOverlay) {
+				this.$exportOverlay.hide();
+			}
+			
 			console.log("Export process finished, restored original state.");
 		}
 	} // End exportCanvas
