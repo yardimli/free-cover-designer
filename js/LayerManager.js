@@ -33,6 +33,44 @@ class LayerManager {
 			rotation: 0, // degrees
 			scale: 100, // percentage
 		};
+		
+		this.moveableInstance = null;
+		this.moveableTargetElement = null;
+	}
+	
+	// --- Helper to parse transform string (basic example) ---
+	// You might need a more robust matrix decomposition library for complex cases
+	_parseTransform(transformString) {
+		const result = {
+			translateX: 0, translateY: 0, rotate: 0, scaleX: 1, scaleY: 1
+		};
+		if (!transformString || transformString === 'none') return result;
+		
+		// Regex is fragile, matrix decomposition is better but complex
+		const translateMatch = transformString.match(/translate\(\s*([^px]+)px\s*,\s*([^px]+)px\s*\)/);
+		if (translateMatch) {
+			result.translateX = parseFloat(translateMatch[1]);
+			result.translateY = parseFloat(translateMatch[2]);
+		}
+		// Note: Moveable often uses matrix3d, making regex harder.
+		// We will rely on Moveable's event data instead where possible.
+		
+		const rotateMatch = transformString.match(/rotate\(\s*([^deg)]+)deg\s*\)/);
+		if (rotateMatch) {
+			result.rotate = parseFloat(rotateMatch[1]);
+		}
+		
+		const scaleMatch = transformString.match(/scale\(\s*([^,)]+)(?:,\s*([^)]+))?\s*\)/);
+		if (scaleMatch) {
+			result.scaleX = parseFloat(scaleMatch[1]);
+			result.scaleY = scaleMatch[2] ? parseFloat(scaleMatch[2]) : result.scaleX; // Handle scale(x) or scale(x, y)
+		}
+		
+		// Fallback for matrix if needed (complex)
+		// const matrixMatch = transformString.match(/matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)\)/);
+		// if (matrixMatch) { ... calculate from matrix elements ... }
+		
+		return result;
 	}
 	
 	_isGoogleFont(fontFamily) {
@@ -123,7 +161,8 @@ class LayerManager {
 					const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
 					return nameWithoutExt.substring(0, 30) + (nameWithoutExt.length > 30 ? '...' : '');
 				}
-			} catch (e) { /* Ignore errors */ }
+			} catch (e) { /* Ignore errors */
+			}
 			
 			// Final fallback name
 			const numericIdPart = layerData.id ? layerData.id.split('-')[1] : 'New';
@@ -261,18 +300,22 @@ class LayerManager {
 		return defaultColor; // Return default if input is invalid
 	}
 	
-	// UPDATED: Added saveHistory parameter
 	deleteLayer(layerId, saveHistory = true) {
 		const layerIndex = this.layers.findIndex(l => l.id === layerId);
 		if (layerIndex > -1) {
-			$(`#${layerId}`).remove(); // Remove element from canvas
-			this.layers.splice(layerIndex, 1); // Remove data from array
-			if (this.selectedLayerId === layerId) {
-				this.selectLayer(null); // Deselect if deleted layer was selected
+			// If the deleted layer was selected, destroy Moveable instance
+			if (this.selectedLayerId === layerId && this.moveableInstance) {
+				this.moveableInstance.destroy();
+				this.moveableInstance = null;
+				this.moveableTargetElement = null;
 			}
-			this._updateZIndices(); // Renumber zIndex for remaining layers
-			this.updateList(); // Update sidebar list
-			// MODIFIED: Only save state if requested
+			$(`#${layerId}`).remove();
+			this.layers.splice(layerIndex, 1);
+			if (this.selectedLayerId === layerId) {
+				this.selectLayer(null);
+			}
+			this._updateZIndices();
+			this.updateList();
 			if (saveHistory) {
 				this.saveState();
 			}
@@ -298,6 +341,14 @@ class LayerManager {
 		const previousContent = currentLayer.content;
 		
 		const mergedData = {...currentLayer};
+		
+		// --- Store previous transform/size for Moveable update check ---
+		const prevX = currentLayer.x;
+		const prevY = currentLayer.y;
+		const prevWidth = currentLayer.width;
+		const prevHeight = currentLayer.height;
+		const prevRotation = currentLayer.rotation;
+		const prevScale = currentLayer.scale;
 		
 		for (const key in newData) {
 			if (newData.hasOwnProperty(key)) {
@@ -380,7 +431,6 @@ class LayerManager {
 		}
 		
 		
-		
 		// Type-specific updates
 		if (updatedLayer.type === 'text') {
 			// ... (text specific updates: content, font, styles) ...
@@ -416,25 +466,24 @@ class LayerManager {
 			this._applyStyles($element, updatedLayer); // Apply general styles (border, filters etc)
 		}
 		
+		// --- Update Moveable if this layer is selected and geometry changed ---
+		if (this.moveableInstance && this.selectedLayerId === layerId) {
+			const geometryChanged = updatedLayer.x !== prevX || updatedLayer.y !== prevY ||
+				updatedLayer.width !== prevWidth || updatedLayer.height !== prevHeight ||
+				updatedLayer.rotation !== prevRotation || updatedLayer.scale !== prevScale;
+			if (geometryChanged) {
+				// console.log("Programmatic update detected, updating Moveable rect for", layerId);
+				this.moveableInstance.updateRect();
+			}
+			// Update guidelines if layer visibility/lock status changed
+			if (newData.visible !== undefined || newData.locked !== undefined) {
+				this._updateMoveableGuidelines();
+			}
+		}
+		
 		// Notify the application that layer data has been updated
 		this.onLayerDataUpdate(updatedLayer);
 		return updatedLayer;
-	}
-	
-	// Convenience method for updating a single style-like property
-	updateLayerStyle(layerId, property, value) {
-		const layer = this.getLayerById(layerId);
-		if (layer) {
-			const update = {[property]: value};
-			// Handle specific conversions or related properties
-			if (property === 'fill') { /* ... */
-			} else if (property === 'fontSize') {
-				value = parseFloat(value) || layer.fontSize;
-				update[property] = value;
-			}
-			// Add more specific handling if needed
-			this.updateLayerData(layerId, update);
-		}
 	}
 	
 	updateLayerName(layerId, newName) {
@@ -456,6 +505,12 @@ class LayerManager {
 	}
 	
 	setLayers(layersData, keepNonTextLayers = false) {
+		if (this.moveableInstance) {
+			this.moveableInstance.destroy();
+			this.moveableInstance = null;
+			this.moveableTargetElement = null;
+		}
+		
 		if (!keepNonTextLayers) {
 			this.$canvas.empty();
 			this.layers = [];
@@ -511,20 +566,271 @@ class LayerManager {
 	// --- Selection ---
 	selectLayer(layerId) {
 		if (this.selectedLayerId === layerId) {
+			// If clicking the same layer, ensure Moveable is visible (it might hide on canvas click)
+			if (this.moveableInstance) this.moveableInstance.updateRect();
 			return;
 		}
+		
 		if (this.selectedLayerId) {
 			$(`#${this.selectedLayerId}`).removeClass('selected');
 		}
+		
 		this.$layerList.find('.list-group-item.active').removeClass('active');
+		
+		// Destroy existing Moveable instance
+		if (this.moveableInstance) {
+			this.moveableInstance.destroy();
+			this.moveableInstance = null;
+			this.moveableTargetElement = null;
+		}
+		
 		this.selectedLayerId = layerId;
 		const selectedLayer = this.getSelectedLayer();
+		
 		if (selectedLayer) {
 			const $element = $(`#${selectedLayer.id}`);
 			$element.addClass('selected');
 			this.$layerList.find(`.list-group-item[data-layer-id="${layerId}"]`).addClass('active');
+			
+			// --- Initialize Moveable for the new selection ---
+			this.moveableTargetElement = $element[0]; // Get the DOM element
+			if (this.moveableTargetElement && !selectedLayer.locked && selectedLayer.visible) {
+				this._createMoveableInstance(this.moveableTargetElement, selectedLayer);
+			}
 		}
 		this.onLayerSelect(selectedLayer); // Call App callback
+	}
+	
+	_createMoveableInstance(targetElement, layerData) {
+		if (this.moveableInstance) {
+			this.moveableInstance.destroy();
+		}
+		
+		const self = this;
+		const layerId = layerData.id;
+		const guidelines = this._calculateGuidelines(layerId);
+		console.log("Moveable guidelines:", guidelines);
+		
+		let initialDragData = {x: layerData.x, y: layerData.y};
+		let initialResizeData = {x: layerData.x, y: layerData.y, width: layerData.width, height: layerData.height};
+		
+		this.moveableInstance = new Moveable(this.$canvas[0], { // Parent element
+			target: targetElement,
+			container: this.$canvas[0], // Keep transforms relative to canvas
+			draggable: true,
+			resizable: true,
+			scalable: false,
+			rotatable: false,
+			keepRatio: false, // Allow free transform, Shift key usually enforces ratio
+			snappable: true,
+			isDisplayInnerSnapDigit:false,
+			isDisplaySnapDigit:false,
+			snapDirections: {
+				top: true,
+				left: true,
+				bottom: true,
+				right: true,
+				center: true,
+				middle: true
+			},
+			elementSnapDirections: {
+				top: true,
+				left: true,
+				bottom: true,
+				right: true,
+				center: true,
+				middle: true
+			},
+			maxSnapElementGuidelineDistance: 150,
+			snapCenter: true,
+			snapThreshold: 5, // Adjust as needed
+			elementGuidelines: guidelines.elementGuidelines, // Other elements
+			verticalGuidelines: guidelines.verticalGuidelines, // Canvas V lines
+			horizontalGuidelines: guidelines.horizontalGuidelines, // Canvas H lines
+			throttleDrag: 0,
+			throttleResize: 0,
+			throttleScale: 0,
+			throttleRotate: 0,
+			renderDirections: ["nw", "n", "ne", "w", "e", "sw", "s", "se"],
+			origin: false, // Rotate/scale around center
+			zoom: 3,
+			padding: {"left": 0, "top": 0, "right": 0, "bottom": 0}, // Default padding
+		});
+		
+		// --- Moveable Event Handlers ---
+		
+		this.moveableInstance
+			.on("dragStart", ({inputEvent, set}) => {
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) {
+					inputEvent.stopPropagation();
+					return false;
+				}
+				// Store the starting position from layer data
+				initialDragData = {x: layer.x, y: layer.y};
+				set([initialDragData.x, initialDragData.y]); // Sync Moveable's internal start position
+				$(targetElement).addClass('moveable-dragging');
+			})
+			.on("drag", ({target, left, top, beforeTranslate, inputEvent}) => {
+				// inputEvent is native mouse event
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) return false;
+				
+				target.style.left = `${left}px`;
+				target.style.top = `${top}px`;
+			})
+			.on("dragEnd", ({target, isDrag, lastEvent, inputEvent}) => {
+				// inputEvent is native mouse event
+				$(target).removeClass('moveable-dragging');
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked || !isDrag || !lastEvent) return;
+				
+				// Use the final calculated left/top from the last drag event
+				const finalX = lastEvent.left;
+				const finalY = lastEvent.top;
+				
+				// Check if position actually changed (use rounding for robustness)
+				if (Math.round(finalX) !== Math.round(initialDragData.x) || Math.round(finalY) !== Math.round(initialDragData.y)) {
+					// Update layer data. This will internally update styles again.
+					self.updateLayerData(layerId, {x: finalX, y: finalY});
+					self.saveState(); // Save history AFTER the change is committed
+				} else {
+					// If no change, ensure styles are exactly as per data (handles potential rounding issues)
+					target.style.left = `${layer.x}px`;
+					target.style.top = `${layer.y}px`;
+				}
+			})
+			.on("resizeStart", ({inputEvent, setOrigin, dragStart}) => {
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) {
+					inputEvent.stopPropagation();
+					return false;
+				}
+				// Store initial size and position
+				initialResizeData = {x: layer.x, y: layer.y, width: layer.width, height: layer.height};
+				
+				setOrigin(["%", "%"]); // Keep origin at center for scaling/resizing appearance
+				
+				// If dragStart is available, link it to the initial position
+				if (dragStart) {
+					dragStart.set([initialResizeData.x, initialResizeData.y]);
+				}
+				
+				$(targetElement).addClass('moveable-resizing');
+			})
+			.on("resize", ({target, width, height, drag, delta, dist, transform, inputEvent}) => {
+				// inputEvent is native mouse event
+				const layer = self.getLayerById(layerId);
+				if (!layer || layer.locked) return false;
+				
+				// Apply width and height directly for feedback
+				target.style.width = `${width}px`;
+				target.style.height = `${height}px`;
+				target.style.transform = drag.transform;
+			})
+			.on("resizeEnd", ({target, isDrag, lastEvent, inputEvent}) => {
+				// inputEvent is native mouse event
+				$(target).removeClass('moveable-resizing');
+				const layer = self.getLayerById(layerId); // Get the layer data *before* update
+				if (!layer || layer.locked || !isDrag || !lastEvent) return;
+				
+				const finalWidth = lastEvent.width;
+				const finalHeight = lastEvent.height;
+				
+				let parsedTransform = this._parseTransformString(lastEvent.drag.transform);
+				console.log(parsedTransform);
+				const finalX = initialResizeData.x + parsedTransform.translate.x;
+				const finalY = initialResizeData.y + parsedTransform.translate.y;
+				
+				// Check if position or dimensions actually changed
+				const positionChanged = Math.round(finalX) !== Math.round(initialResizeData.x) || Math.round(finalY) !== Math.round(initialResizeData.y);
+				const dimensionsChanged = Math.round(finalWidth) !== Math.round(initialResizeData.width) || Math.round(finalHeight) !== Math.round(initialResizeData.height);
+				
+				if (positionChanged || dimensionsChanged) {
+					self.updateLayerData(layerId, {
+						width: finalWidth,
+						height: finalHeight,
+						x: finalX,
+						y: finalY
+					});
+					self.saveState(); // Save history
+				}
+				
+				// IMPORTANT: Reset the transform applied during the resize.
+				// updateLayerData should have already set top/left/width/height.
+				// We now need to ensure the transform ONLY reflects rotation/scale from layer data.
+				// Call _applyTransform which reads rotation/scale from the (potentially just updated) layer data.
+				const updatedLayer = self.getLayerById(layerId); // Get potentially updated data
+				if (updatedLayer) {
+					self._applyTransform($(target), updatedLayer);
+				}
+				
+				
+				// Crucial: Tell Moveable to update its internal calculation based on the final styles
+				// This prevents potential jumps on the next interaction.
+				if (self.moveableInstance) {
+					// Use requestAnimationFrame to ensure styles are applied before updateRect
+					requestAnimationFrame(() => {
+						if (self.moveableInstance) { // Check again as it might be destroyed
+							self.moveableInstance.updateRect();
+						}
+					});
+				}
+			});
+		
+		// Initial positioning update if needed (usually okay, but safe)
+		this.moveableInstance.updateRect();
+	}
+	
+	_parseTransformString(transformString) {
+		// Extract translate values
+		const translateRegex = /translate\(([-\d.e]+)px,\s*([-\d.e]+)px\)/;
+		const translateMatch = transformString.match(translateRegex);
+		
+		// Extract rotate value
+		const rotateRegex = /rotate\(([-\d.e]+)deg\)/;
+		const rotateMatch = transformString.match(rotateRegex);
+		
+		// Extract scale value
+		const scaleRegex = /scale\(([-\d.e]+)\)/;
+		const scaleMatch = transformString.match(scaleRegex);
+		
+		return {
+			translate: {
+				x: translateMatch ? parseFloat(translateMatch[1]) : 0,
+				y: translateMatch ? parseFloat(translateMatch[2]) : 0
+			},
+			rotate: rotateMatch ? parseFloat(rotateMatch[1]) : 0,
+			scale: scaleMatch ? parseFloat(scaleMatch[1]) : 1
+		};
+	}
+	
+	_calculateGuidelines(currentLayerId) {
+		const canvasWidth = this.canvasManager.currentCanvasWidth;
+		const canvasHeight = this.canvasManager.currentCanvasHeight;
+		
+		// Canvas Guidelines
+		const verticalGuidelines = [0, canvasWidth / 2, canvasWidth];
+		const horizontalGuidelines = [0, canvasHeight / 2, canvasHeight];
+		
+		// Element Guidelines (other visible, unlocked layers)
+		const elementGuidelines = this.layers
+			.filter(l => l.id !== currentLayerId && l.visible && !l.locked)
+			.map(l => document.getElementById(l.id))
+			.filter(el => el); // Filter out nulls if element not found
+		
+		return {verticalGuidelines, horizontalGuidelines, elementGuidelines};
+	}
+	
+	// Call this if guidelines need refreshing (e.g., layer added/deleted/visibility changed)
+	_updateMoveableGuidelines() {
+		if (this.moveableInstance && this.selectedLayerId) {
+			const guidelines = this._calculateGuidelines(this.selectedLayerId);
+			this.moveableInstance.verticalGuidelines = guidelines.verticalGuidelines;
+			this.moveableInstance.horizontalGuidelines = guidelines.horizontalGuidelines;
+			this.moveableInstance.elementGuidelines = guidelines.elementGuidelines;
+			// console.log("Updated Moveable guidelines");
+		}
 	}
 	
 	getSelectedLayer() {
@@ -539,6 +845,14 @@ class LayerManager {
 			const $element = $(`#${layerId}`);
 			$element.toggle(layer.visible);
 			$element.toggleClass('layer-hidden', !layer.visible);
+			
+			// Update Moveable if the selected layer's visibility changed
+			if (layerId === this.selectedLayerId) {
+				this._updateElementInteractivity($element, layer);
+			}
+			// Update guidelines as visibility changed
+			this._updateMoveableGuidelines();
+			
 			this.updateList();
 			this.saveState();
 		}
@@ -547,15 +861,16 @@ class LayerManager {
 	// UPDATED: Added saveHistory parameter
 	toggleLockLayer(layerId, saveHistory = true) {
 		const layer = this.getLayerById(layerId);
+		
 		if (layer) {
 			layer.locked = !layer.locked;
-			// updateLayerData will handle visual update and interactivity
 			this.updateLayerData(layerId, {locked: layer.locked});
-			this.updateList(); // Update list item appearance
+			this.updateList();
+			
 			if (layerId === this.selectedLayerId) {
-				this.onLayerSelect(layer); // Notify App if selected layer's lock changed
+				this.onLayerSelect(layer);
 			}
-			// MODIFIED: Only save state if requested
+			
 			if (saveHistory) {
 				this.saveState();
 			}
@@ -564,7 +879,6 @@ class LayerManager {
 	
 	toggleSelectedLayerLock() {
 		if (this.selectedLayerId) {
-			// Calls toggleLockLayer which now defaults to saving history
 			this.toggleLockLayer(this.selectedLayerId);
 		}
 	}
@@ -573,49 +887,38 @@ class LayerManager {
 	moveLayer(layerId, direction) {
 		const layerIndex = this.layers.findIndex(l => l.id === layerId);
 		if (layerIndex === -1) return;
-		
-		const currentLayers = [...this.layers]; // Work on a copy for sorting
-		// Remove the layer to move
+		const currentLayers = [...this.layers];
 		const layerToMove = currentLayers.splice(layerIndex, 1)[0];
-		
-		// Re-insert based on direction
 		if (direction === 'front') {
-			currentLayers.push(layerToMove); // Add to the end (highest index)
+			currentLayers.push(layerToMove);
 		} else if (direction === 'back') {
-			currentLayers.unshift(layerToMove); // Add to the beginning (lowest index)
-		} else if (direction === 'up' && layerIndex < this.layers.length - 1) { // Check bounds using original length
-			// Insert after the next element in the *original* sorted array's position
-			// Find the element that was originally after it
+			currentLayers.unshift(layerToMove);
+		} else if (direction === 'up' && layerIndex < this.layers.length - 1) {
 			const originalNextLayerId = this.layers[layerIndex + 1].id;
 			const insertBeforeIndex = currentLayers.findIndex(l => l.id === originalNextLayerId);
 			if (insertBeforeIndex !== -1) {
-				currentLayers.splice(insertBeforeIndex + 1, 0, layerToMove); // Insert after it
+				currentLayers.splice(insertBeforeIndex + 1, 0, layerToMove);
 			} else {
-				currentLayers.push(layerToMove); // Fallback: move to front if original next not found
+				currentLayers.push(layerToMove);
 			}
 		} else if (direction === 'down' && layerIndex > 0) {
-			// Insert before the previous element in the *original* sorted array's position
 			const originalPrevLayerId = this.layers[layerIndex - 1].id;
 			const insertBeforeIndex = currentLayers.findIndex(l => l.id === originalPrevLayerId);
 			if (insertBeforeIndex !== -1) {
-				currentLayers.splice(insertBeforeIndex, 0, layerToMove); // Insert before it
+				currentLayers.splice(insertBeforeIndex, 0, layerToMove);
 			} else {
-				currentLayers.unshift(layerToMove); // Fallback: move to back if original prev not found
+				currentLayers.unshift(layerToMove);
 			}
 		} else {
-			// Invalid direction or already at boundary, reinsert at original effective position
 			currentLayers.splice(layerIndex, 0, layerToMove);
-			return; // No change needed
+			return;
 		}
-		
-		// Reassign zIndex based on the new order in the modified array
 		currentLayers.forEach((layer, index) => {
 			layer.zIndex = index + 1;
 		});
-		
-		this.layers = currentLayers; // Update the main layers array
-		this._updateZIndices(); // Apply CSS z-index
-		this.updateList(); // Update sidebar list order
+		this.layers = currentLayers;
+		this._updateZIndices();
+		this.updateList();
 		this.saveState();
 	}
 	
@@ -630,11 +933,8 @@ class LayerManager {
 	}
 	
 	_updateZIndices() {
-		// Sort first to ensure array order matches desired zIndex
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-		// Then apply based on sorted order
 		this.layers.forEach((layer, index) => {
-			// Optionally re-assign zIndex based on current array order
 			// layer.zIndex = index + 1; // Uncomment if strict 1-based index is needed
 			$(`#${layer.id}`).css('z-index', layer.zIndex || 0);
 		});
@@ -670,7 +970,7 @@ class LayerManager {
 		if (layerData.type === 'text') {
 			this._ensureGoogleFontLoaded(layerData.fontFamily);
 			const $textContent = $('<div class="text-content"></div>');
-
+			
 			$textContent.text(layerData.content || '');
 			$element.append($textContent);
 			this._applyTextStyles($textContent, layerData);
@@ -706,222 +1006,41 @@ class LayerManager {
 	_makeElementInteractive($element, layerData) {
 		const layerId = layerData.id;
 		const self = this;
-		let startMouseX, startMouseY, startElementX, startElementY;
 		
-		$element.draggable({
-			containment: this.$canvas, // Contain within the canvas div itself
-			start: (event, ui) => {
-				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return false; // Prevent dragging locked layers
-				
-				self.selectLayer(layerId);
-				$(event.target).addClass('ui-draggable-dragging');
-				
-				// Store start position relative to mouse and unscaled element coords
-				startMouseX = event.pageX;
-				startMouseY = event.pageY;
-				startElementX = layer.x;
-				startElementY = layer.y;
-			},
-			drag: (event, ui) => {
-				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return false;
-				
-				const zoom = self.canvasManager.currentZoom;
-				// Calculate mouse delta
-				const mouseDx = event.pageX - startMouseX;
-				const mouseDy = event.pageY - startMouseY;
-				
-				// Convert mouse delta to unscaled element delta
-				const elementDx = mouseDx / zoom;
-				const elementDy = mouseDy / zoom;
-				
-				// Calculate new unscaled position
-				const newX = startElementX + elementDx;
-				const newY = startElementY + elementDy;
-				
-				// Update the ui.position which jQuery UI uses for feedback/containment check
-				// It expects values relative to the offset parent (the canvas) in scaled pixels
-				// But we are managing position via layerData.x/y (unscaled)
-				// So, we update the element's CSS directly with unscaled values
-				ui.position.left = newX;
-				ui.position.top = newY;
-				
-				// OPTIONALLY: Update element style directly for immediate feedback *if needed*
-				// $element.css({ left: newX + 'px', top: newY + 'px' });
-				// Usually setting ui.position is enough, but direct CSS can be a backup
-			},
-			stop: (event, ui) => {
-				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return;
-				
-				// Use the final position calculated during drag (stored in ui.position)
-				self.updateLayerData(layerId, {x: ui.position.left, y: ui.position.top});
-				$(event.target).removeClass('ui-draggable-dragging');
-				self.saveState(); // Save state after drag completes
-			}
-		});
-		
-		$element.resizable({
-			handles: 'n, e, s, w, ne, se, sw, nw',
-			// containment: this.$canvas, // Resizable containment can be tricky with zoom/transforms
-			start: (event, ui) => {
-				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return false;
-				self.selectLayer(layerId);
-				
-				// Get the target element itself
-				const $target = $(event.target);
-				$target.addClass('ui-resizable-resizing');
-				
-				// Calculate initial unscaled size (handle 'auto')
-				const currentZoom = self.canvasManager.currentZoom;
-				const initialUnscaledWidth = layer.width === 'auto' ? $target.outerWidth() / currentZoom : layer.width;
-				const initialUnscaledHeight = layer.height === 'auto' ? $target.outerHeight() / currentZoom : layer.height;
-				
-				// --- STORE data on the element ---
-				$target.data('resizableStartData', {
-					originalPositionUnscaled: {left: layer.x, top: layer.y},
-					originalSizeUnscaled: {width: initialUnscaledWidth, height: initialUnscaledHeight},
-					// Store the initial CSS values provided by jQuery UI in the start event's ui object
-					originalCss: {left: ui.position.left, top: ui.position.top, width: ui.size.width, height: ui.size.height}
-				});
-				// --- END STORE ---
-			},
-			resize: (event, ui) => {
-				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return false;
-				
-				// --- RETRIEVE data from the element ---
-				const $target = $(event.target);
-				const startData = $target.data('resizableStartData');
-				if (!startData) {
-					console.error("Resizable start data not found during resize for layer:", layerId);
-					return; // Cannot proceed without start data
-				}
-				// --- END RETRIEVE ---
-				
-				const zoom = self.canvasManager.currentZoom;
-				
-				// Calculate change in scaled dimensions/position provided by *this* resize event's ui object
-				const cssWidthChange = ui.size.width - startData.originalCss.width;
-				const cssHeightChange = ui.size.height - startData.originalCss.height;
-				const cssLeftChange = ui.position.left - startData.originalCss.left;
-				const cssTopChange = ui.position.top - startData.originalCss.top;
-				
-				// Convert these CSS changes to unscaled changes
-				const unscaledWidthChange = cssWidthChange / zoom;
-				const unscaledHeightChange = cssHeightChange / zoom;
-				const unscaledLeftChange = cssLeftChange / zoom;
-				const unscaledTopChange = cssTopChange / zoom;
-				
-				// Calculate the new unscaled dimensions and position based on the *stored original unscaled values*
-				const newUnscaledWidth = startData.originalSizeUnscaled.width + unscaledWidthChange;
-				const newUnscaledHeight = startData.originalSizeUnscaled.height + unscaledHeightChange;
-				const newUnscaledX = startData.originalPositionUnscaled.left + unscaledLeftChange;
-				const newUnscaledY = startData.originalPositionUnscaled.top + unscaledTopChange;
-				
-				// Update the element's CSS directly using the calculated unscaled values
-				// This keeps the element's CSS aligned with the unscaled data model during resize
-				$target.css({
-					left: newUnscaledX + 'px',
-					top: newUnscaledY + 'px',
-					width: newUnscaledWidth + 'px',
-					// Handle auto height for text layers specifically
-					height: (layer.type === 'text' && layer.height === 'auto') ? 'auto' : newUnscaledHeight + 'px'
-				});
-				
-				// If text layer with auto height, reapply styles to potentially adjust height
-				if (layer.type === 'text' && layer.height === 'auto') {
-					self._applyTextStyles($target.find('.text-content'), layer); // Re-apply styles
-					$target.css('height', 'auto'); // Ensure CSS height remains auto
-				}
-				
-				// --- STORE current calculated unscaled values for the stop event ---
-				// (Optional but can be cleaner than recalculating in stop)
-				$target.data('resizableCurrentUnscaled', {
-					x: newUnscaledX,
-					y: newUnscaledY,
-					width: newUnscaledWidth,
-					height: (layer.type === 'text' && layer.height === 'auto') ? 'auto' : newUnscaledHeight
-				});
-				// --- END STORE ---
-			},
-			
-			stop: (event, ui) => {
-				const layer = self.getLayerById(layerId);
-				if (!layer || layer.locked) return;
-				
-				const $target = $(event.target);
-				// --- RETRIEVE the final calculated unscaled values from resize ---
-				const finalUnscaled = $target.data('resizableCurrentUnscaled');
-				
-				if (!finalUnscaled) {
-					console.error("Resizable final unscaled data not found during stop for layer:", layerId);
-					// Attempt graceful recovery or just log error
-				} else {
-					// Update layer data with the final unscaled values
-					self.updateLayerData(layerId, {
-						x: finalUnscaled.x,
-						y: finalUnscaled.y,
-						width: finalUnscaled.width,
-						height: finalUnscaled.height // Already 'auto' if needed
-					});
-					
-					// Ensure final CSS matches the updated data (especially for auto height)
-					$target.css({
-						left: finalUnscaled.x + 'px',
-						top: finalUnscaled.y + 'px',
-						width: finalUnscaled.width + 'px',
-						height: (typeof finalUnscaled.height === 'number') ? finalUnscaled.height + 'px' : 'auto' // Set CSS height correctly
-					});
-					
-					if (layer.type === 'text' && finalUnscaled.height === 'auto') {
-						$target.css('height', 'auto'); // Ensure it recalculates if needed after potential content reflow
-					}
-					self.saveState(); // Save state after resize completes
-				}
-				
-				
-				$target.removeClass('ui-resizable-resizing');
-				
-				// --- CLEANUP stored data ---
-				$target.removeData('resizableStartData');
-				$target.removeData('resizableCurrentUnscaled');
-				// --- END CLEANUP ---
-			}
-		});
-		
+		// Remove previous listeners if any (safety)
+		$element.off('click.layerManager');
 		
 		// Single click to select
-		$element.on('click', (e) => {
-			e.stopPropagation(); // Prevent click from bubbling to canvas area (which deselects)
+		$element.on('click.layerManager', (e) => {
+			e.stopPropagation(); // Prevent click bubbling to canvas area
 			self.selectLayer(layerId);
 		});
 		
-		// Ensure initial interactivity state is correct
-		self._updateElementInteractivity($element, layerData);
+		// Ensure initial interactivity state is correct (cursor, disabled class)
+		this._updateElementInteractivity($element, layerData);
 	}
 	
 	
 	_updateElementInteractivity($element, layerData) {
 		const isLocked = layerData.locked;
-		const isDisabled = !layerData.visible || isLocked; // Consider invisible layers disabled too
+		const isHidden = !layerData.visible;
+		const isDisabled = isLocked || isHidden;
 		
-		try {
-			if ($element.hasClass('ui-draggable')) {
-				$element.draggable(isDisabled ? 'disable' : 'enable');
-			}
-			if ($element.hasClass('ui-resizable')) {
-				$element.resizable(isDisabled ? 'disable' : 'enable');
-			}
-			// Add a general class to potentially style locked/hidden elements differently
-			$element.toggleClass('interactions-disabled', isDisabled);
-			// Ensure correct cursor even if only visibility changes
-			$element.css('cursor', isLocked ? 'default' : 'grab');
-			
-		} catch (error) {
-			console.warn("Error updating interactivity for element:", layerData.id, error);
+		$element.toggleClass('interactions-disabled', isDisabled);
+		$element.css('cursor', isLocked ? 'default' : 'grab');
+		
+		// If the layer is currently selected AND becomes disabled, destroy Moveable
+		if (this.selectedLayerId === layerData.id && isDisabled && this.moveableInstance) {
+			console.log("Destroying Moveable for disabled/locked layer:", layerData.id);
+			this.moveableInstance.destroy();
+			this.moveableInstance = null;
+			this.moveableTargetElement = null;
+		}
+		// If the layer is currently selected AND becomes enabled, create Moveable (if not already present)
+		else if (this.selectedLayerId === layerData.id && !isDisabled && !this.moveableInstance) {
+			console.log("Recreating Moveable for enabled layer:", layerData.id);
+			this.moveableTargetElement = $element[0];
+			this._createMoveableInstance(this.moveableTargetElement, layerData);
 		}
 	}
 	
@@ -1051,16 +1170,6 @@ class LayerManager {
 			if (filters.blur !== 0) filterString += `blur(${filters.blur}px) `;
 			
 			$img.css('filter', filterString.trim() || 'none');
-		}
-		
-		// Border (Example - could be extended)
-		if (layerData.border) { // Assuming border is a string like "1px solid red"
-			$element.css('border', layerData.border);
-		} else {
-			// Remove border unless selected (selection border is handled by class)
-			if (!$element.hasClass('selected')) {
-				$element.css('border', 'none'); // Remove default/placeholder border
-			}
 		}
 	}
 	

@@ -359,15 +359,15 @@ body {
 .canvas-element {
     position: absolute;
     cursor: grab;
-    border: 1px dashed transparent;
+    /*border: 1px dashed transparent;*/
+    border: none;
     box-sizing: border-box;
 }
 
-.canvas-element.ui-draggable-dragging,
-.canvas-element.ui-resizable-resizing {
-    cursor: grabbing;
+.canvas-element.moveable-dragging, .canvas-element.moveable-resizing, .canvas-element.moveable-scaling, .canvas-element.moveable-rotating {
     z-index: 1001 !important;
     opacity: 0.7;
+    cursor: default;
 }
 
 .canvas-element.selected {
@@ -382,79 +382,22 @@ body {
     cursor: default !important;
 }
 
-.canvas-element.locked .ui-resizable-handle {
-    display: none;
+.moveable-control {
+    background: #0d6efd !important;
+    border: 1px solid #fff !important;
+    width: 10px !important;
+    height: 10px !important;
+    border-radius: 50% !important;
+    margin-top: -5px !important; /* Adjust based on size */
+    margin-left: -5px !important; /* Adjust based on size */
+    /*transform: scale(var(--canvas-zoom-x)) !important;*/
+    /*transform-origin: center center;*/
 }
 
-/* Resize Handle Styling */
-.canvas-element .ui-resizable-handle {
-    background: #0d6efd;
-    border: 1px solid #fff;
-    width: 10px;
-    height: 10px;
-    z-index: 1002;
-    box-sizing: border-box;
-    border-radius: 50%;
-    transform: scale(var(--canvas-zoom-x));
-    transform-origin: center center;
-    display: none !important; /* Hide by default */
-}
-
-.canvas-element.selected .ui-resizable-handle {
-    display: block !important; /* Show when selected */
-}
-
-/* Specific handle positions (optional visual tweaks) */
-.canvas-element .ui-resizable-n {
-    top: -5px;
-    left: 50%;
-    margin-left: -5px;
-    cursor: n-resize;
-}
-
-.canvas-element .ui-resizable-s {
-    bottom: -5px;
-    left: 50%;
-    margin-left: -5px;
-    cursor: s-resize;
-}
-
-.canvas-element .ui-resizable-e {
-    right: -5px;
-    top: 50%;
-    margin-top: -5px;
-    cursor: e-resize;
-}
-
-.canvas-element .ui-resizable-w {
-    left: -5px;
-    top: 50%;
-    margin-top: -5px;
-    cursor: w-resize;
-}
-
-.canvas-element .ui-resizable-se {
-    right: -5px;
-    bottom: -5px;
-    cursor: se-resize;
-}
-
-.canvas-element .ui-resizable-sw {
-    left: -5px;
-    bottom: -5px;
-    cursor: sw-resize;
-}
-
-.canvas-element .ui-resizable-ne {
-    right: -5px;
-    top: -5px;
-    cursor: ne-resize;
-}
-
-.canvas-element .ui-resizable-nw {
-    left: -5px;
-    top: -5px;
-    cursor: nw-resize;
+.moveable-line.moveable-guideline {
+    background: #ff4444 !important; /* Guideline color */
+    opacity: 0.9;
+    border: 1px solid #ccc;
 }
 
 .canvas-element img {

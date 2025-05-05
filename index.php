@@ -315,6 +315,7 @@
 <script src="vendors/jsfontpicker/dist/jquery.fontpicker.min.js"></script>
 <script type="module" src="vendors/modern-screenshot.js"></script>
 <script src="vendors/tinycolor-min.js"></script>
+<script src="vendors/moveable.min.js"></script>
 
 <script src="js/LayerManager.js"></script>
 <script src="js/HistoryManager.js"></script>
