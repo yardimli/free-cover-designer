@@ -1,6 +1,5 @@
 /* free-cover-designer/css/style.css */
 :root {
-    --canvas-zoom-x: 1; /* Default zoom level */
     --sidebar-icon-width: 60px;
     --sidebar-panel-width: 340px;
     --inspector-panel-width: 300px;
@@ -390,8 +389,6 @@ body {
     border-radius: 50% !important;
     margin-top: -5px !important; /* Adjust based on size */
     margin-left: -5px !important; /* Adjust based on size */
-    /*transform: scale(var(--canvas-zoom-x)) !important;*/
-    /*transform-origin: center center;*/
 }
 
 .moveable-line.moveable-guideline {
@@ -849,4 +846,215 @@ body {
 #export-overlay p {
     font-size: 1.1rem;
     margin-top: 1rem; /* Space between spinner and text */
+}
+
+
+#canvasPreviewContainer {
+    min-height: 250px; /* Ensure minimum height for the column */
+    background-color: #e9ecef; /* Light background for the preview column */
+    border-radius: 0.25rem;
+    padding: 10px;
+}
+
+#canvasPreviewArea {
+    display: flex; /* Arrange back, spine, front horizontally */
+    align-items: center; /* Vertically center items if heights differ slightly */
+    justify-content: center; /* Horizontally center the group */
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Hide parts if scaling is imperfect */
+    transition: opacity 0.2s ease-in-out;
+}
+
+#previewBack,
+#previewSpine,
+#previewFront {
+    box-sizing: border-box;
+    border: 1px solid #6c757d; /* Darker border */
+    flex-shrink: 0; /* Prevent shrinking */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #495057;
+    overflow: hidden;
+    white-space: normal; /* Allow text wrapping */
+    padding: 2px;
+    transition: width 0.2s ease-in-out, height 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+#previewBack {
+    background-color: #f8f9fa; /* Lighter background */
+    border-right: none; /* Remove right border if spine exists */
+}
+
+#previewSpine {
+    background-color: #dee2e6; /* Slightly darker for spine */
+    border-left: 1px dashed #6c757d; /* Dashed left border */
+    border-right: 1px dashed #6c757d; /* Dashed right border */
+    writing-mode: vertical-rl; /* Optional: Vertical text for spine */
+    text-orientation: mixed;   /* Optional: Vertical text orientation */
+}
+
+#previewFront {
+    background-color: #f8f9fa; /* Lighter background */
+    border-left: none; /* Remove left border if spine exists */
+}
+
+/* Adjust borders when elements are hidden */
+#canvasPreviewArea > #previewSpine:not([style*="display: none"]) + #previewFront {
+    border-left: none;
+}
+#canvasPreviewArea > #previewBack:not([style*="display: none"]) + #previewSpine {
+    border-left: 1px dashed #6c757d;
+}
+#canvasPreviewArea > #previewBack:not([style*="display: none"]) + #previewFront:only-child {
+    /* This case shouldn't happen with current logic, but good fallback */
+    border-left: 1px solid #6c757d;
+}
+
+
+/* Style for radio button group */
+#canvasSizePresetGroup .form-check {
+    margin-bottom: 0.5rem;
+}
+
+/* Ensure error messages have some space */
+.modal-body .invalid-feedback {
+    margin-top: 0.25rem;
+    width: 100%; /* Ensure it takes full width */
+}
+
+/* --- Canvas Size Modal Theming --- */
+#canvasSizeModal .modal-content-editor-theme {
+    background-color: #f8f9fa; /* Match panel background */
+    border: 1px solid #dee2e6; /* Match panel border */
+    border-radius: 4px; /* Reduced radius */
+    color: #495057; /* Match panel text */
+}
+
+#canvasSizeModal .modal-header {
+    background-color: #e9ecef; /* Match panel header */
+    border-bottom: 1px solid #dee2e6;
+    padding: 0.6rem 0.8rem; /* Reduced padding */
+    border-top-left-radius: 3px; /* Match content radius */
+    border-top-right-radius: 3px;
+}
+
+#canvasSizeModal .modal-header .modal-title {
+    font-size: 1rem; /* Slightly smaller title */
+    font-weight: bold;
+    color: #495057;
+}
+
+#canvasSizeModal .modal-header .btn-close {
+    filter: invert(30%) grayscale(100%) brightness(100%); /* Make close button darker */
+    opacity: 0.7;
+}
+#canvasSizeModal .modal-header .btn-close:hover {
+    opacity: 1;
+}
+
+
+#canvasSizeModal .modal-body {
+    padding: 0.8rem; /* Reduced padding */
+    font-size: 0.85rem; /* Match inspector font size */
+}
+
+#canvasSizeModal .modal-footer {
+    background-color: #f8f9fa; /* Match content background */
+    border-top: 1px solid #e9ecef; /* Lighter separator */
+    padding: 0.6rem 0.8rem; /* Reduced padding */
+    border-bottom-left-radius: 3px; /* Match content radius */
+    border-bottom-right-radius: 3px;
+}
+
+/* Reduce margins on form elements */
+#canvasSizeModal .modal-body .mb-1 { margin-bottom: 0.25rem !important; }
+#canvasSizeModal .modal-body .mb-2 { margin-bottom: 0.5rem !important; }
+#canvasSizeModal .modal-body .mb-3 { margin-bottom: 0.75rem !important; } /* Keep slightly larger for main sections if needed */
+#canvasSizeModal .modal-body .mt-1 { margin-top: 0.25rem !important; }
+
+/* Style form elements */
+#canvasSizeModal .form-label-sm {
+    font-size: 0.75rem; /* Smaller labels */
+    margin-bottom: 0.15rem;
+    color: #6c757d;
+}
+
+#canvasSizeModal .form-control-sm,
+#canvasSizeModal .form-select-sm {
+    font-size: 0.8rem; /* Match inspector controls */
+    border-radius: 3px; /* Reduced radius */
+    border-color: #ced4da;
+}
+#canvasSizeModal .form-control-sm:focus,
+#canvasSizeModal .form-select-sm:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+
+#canvasSizeModal .form-check-sm .form-check-input {
+    width: 0.9em;
+    height: 0.9em;
+    margin-top: 0.2em;
+}
+#canvasSizeModal .form-check-sm .form-check-label {
+    font-size: 0.85rem; /* Match body font size */
+    padding-left: 0.3em;
+}
+
+#canvasSizeModal .btn-sm {
+    font-size: 0.8rem; /* Match inspector buttons */
+    padding: 0.25rem 0.6rem; /* Adjust padding */
+    border-radius: 3px; /* Reduced radius */
+}
+
+#canvasSizeModal .btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+#canvasSizeModal .btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+#canvasSizeModal .invalid-feedback {
+    font-size: 0.75rem; /* Smaller error messages */
+    margin-top: 0.15rem;
+}
+
+/* Preview Area Adjustments */
+#canvasPreviewContainer {
+    background-color: #e9ecef; /* Match header background */
+    border-radius: 3px; /* Reduced radius */
+    padding: 8px; /* Reduced padding */
+    min-height: 200px; /* Slightly reduced min-height */
+}
+
+#previewBack, #previewSpine, #previewFront {
+    border: 1px solid #adb5bd; /* Slightly lighter border */
+    font-size: 0.65rem; /* Smaller text */
+    padding: 1px; /* Tighter padding */
+    border-radius: 2px; /* Slight radius */
+}
+
+#previewSpine {
+    border-left: 1px dashed #adb5bd;
+    border-right: 1px dashed #adb5bd;
+    background-color: #dee2e6;
+}
+
+#previewBack, #previewFront {
+    background-color: #f8f9fa;
+}
+
+/* Ensure borders connect correctly */
+#canvasPreviewArea > #previewSpine:not([style*="display: none"]) + #previewFront {
+    border-left: none;
+}
+#canvasPreviewArea > #previewBack:not([style*="display: none"]) + #previewSpine {
+    border-left: 1px dashed #adb5bd;
 }

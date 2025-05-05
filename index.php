@@ -180,6 +180,7 @@
 			<hr class="mx-2" style="border-top: 1px solid #495057;">
 
 			<!-- Action Buttons -->
+<!--			<li class="nav-item"><a class="nav-link" href="#" id="openCanvasSizeModalBtn" title="Set Canvas Size"><i class="fas fa-ruler-combined fa-lg"></i></a></li>-->
 			<li class="nav-item"><a class="nav-link" href="#" id="loadDesignIconBtn" title="Load Design (.json)"><i class="fas fa-folder-open fa-lg"></i></a></li>
 			<li class="nav-item"><a class="nav-link" href="#" id="saveDesign" title="Save Design (.json)"><i class="fas fa-save fa-lg"></i></a></li>
 			<li class="nav-item"><a class="nav-link" href="#" id="undoBtn" title="Undo"><i class="fas fa-undo fa-lg"></i></a></li>
@@ -302,6 +303,9 @@
 	</div>
 </div>
 
+<!-- Canvas Size Modal -->
+<?php include 'canvasSizeModal.php'; ?>
+
 <!-- Embed data (No changes needed) -->
 <script id="templateData" type="application/json"><?php echo $templates_json; ?></script>
 <script id="coverData" type="application/json"><?php echo $covers_json; ?></script>
@@ -322,6 +326,7 @@
 <script src="js/CanvasManager.js"></script>
 <script src="js/InspectorPanel.js"></script>
 <script src="js/SidebarItemManager.js"></script>
+<script src="js/CanvasSizeModal.js"></script>
 <script src="js/App.js"></script>
 
 </body>

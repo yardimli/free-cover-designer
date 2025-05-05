@@ -5,7 +5,7 @@ $(document).ready(function () {
 	const $canvasArea = $('#canvas-area');
 	const $canvasWrapper = $('#canvas-wrapper');
 	const $loadDesignInput = $('#loadDesignInput');
-	const $inspectorPanelElement = $('#inspectorPanel'); // Reference the panel element itself
+	const $inspectorPanelElement = $('#inspectorPanel');
 	
 	// Sidebar Panel References
 	const $sidebarPanelsContainer = $('#sidebar-panels-container');
@@ -17,6 +17,8 @@ $(document).ready(function () {
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
 		onZoomChange: handleZoomChange
 	});
+	
+	const canvasSizeModal = new CanvasSizeModal(canvasManager);
 	
 	let googleFonts = []; // Placeholder if needed elsewhere
 	
@@ -52,7 +54,6 @@ $(document).ready(function () {
 		overlaysListSelector: '#overlayList', // Corrected selector name
 		overlaysSearchSelector: '#overlaySearch', // Corrected selector name
 		sidebarPanelsContainerSelector: '#sidebar-panels-container',
-		elementsUrl: 'data/elements.json', // Example if loading elements via JSON
 		applyTemplate: (jsonPath) => {
 			// ... (apply template logic - remove text layers, load design) ...
 			console.log("Applying template via click, removing existing text layers...");
@@ -90,6 +91,14 @@ $(document).ready(function () {
 	historyManager.saveState();
 	updateActionButtons();
 	inspectorPanel.hide(); // Ensure inspector starts hidden
+	
+	try {
+		const kindlePresetValue = "1600x2560"; // Match the value in PHP/HTML
+		// Show the modal, passing the default value
+		canvasSizeModal.show({ defaultPresetValue: kindlePresetValue });
+	} catch (error) {
+		console.error("Error showing initial canvas size modal:", error);
+	}
 	
 	// --- UI Update Callbacks ---
 	
@@ -182,15 +191,14 @@ $(document).ready(function () {
 			actionFn(); // Execute the action
 		};
 		
-		// Layer Actions
-		$('#deleteBtn').on('click', () => layerManager.deleteSelectedLayer());
-		$('#lockBtn').on('click', () => layerManager.toggleSelectedLayerLock());
 		
 		// History Actions
 		$('#undoBtn').on('click', () => historyManager.undo());
 		$('#redoBtn').on('click', () => historyManager.redo());
 		
-		// Layer Order Actions
+		// Layer Actions
+		$('#deleteBtn').on('click', () => layerManager.deleteSelectedLayer());
+		$('#lockBtn').on('click', () => layerManager.toggleSelectedLayerLock());
 		$('#bringToFrontBtn').on('click', () => layerManager.moveSelectedLayer('front'));
 		$('#sendToBackBtn').on('click', () => layerManager.moveSelectedLayer('back'));
 		
@@ -210,7 +218,12 @@ $(document).ready(function () {
 		});
 		
 		// Export Actions
-		$('#downloadBtn').on('click', (e) => preventDisabled(e, () => canvasManager.exportCanvas('png'))); // Default to PNG
+		$('#downloadBtn').on('click', (e) => preventDisabled(e, () => canvasManager.exportCanvas('png', true))); // Default to PNG
+		
+		$('#openCanvasSizeModalBtn').on('click', (e) => {
+			e.preventDefault();
+			canvasSizeModal.show();
+		});
 	}
 	
 	function updateActionButtons() {

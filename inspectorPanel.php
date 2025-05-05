@@ -1,351 +1,345 @@
+<?php
+	// free-cover-designer/inspectorPanel.php
+?>
 <div id="inspectorPanel" class="inspector-panel closed">
-
 	<button type="button" class="btn-close close-inspector-btn" aria-label="Close"></button>
 
-	<div class="inspector-section" id="inspector-layer-info-actions">
-		<h6 class="section-header mb-0 pb-1 pt-1">
-			<span id="inspector-layer-name" class="text-truncate" title="Selected Layer Name">No Layer Selected</span>
-		</h6>
-		<div class="section-content pt-2 pb-2 d-flex justify-content-start">
-			<!-- Moved Buttons Here -->
-			<div class="btn-group btn-group-sm me-2" role="group" aria-label="Layer Order">
-				<button class="btn btn-outline-secondary" id="sendToBackBtn" title="Send to Back"><i class="fas fa-angle-double-down"></i></button>
-				<button class="btn btn-outline-secondary" id="bringToFrontBtn" title="Bring to Front"><i class="fas fa-angle-double-up"></i></button>
-			</div>
-			<div class="btn-group btn-group-sm" role="group" aria-label="Layer Actions">
-				<button class="btn btn-outline-secondary" id="lockBtn" title="Lock/Unlock Selected"><i class="fas fa-lock"></i></button>
-				<button class="btn btn-outline-danger" id="deleteBtn" title="Delete Selected"><i class="fas fa-trash"></i></button>
-			</div>
+	<!-- Layer Info & Actions -->
+	<div id="inspector-layer-info-actions" class="inspector-section">
+		<div class="section-header">
+			<span id="inspector-layer-name" title="Layer Name">No Layer Selected</span>
 		</div>
-	</div>
-
-	<div class="inspector-section" id="inspector-alignment">
-		<h6 class="section-header">Alignment</h6>
-		<div class="section-content d-flex justify-content-between alignment-icons">
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="left" title="Align Left"><i
-					class="fas fa-align-left"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="h-center" title="Align Horizontal Center"><i
-					class="fas fa-align-center"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="right" title="Align Right"><i
-					class="fas fa-align-right"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="top" title="Align Top"><i
-					class="fas fa-align-left fa-rotate-90"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="v-center" title="Align Vertical Center"><i
-					class="fas fa-align-center fa-rotate-90"></i></button>
-			<button class="btn btn-outline-secondary btn-sm" data-align-layer="bottom" title="Align Bottom"><i
-					class="fas fa-align-left fa-rotate-270"></i></button>
-		</div>
-	</div>
-
-	<div class="inspector-section" id="inspector-layer">
-		<h6 class="section-header">Layer</h6>
 		<div class="section-content">
-			<label for="inspector-opacity" class="form-label">Opacity</label>
-			<div class="d-flex align-items-center">
-				<input type="range" class="form-range" id="inspector-opacity" min="0" max="1" step="0.01" value="1">
-				<span class="ms-2 opacity-label" id="inspector-opacity-value">100%</span>
+			<div class="btn-group btn-group-sm w-100" role="group" aria-label="Layer Actions">
+				<button type="button" class="btn btn-outline-secondary" id="lockBtn" title="Lock/Unlock Selected"><i class="fas fa-lock-open"></i></button>
+				<button type="button" class="btn btn-outline-secondary" id="bringToFrontBtn" title="Bring to Front"><i class="fas fa-arrow-up"></i></button>
+				<button type="button" class="btn btn-outline-secondary" id="sendToBackBtn" title="Send to Back"><i class="fas fa-arrow-down"></i></button>
+				<button type="button" class="btn btn-outline-danger" id="deleteBtn" title="Delete Selected"><i class="fas fa-trash-alt"></i></button>
 			</div>
+		</div>
+	</div>
 
+	<!-- Alignment (Canvas) -->
+	<div id="inspector-alignment" class="inspector-section">
+		<div class="section-header">Align (Canvas)</div>
+		<div class="section-content">
+			<div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Horizontal Alignment">
+				<button type="button" class="btn btn-outline-secondary" data-align-layer="left" title="Align Left"><i class="fas fa-align-left"></i></button>
+				<button type="button" class="btn btn-outline-secondary" data-align-layer="h-center" title="Align Horizontal Center"><i class="fas fa-align-center"></i></button>
+				<button type="button" class="btn btn-outline-secondary" data-align-layer="right" title="Align Right"><i class="fas fa-align-right"></i></button>
+				<button type="button" class="btn btn-outline-secondary" data-align-layer="top" title="Align Top"><i class="fas fa-align-left fa-rotate-90"></i></button>
+				<button type="button" class="btn btn-outline-secondary" data-align-layer="v-center" title="Align Vertical Center"><i class="fas fa-align-center fa-rotate-90"></i></button>
+				<button type="button" class="btn btn-outline-secondary" data-align-layer="bottom" title="Align Bottom"><i class="fas fa-align-right fa-rotate-90"></i></button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Layer Properties -->
+	<div id="inspector-layer" class="inspector-section">
+		<div class="section-header">Layer</div>
+		<div class="section-content">
+			<!-- Opacity -->
+			<div class="mb-2">
+				<label for="inspector-opacity" class="form-label">Opacity</label>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-opacity" min="0" max="1" step="0.01" value="1">
+					<span class="input-group-text opacity-label" id="inspector-opacity-value">100%</span>
+				</div>
+			</div>
+			<!-- Rotation -->
 			<div class="mb-2">
 				<label for="inspector-rotation" class="form-label">Rotation</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-rotation" min="0" max="360" step="1" value="0">
-					<span class="ms-2 opacity-label" id="inspector-rotation-value">0°</span>
+					<span class="input-group-text opacity-label" id="inspector-rotation-value">0°</span>
 				</div>
 			</div>
-
+			<!-- Scale -->
 			<div class="mb-2">
 				<label for="inspector-scale" class="form-label">Scale</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-scale" min="1" max="500" step="1" value="100">
-					<span class="ms-2 opacity-label" id="inspector-scale-value">100%</span>
+					<span class="input-group-text opacity-label" id="inspector-scale-value">100%</span>
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<div class="inspector-section" id="inspector-color">
-		<h6 class="section-header">Color</h6>
+	<!-- Text Properties -->
+	<div id="inspector-text" class="inspector-section" style="display: none;">
+		<div class="section-header">Text</div>
 		<div class="section-content">
-			<div class="color-input-group">
-				<input type="color" class="form-control form-control-color inspector-color-picker" id="inspector-fill-color"
-				       value="#FFFFFF">
-				<input type="text" class="form-control form-control-sm inspector-color-hex" id="inspector-fill-hex"
-				       value="FFFFFF">
-				<span class="ms-2 opacity-label" id="inspector-fill-opacity-value">100%</span>
-			</div>
-			<input type="range" class="form-range mt-1" id="inspector-fill-opacity" min="0" max="1" step="0.01" value="1">
-		</div>
-	</div>
-
-	<div class="inspector-section" id="inspector-border">
-		<h6 class="section-header">
-			<span>Border</span>
-			<button class="btn btn-sm p-0 border-0 text-secondary" id="inspector-border-toggle" title="Toggle Border"><i
-					class="far fa-square"></i></button>
-		</h6>
-		<div class="section-content">
-			<div class="color-input-group mb-2">
-				<input type="color" class="form-control form-control-color inspector-color-picker" id="inspector-border-color"
-				       value="#000000">
-				<input type="text" class="form-control form-control-sm inspector-color-hex" id="inspector-border-hex"
-				       value="000000">
-				<span class="ms-2 opacity-label" id="inspector-border-opacity-value">100%</span>
-			</div>
-			<input type="range" class="form-range mt-1 mb-2" id="inspector-border-opacity" min="0" max="1" step="0.01"
-			       value="1">
-
-			<label for="inspector-border-weight" class="form-label">Border Weight</label>
-			<div class="d-flex align-items-center">
-				<input type="range" class="form-range" id="inspector-border-weight" min="0" max="50" step="0.5" value="0">
-				<span class="ms-2 opacity-label" id="inspector-border-weight-value">0</span>
-			</div>
-		</div>
-	</div>
-
-	<div class="inspector-section" id="inspector-text">
-		<h6 class="section-header">Text</h6>
-		<div class="section-content">
-			<div class="mb-2">
+			<!-- Text Content -->
+			<div class="mb-3">
 				<label for="inspector-text-content" class="form-label">Content</label>
-				<textarea id="inspector-text-content" class="form-control form-control-sm" rows="4"
-				          placeholder="Enter text..."></textarea>
+				<textarea id="inspector-text-content" class="form-control form-control-sm" rows="3"></textarea>
 			</div>
-
-			<!-- Font Picker -->
-			<div class="mb-2">
-				<input type="text" id="inspector-font-family" class="form-control form-control-sm font-picker"
-				       placeholder="Select Font...">
+			<!-- Font Family -->
+			<div class="mb-3">
+				<input type="text" id="inspector-font-family" class="form-control form-control-sm">
 			</div>
-			<!-- Size, Weight, Style, Deco -->
-			<div class="row gx-2 mb-2">
+			<!-- Font Size, Weight, Style -->
+			<div class="row g-2 mb-3">
 				<div class="col">
 					<label for="inspector-font-size" class="form-label">Size</label>
-					<div class="input-group input-group-sm">
-						<input type="number" id="inspector-font-size" class="form-control" value="24" min="1" step="1">
-						<span class="input-group-text">px</span>
-					</div>
+					<input type="number" id="inspector-font-size" class="form-control form-control-sm" min="1" value="24">
 				</div>
-				<div class="col-auto d-flex align-items-end">
-					<div class="btn-group btn-group-sm">
-						<button id="inspector-bold-btn" class="btn btn-outline-secondary inspector-text-style-btn" title="Bold"><i
-								class="fas fa-bold"></i></button>
-						<button id="inspector-italic-btn" class="btn btn-outline-secondary inspector-text-style-btn" title="Italic">
-							<i class="fas fa-italic"></i></button>
-						<button id="inspector-underline-btn" class="btn btn-outline-secondary inspector-text-style-btn"
-						        title="Underline"><i class="fas fa-underline"></i></button>
+				<div class="col">
+					<label class="form-label">Style</label>
+					<div class="btn-group btn-group-sm w-100" role="group">
+						<button type="button" id="inspector-bold-btn" class="btn btn-outline-secondary inspector-text-style-btn" title="Bold"><i class="fas fa-bold"></i></button>
+						<button type="button" id="inspector-italic-btn" class="btn btn-outline-secondary inspector-text-style-btn" title="Italic"><i class="fas fa-italic"></i></button>
+						<button type="button" id="inspector-underline-btn" class="btn btn-outline-secondary inspector-text-style-btn" title="Underline"><i class="fas fa-underline"></i></button>
 					</div>
 				</div>
 			</div>
-
-			<!-- Spacing (Letter, Line) -->
-			<div class="row gx-2 mb-2">
+			<!-- Alignment (Horizontal & Vertical) -->
+			<div class="row g-2 mb-3">
 				<div class="col">
-					<label for="inspector-letter-spacing" class="form-label">Spacing</label>
-					<div class="input-group input-group-sm">
-						<span class="input-group-text"><i class="fas fa-text-width"></i></span>
-						<input type="number" id="inspector-letter-spacing" class="form-control" value="0" step="0.1">
+					<label class="form-label">Horiz Align</label>
+					<div class="btn-group btn-group-sm w-100" role="group" aria-label="Horizontal text alignment" id="inspector-text-align">
+						<button type="button" class="btn btn-outline-secondary" data-align="left" title="Align Left"><i class="fas fa-align-left"></i></button>
+						<button type="button" class="btn btn-outline-secondary" data-align="center" title="Align Center"><i class="fas fa-align-center"></i></button>
+						<button type="button" class="btn btn-outline-secondary" data-align="right" title="Align Right"><i class="fas fa-align-right"></i></button>
+						<button type="button" class="btn btn-outline-secondary" data-align="justify" title="Align Justify"><i class="fas fa-align-justify"></i></button>
 					</div>
+				</div>
+				<!-- START: New Vertical Alignment Buttons -->
+				<div class="col">
+					<label class="form-label">Vert Align</label>
+					<div class="btn-group btn-group-sm w-100" role="group" aria-label="Vertical text alignment" id="inspector-text-v-align">
+						<button type="button" class="btn btn-outline-secondary" data-align-v="flex-start" title="Align Top"><i class="fas fa-arrow-up"></i></button>
+						<button type="button" class="btn btn-outline-secondary" data-align-v="center" title="Align Middle"><i class="fas fa-bars"></i></button> <!-- Using bars for middle -->
+						<button type="button" class="btn btn-outline-secondary" data-align-v="flex-end" title="Align Bottom"><i class="fas fa-arrow-down"></i></button>
+					</div>
+				</div>
+				<!-- END: New Vertical Alignment Buttons -->
+			</div>
+			<!-- Spacing -->
+			<div class="row g-2 mb-3">
+				<div class="col">
+					<label for="inspector-letter-spacing" class="form-label">Letter Spacing</label>
+					<input type="number" id="inspector-letter-spacing" class="form-control form-control-sm" step="0.1" value="0">
 				</div>
 				<div class="col">
 					<label for="inspector-line-height" class="form-label">Line Height</label>
-					<div class="input-group input-group-sm">
-						<span class="input-group-text"><i class="fas fa-text-height"></i></span>
-						<input type="number" id="inspector-line-height" class="form-control" value="1.3" step="0.01" min="0.5">
-					</div>
-				</div>
-			</div>
-
-			<!-- Text Alignment -->
-			<div class="mb-2">
-				<label class="form-label">Align</label>
-				<div class="btn-group d-flex" role="group" id="inspector-text-align">
-					<button type="button" class="btn btn-outline-secondary btn-sm" data-align="left" title="Align Left"><i
-							class="fas fa-align-left"></i></button>
-					<button type="button" class="btn btn-outline-secondary btn-sm" data-align="center" title="Align Center"><i
-							class="fas fa-align-center"></i></button>
-					<button type="button" class="btn btn-outline-secondary btn-sm" data-align="right" title="Align Right"><i
-							class="fas fa-align-right"></i></button>
-					<button type="button" class="btn btn-outline-secondary btn-sm" data-align="justify" title="Align Justify"><i
-							class="fas fa-align-justify"></i></button>
+					<input type="number" id="inspector-line-height" class="form-control form-control-sm" step="0.1" min="0.5" value="1.3">
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<div class="inspector-section" id="inspector-text-shading">
-		<h6 class="section-header">
-			<span>Text Shading</span>
+	<!-- Text Color -->
+	<div id="inspector-color" class="inspector-section" style="display: none;">
+		<div class="section-header">Color</div>
+		<div class="section-content">
+			<div class="color-input-group mb-2">
+				<input type="color" class="form-control form-control-color me-2" id="inspector-fill-color" value="#000000" title="Fill Color">
+				<div class="input-group input-group-sm flex-grow-1">
+					<span class="input-group-text">#</span>
+					<input type="text" class="form-control" id="inspector-fill-hex" maxlength="6" placeholder="000000">
+				</div>
+			</div>
+			<!-- Opacity for Fill (Handled by RGBA now, keep slider for potential future use or remove) -->
+			<label for="inspector-fill-opacity" class="form-label visually-hidden">Fill Opacity</label>
+			<div class="input-group input-group-sm visually-hidden">
+				<input type="range" class="form-range" id="inspector-fill-opacity" min="0" max="1" step="0.01" value="1">
+				<span class="input-group-text opacity-label" id="inspector-fill-opacity-value">100%</span>
+			</div>
+		</div>
+	</div>
+
+	<!-- Text Border (Stroke) -->
+	<div id="inspector-border" class="inspector-section" style="display: none;">
+		<div class="section-header">Border (Stroke)</div>
+		<div class="section-content">
+			<!-- Border Color -->
+			<div class="color-input-group mb-2">
+				<input type="color" class="form-control form-control-color me-2" id="inspector-border-color" value="#000000" title="Border Color">
+				<div class="input-group input-group-sm flex-grow-1">
+					<span class="input-group-text">#</span>
+					<input type="text" class="form-control" id="inspector-border-hex" maxlength="6" placeholder="000000">
+				</div>
+			</div>
+			<!-- Border Opacity (Handled by RGBA now) -->
+			<label for="inspector-border-opacity" class="form-label visually-hidden">Border Opacity</label>
+			<div class="input-group input-group-sm mb-2 visually-hidden">
+				<input type="range" class="form-range" id="inspector-border-opacity" min="0" max="1" step="0.01" value="1">
+				<span class="input-group-text opacity-label" id="inspector-border-opacity-value">100%</span>
+			</div>
+			<!-- Border Weight -->
+			<div class="mb-2">
+				<label for="inspector-border-weight" class="form-label">Weight</label>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-border-weight" min="0" max="50" step="0.5" value="0">
+					<span class="input-group-text opacity-label" id="inspector-border-weight-value">0</span>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Text Shading (Shadow) -->
+	<div id="inspector-text-shading" class="inspector-section" style="display: none;">
+		<div class="section-header">
+			<span>Shading (Shadow)</span>
 			<div class="form-check form-switch">
 				<input class="form-check-input" type="checkbox" role="switch" id="inspector-shading-enabled">
+				<label class="form-check-label visually-hidden" for="inspector-shading-enabled">Enable Shading</label>
 			</div>
-		</h6>
-		<div class="section-content">
+		</div>
+		<div class="section-content" style="display: none;">
 			<!-- Shading Color -->
-			<label class="form-label">Color</label>
 			<div class="color-input-group mb-2">
-				<input type="color" class="form-control form-control-color inspector-color-picker" id="inspector-shading-color"
-				       value="#000000">
-				<input type="text" class="form-control form-control-sm inspector-color-hex" id="inspector-shading-hex"
-				       value="000000">
-				<span class="ms-2 opacity-label" id="inspector-shading-opacity-value">50%</span>
-			</div>
-			<input type="range" class="form-range mt-1 mb-2" id="inspector-shading-opacity" min="0" max="1" step="0.01"
-			       value="0.5">
-
-			<!-- Offset -->
-			<div class="mb-2">
-				<label for="inspector-shading-offset" class="form-label">Offset</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-shading-offset" min="0" max="100" step="1" value="5">
-					<span class="ms-2 opacity-label" id="inspector-shading-offset-value">5</span>
+				<input type="color" class="form-control form-control-color me-2" id="inspector-shading-color" value="#000000" title="Shadow Color">
+				<div class="input-group input-group-sm flex-grow-1">
+					<span class="input-group-text">#</span>
+					<input type="text" class="form-control" id="inspector-shading-hex" maxlength="6" placeholder="000000">
 				</div>
 			</div>
-
-			<!-- Angle -->
-			<div class="mb-2">
-				<label for="inspector-shading-angle" class="form-label">Angle</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-shading-angle" min="-180" max="180" step="1" value="-90">
-					<span class="ms-2 opacity-label" id="inspector-shading-angle-value">-90</span>
-				</div>
+			<!-- Shading Opacity (Handled by RGBA now) -->
+			<label for="inspector-shading-opacity" class="form-label visually-hidden">Shadow Opacity</label>
+			<div class="input-group input-group-sm mb-2 visually-hidden">
+				<input type="range" class="form-range" id="inspector-shading-opacity" min="0" max="1" step="0.01" value="0.5">
+				<span class="input-group-text opacity-label" id="inspector-shading-opacity-value">50%</span>
 			</div>
-			<!-- Blur -->
+			<!-- Shading Blur -->
 			<div class="mb-2">
 				<label for="inspector-shading-blur" class="form-label">Blur</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-shading-blur" min="0" max="100" step="1" value="10">
-					<span class="ms-2 opacity-label" id="inspector-shading-blur-value">10</span>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-shading-blur" min="0" max="100" step="1" value="0">
+					<span class="input-group-text opacity-label" id="inspector-shading-blur-value">0</span>
+				</div>
+			</div>
+			<!-- Shading Offset -->
+			<div class="mb-2">
+				<label for="inspector-shading-offset" class="form-label">Offset</label>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-shading-offset" min="0" max="100" step="1" value="5">
+					<span class="input-group-text opacity-label" id="inspector-shading-offset-value">5</span>
+				</div>
+			</div>
+			<!-- Shading Angle -->
+			<div class="mb-2">
+				<label for="inspector-shading-angle" class="form-label">Angle</label>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-shading-angle" min="-180" max="180" step="1" value="45">
+					<span class="input-group-text opacity-label" id="inspector-shading-angle-value">45</span>
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<div class="inspector-section" id="inspector-text-background">
-		<h6 class="section-header">
+	<!-- Text Background -->
+	<div id="inspector-text-background" class="inspector-section" style="display: none;">
+		<div class="section-header">
 			<span>Background</span>
 			<div class="form-check form-switch">
 				<input class="form-check-input" type="checkbox" role="switch" id="inspector-background-enabled">
+				<label class="form-check-label visually-hidden" for="inspector-background-enabled">Enable Background</label>
 			</div>
-		</h6>
-		<div class="section-content">
+		</div>
+		<div class="section-content" style="display: none;">
 			<!-- Background Color -->
-			<label class="form-label">Color</label>
 			<div class="color-input-group mb-2">
-				<input type="color" class="form-control form-control-color inspector-color-picker"
-				       id="inspector-background-color" value="#FFFFFF">
-				<input type="text" class="form-control form-control-sm inspector-color-hex" id="inspector-background-hex"
-				       value="FFFFFF">
-				<span class="ms-2 opacity-label" id="inspector-background-opacity-value">100%</span>
+				<input type="color" class="form-control form-control-color me-2" id="inspector-background-color" value="#FFFFFF" title="Background Color">
+				<div class="input-group input-group-sm flex-grow-1">
+					<span class="input-group-text">#</span>
+					<input type="text" class="form-control" id="inspector-background-hex" maxlength="6" placeholder="FFFFFF">
+				</div>
 			</div>
-			<input type="range" class="form-range mt-1 mb-2" id="inspector-background-opacity" min="0" max="1" step="0.01"
-			       value="1">
-
+			<!-- Background Opacity -->
+			<label for="inspector-background-opacity" class="form-label">Background Opacity</label>
+			<div class="input-group input-group-sm mb-2">
+				<input type="range" class="form-range" id="inspector-background-opacity" min="0" max="1" step="0.01" value="1">
+				<span class="input-group-text opacity-label" id="inspector-background-opacity-value">100%</span>
+			</div>
 			<!-- Background Padding -->
 			<div class="mb-2">
 				<label for="inspector-background-padding" class="form-label">Padding</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-background-padding" min="0" max="200" step="0" value="0">
-					<span class="ms-2 opacity-label" id="inspector-background-padding-value">0</span>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-background-padding" min="0" max="200" step="1" value="0">
+					<span class="input-group-text opacity-label" id="inspector-background-padding-value">0</span>
 				</div>
 			</div>
-
-			<!-- Corner Radius -->
+			<!-- Background Corner Radius -->
 			<div class="mb-2">
 				<label for="inspector-background-radius" class="form-label">Corner Radius</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-background-radius" min="0" max="100" step="0.5"
-					       value="0">
-					<span class="ms-2 opacity-label" id="inspector-background-radius-value">100</span>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-background-radius" min="0" max="100" step="0.5" value="0">
+					<span class="input-group-text opacity-label" id="inspector-background-radius-value">0</span>
 				</div>
 			</div>
-
 		</div>
 	</div>
 
-	<!-- Image Filters Section -->
-	<div class="inspector-section" id="inspector-image-filters" style="display: none;"> <!-- Initially hidden -->
-		<h6 class="section-header">Image Filters</h6>
+	<!-- Image Filters -->
+	<div id="inspector-image-filters" class="inspector-section" style="display: none;">
+		<div class="section-header">Filters</div>
 		<div class="section-content">
-
 			<!-- Brightness -->
 			<div class="mb-2">
 				<label for="inspector-filter-brightness" class="form-label">Brightness</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-filter-brightness" min="0" max="200" step="1"
-					       value="100">
-					<span class="ms-2 text-nowrap" id="inspector-filter-brightness-value"
-					      style="min-width: 45px; text-align: right;">100%</span>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-filter-brightness" min="0" max="200" step="1" value="100">
+					<span class="input-group-text opacity-label" id="inspector-filter-brightness-value">100</span>
 				</div>
 			</div>
-
 			<!-- Contrast -->
 			<div class="mb-2">
 				<label for="inspector-filter-contrast" class="form-label">Contrast</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-filter-contrast" min="0" max="200" step="1" value="100">
-					<span class="ms-2 text-nowrap" id="inspector-filter-contrast-value"
-					      style="min-width: 45px; text-align: right;">100%</span>
+					<span class="input-group-text opacity-label" id="inspector-filter-contrast-value">100</span>
 				</div>
 			</div>
-
 			<!-- Saturation -->
 			<div class="mb-2">
 				<label for="inspector-filter-saturation" class="form-label">Saturation</label>
-				<div class="d-flex align-items-center">
-					<input type="range" class="form-range" id="inspector-filter-saturation" min="0" max="200" step="1"
-					       value="100">
-					<span class="ms-2 text-nowrap" id="inspector-filter-saturation-value"
-					      style="min-width: 45px; text-align: right;">100%</span>
+				<div class="input-group input-group-sm">
+					<input type="range" class="form-range" id="inspector-filter-saturation" min="0" max="200" step="1" value="100">
+					<span class="input-group-text opacity-label" id="inspector-filter-saturation-value">100</span>
 				</div>
 			</div>
-
 			<!-- Grayscale -->
 			<div class="mb-2">
 				<label for="inspector-filter-grayscale" class="form-label">Grayscale</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-filter-grayscale" min="0" max="100" step="1" value="0">
-					<span class="ms-2 text-nowrap" id="inspector-filter-grayscale-value"
-					      style="min-width: 45px; text-align: right;">0%</span>
+					<span class="input-group-text opacity-label" id="inspector-filter-grayscale-value">0</span>
 				</div>
 			</div>
-
 			<!-- Sepia -->
 			<div class="mb-2">
 				<label for="inspector-filter-sepia" class="form-label">Sepia</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-filter-sepia" min="0" max="100" step="1" value="0">
-					<span class="ms-2 text-nowrap" id="inspector-filter-sepia-value" style="min-width: 45px; text-align: right;">0%</span>
+					<span class="input-group-text opacity-label" id="inspector-filter-sepia-value">0</span>
 				</div>
 			</div>
-
 			<!-- Hue Rotate -->
 			<div class="mb-2">
 				<label for="inspector-filter-hue-rotate" class="form-label">Hue Rotate</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-filter-hue-rotate" min="0" max="360" step="1" value="0">
-					<span class="ms-2 text-nowrap" id="inspector-filter-hue-rotate-value"
-					      style="min-width: 45px; text-align: right;">0deg</span>
+					<span class="input-group-text opacity-label" id="inspector-filter-hue-rotate-value">0</span>
 				</div>
 			</div>
-
 			<!-- Blur -->
 			<div class="mb-2">
 				<label for="inspector-filter-blur" class="form-label">Blur</label>
-				<div class="d-flex align-items-center">
+				<div class="input-group input-group-sm">
 					<input type="range" class="form-range" id="inspector-filter-blur" min="0" max="20" step="0.1" value="0">
-					<span class="ms-2 text-nowrap" id="inspector-filter-blur-value" style="min-width: 45px; text-align: right;">0px</span>
+					<span class="input-group-text opacity-label" id="inspector-filter-blur-value">0.0</span>
 				</div>
 			</div>
-
 		</div>
 	</div>
 
-	<!-- NEW: Blend Mode Section -->
-	<div class="inspector-section" id="inspector-image-blend-mode" style="display: none;"> <!-- Initially hidden -->
-		<h6 class="section-header">Blend Mode</h6>
+	<!-- Image Blend Mode -->
+	<div id="inspector-image-blend-mode" class="inspector-section" style="display: none;">
+		<div class="section-header">Blend Mode</div>
 		<div class="section-content">
-			<select class="form-select form-select-sm" id="inspector-blend-mode">
+			<select id="inspector-blend-mode" class="form-select form-select-sm">
 				<option value="normal">Normal</option>
 				<option value="multiply">Multiply</option>
 				<option value="screen">Screen</option>

@@ -240,11 +240,19 @@ class InspectorPanel {
 		this.$panel.find('#inspector-italic-btn').on('click', () => this.toggleStyle('fontStyle', 'italic', 'normal'));
 		this.$panel.find('#inspector-underline-btn').on('click', () => this.toggleStyle('textDecoration', 'underline', 'none'));
 		
-		// Text Alignment (within text box)
+		// Text Alignment (Horizontal - within text box)
 		this.$panel.find('#inspector-text-align button').on('click', (e) => {
 			const align = $(e.currentTarget).data('align');
 			updateLayer('align', align, true);
 			this.$panel.find('#inspector-text-align button').removeClass('active');
+			$(e.currentTarget).addClass('active');
+		});
+		
+		// Text Alignment (Vertical - within text box)
+		this.$panel.find('#inspector-text-v-align button').on('click', (e) => {
+			const vAlign = $(e.currentTarget).data('alignV');
+			updateLayer('vAlign', vAlign, true);
+			this.$panel.find('#inspector-text-v-align button').removeClass('active');
 			$(e.currentTarget).addClass('active');
 		});
 		
@@ -594,9 +602,14 @@ class InspectorPanel {
 			$('#inspector-italic-btn').toggleClass('active', layerData.fontStyle === 'italic');
 			$('#inspector-underline-btn').toggleClass('active', layerData.textDecoration === 'underline');
 			
-			// Text Align (internal)
+			// Text Align (Horizontal - internal)
 			$('#inspector-text-align button').removeClass('active');
 			$(`#inspector-text-align button[data-align="${layerData.align || 'left'}"]`).addClass('active');
+			
+			// Text Align (Vertical - internal)
+			const vAlign = layerData.vAlign || 'center';
+			$('#inspector-text-v-align button').removeClass('active');
+			$(`#inspector-text-v-align button[data-align-v="${vAlign}"]`).addClass('active');
 			
 			// Shading / Shadow
 			const shadowEnabled = !!layerData.shadowEnabled;

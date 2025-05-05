@@ -38,40 +38,6 @@ class LayerManager {
 		this.moveableTargetElement = null;
 	}
 	
-	// --- Helper to parse transform string (basic example) ---
-	// You might need a more robust matrix decomposition library for complex cases
-	_parseTransform(transformString) {
-		const result = {
-			translateX: 0, translateY: 0, rotate: 0, scaleX: 1, scaleY: 1
-		};
-		if (!transformString || transformString === 'none') return result;
-		
-		// Regex is fragile, matrix decomposition is better but complex
-		const translateMatch = transformString.match(/translate\(\s*([^px]+)px\s*,\s*([^px]+)px\s*\)/);
-		if (translateMatch) {
-			result.translateX = parseFloat(translateMatch[1]);
-			result.translateY = parseFloat(translateMatch[2]);
-		}
-		// Note: Moveable often uses matrix3d, making regex harder.
-		// We will rely on Moveable's event data instead where possible.
-		
-		const rotateMatch = transformString.match(/rotate\(\s*([^deg)]+)deg\s*\)/);
-		if (rotateMatch) {
-			result.rotate = parseFloat(rotateMatch[1]);
-		}
-		
-		const scaleMatch = transformString.match(/scale\(\s*([^,)]+)(?:,\s*([^)]+))?\s*\)/);
-		if (scaleMatch) {
-			result.scaleX = parseFloat(scaleMatch[1]);
-			result.scaleY = scaleMatch[2] ? parseFloat(scaleMatch[2]) : result.scaleX; // Handle scale(x) or scale(x, y)
-		}
-		
-		// Fallback for matrix if needed (complex)
-		// const matrixMatch = transformString.match(/matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)\)/);
-		// if (matrixMatch) { ... calculate from matrix elements ... }
-		
-		return result;
-	}
 	
 	_isGoogleFont(fontFamily) {
 		if (!fontFamily) return false;
@@ -118,13 +84,12 @@ class LayerManager {
 		document.head.appendChild(link);
 	}
 	
-	// --- Core Layer Management ---
 	// Generates a short, unique ID
 	_generateId() {
 		return `layer-${this.uniqueIdCounter++}`;
 	}
 	
-	// --- NEW: Helper to generate default layer name ---
+	// --- Helper to generate default layer name ---
 	_generateDefaultLayerName(layerData) {
 		if (layerData.type === 'text') {
 			const textContent = (layerData.content || '').trim();
@@ -173,7 +138,6 @@ class LayerManager {
 		return `Layer ${numericIdPart}`;
 	}
 	
-	// --- END NEW HELPER ---
 	
 	addLayer(type, props = {}) {
 		const layerId = props.id || this._generateId(); // Use provided ID or generate new
@@ -209,6 +173,7 @@ class LayerManager {
 			textDecoration: 'none',
 			fill: 'rgba(0,0,0,1)',
 			align: 'left',
+			vAlign: 'center',
 			lineHeight: 1.3,
 			letterSpacing: 0,
 			shadowEnabled: false,
@@ -353,6 +318,7 @@ class LayerManager {
 		for (const key in newData) {
 			if (newData.hasOwnProperty(key)) {
 				let value = newData[key];
+				console.log(`Updating ${key} for layer ${layerId} value ${value}`);
 				
 				if (key === 'filters' && typeof value === 'object' && currentLayer.type === 'image') {
 					// Merge the incoming filter changes with existing filters
@@ -366,7 +332,7 @@ class LayerManager {
 					continue; // Skip the generic assignment below for 'filters'
 				}
 				
-				// Parse/Validate specific properties (same as before)
+				// Parse/Validate specific properties
 				if (['x', 'y', 'width', 'height', 'opacity', 'fontSize', 'lineHeight', 'letterSpacing', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'strokeWidth', 'backgroundPadding', 'backgroundCornerRadius', 'backgroundOpacity', 'rotation', 'scale'].includes(key)) {
 					value = value === 'auto' ? 'auto' : parseFloat(value);
 					
@@ -389,6 +355,7 @@ class LayerManager {
 				}
 				
 				mergedData[key] = value;
+				console.log(mergedData);
 			}
 		}
 		
@@ -445,13 +412,14 @@ class LayerManager {
 			// Re-apply styles if *any* relevant property changed
 			const styleProps = [
 				'content', 'fontSize', 'fontFamily', 'fontStyle', 'fontWeight', 'textDecoration',
-				'fill', 'align', 'lineHeight', 'letterSpacing',
+				'fill', 'align', 'vAlign', 'lineHeight', 'letterSpacing',
 				'shadowEnabled', 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'shadowColor',
 				'strokeWidth', 'stroke',
 				'backgroundEnabled', 'backgroundColor', 'backgroundOpacity', 'backgroundPadding', 'backgroundCornerRadius',
 				'width' // Width change can affect text wrap
 			];
 			if (Object.keys(newData).some(key => styleProps.includes(key))) {
+				console.log("Reapplying text styles for", $textContent, updatedLayer);
 				this._applyTextStyles($textContent, updatedLayer);
 			}
 			// Adjust height if needed
@@ -756,18 +724,12 @@ class LayerManager {
 					self.saveState(); // Save history
 				}
 				
-				// IMPORTANT: Reset the transform applied during the resize.
-				// updateLayerData should have already set top/left/width/height.
-				// We now need to ensure the transform ONLY reflects rotation/scale from layer data.
-				// Call _applyTransform which reads rotation/scale from the (potentially just updated) layer data.
 				const updatedLayer = self.getLayerById(layerId); // Get potentially updated data
 				if (updatedLayer) {
 					self._applyTransform($(target), updatedLayer);
 				}
 				
-				
 				// Crucial: Tell Moveable to update its internal calculation based on the final styles
-				// This prevents potential jumps on the next interaction.
 				if (self.moveableInstance) {
 					// Use requestAnimationFrame to ensure styles are applied before updateRect
 					requestAnimationFrame(() => {
@@ -1061,7 +1023,12 @@ class LayerManager {
 			fontStyle: layerData.fontStyle || 'normal',
 			textDecoration: layerData.textDecoration || 'none',
 			color: layerData.fill || 'rgba(0,0,0,1)',
+			
 			textAlign: layerData.align || 'left',
+			justifyContent: layerData.align || 'left',
+			alignItems: layerData.vAlign || 'center',
+			display: 'flex',
+			
 			lineHeight: layerData.lineHeight || 1.3,
 			letterSpacing: (layerData.letterSpacing || 0) + 'px',
 			border: 'none', // Text content itself shouldn't have border

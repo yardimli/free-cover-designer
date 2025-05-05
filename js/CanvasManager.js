@@ -5,7 +5,6 @@ class CanvasManager {
 		this.$canvasArea = $canvasArea;
 		this.$canvasWrapper = $canvasWrapper;
 		this.$canvas = $canvas;
-		this.canvasAreaDiv = $canvasArea[0]; // Keep reference to the DOM element
 		this.$exportOverlay = $('#export-overlay');
 		
 		// Dependencies
@@ -21,6 +20,7 @@ class CanvasManager {
 		this.isPanning = false;
 		this.lastPanX = 0;
 		this.lastPanY = 0;
+		this.inverseZoomMultiplier = 1;
 		
 		// Default Canvas Size (can be overridden by loaded designs/templates)
 		this.DEFAULT_CANVAS_WIDTH = 1540;
@@ -33,7 +33,7 @@ class CanvasManager {
 		this.setCanvasSize(this.DEFAULT_CANVAS_WIDTH, this.DEFAULT_CANVAS_HEIGHT); // Set initial size
 		
 		if (this.$canvasArea && this.$canvasArea.length) {
-			this.$canvasArea.css('--canvas-zoom-x', 1 / this.currentZoom);
+			this.inverseZoomMultiplier = 1 / this.currentZoom;
 		} else {
 			console.warn("CanvasManager: $canvasArea not found during initialization for setting CSS variable.");
 		}
@@ -168,7 +168,7 @@ class CanvasManager {
 		$('#zoom-out').on('click', () => this.zoom(0.8));
 		
 		const self = this;
-
+		
 		$('#zoom-options-menu').on('click', '.zoom-option', function (e) {
 			e.preventDefault(); // Prevent default link behavior
 			const zoomValue = $(this).data('zoom');
@@ -219,7 +219,7 @@ class CanvasManager {
 		this.currentZoom = clampedZoom;
 		
 		if (this.$canvasArea && this.$canvasArea.length) {
-			this.$canvasArea.css('--canvas-zoom-x', 1 / this.currentZoom);
+			this.inverseZoomMultiplier = 1 / this.currentZoom;
 		}
 		
 		// Update wrapper size and canvas transform (scale from top-left)
@@ -349,10 +349,10 @@ class CanvasManager {
 					const blob = await fontResponse.blob();
 					const base64 = await this._blobToBase64(blob);
 					const mimeType = blob.type || 'font/woff2'; // Use blob type or default to woff2
-					return { url, base64, mimeType };
+					return {url, base64, mimeType};
 				} catch (fontError) {
 					console.error(`Failed to fetch or encode font: ${url}`, fontError);
-					return { url, error: true }; // Mark as error
+					return {url, error: true}; // Mark as error
 				}
 			});
 			
@@ -397,7 +397,7 @@ class CanvasManager {
 	
 	
 	// --- Export ---
-	async exportCanvas(format = 'png') { // Still async
+	async exportCanvas(format = 'png', transparentBackground = false) { // Still async
 		
 		if (this.$exportOverlay) {
 			this.$exportOverlay.show();
@@ -443,7 +443,7 @@ class CanvasManager {
 			width: this.currentCanvasWidth,
 			height: this.currentCanvasHeight,
 			scale: 1,
-			backgroundColor: '#ffffff',
+			// backgroundColor: '#ffffff',
 			quality: quality,
 			fetch: {
 				// mode: 'cors', // Generally not needed now fonts are embedded
@@ -452,6 +452,10 @@ class CanvasManager {
 				if (!clonedNode || clonedNode.id !== 'canvas') {
 					console.warn("onCloneNode did not receive the expected #canvas clone.");
 					return;
+				}
+				
+				if (transparentBackground) {
+					clonedNode.style.backgroundColor = 'transparent';
 				}
 				
 				// --- Inject the EMBEDDED Font CSS ---
@@ -518,7 +522,12 @@ class CanvasManager {
 							clonedTextContent.style.fontStyle = layer.fontStyle || 'normal';
 							clonedTextContent.style.textDecoration = layer.textDecoration || 'none';
 							clonedTextContent.style.color = layer.fill || 'rgba(0,0,0,1)';
+							
 							clonedTextContent.style.textAlign = layer.align || 'left';
+							clonedTextContent.style.justifyContent = layer.align || 'left';
+							clonedTextContent.style.display = 'flex';
+							clonedTextContent.style.alignItems = layer.vAlign || 'center';
+							
 							clonedTextContent.style.lineHeight = layer.lineHeight || 1.3;
 							clonedTextContent.style.letterSpacing = (layer.letterSpacing || 0) + 'px';
 							clonedTextContent.style.whiteSpace = 'pre-wrap';
@@ -553,8 +562,11 @@ class CanvasManager {
 								if (bgOpacity < 1) {
 									try {
 										let tiny = tinycolor(bgColor);
-										if (tiny.isValid()) { bgColor = tiny.setAlpha(bgOpacity).toRgbString(); }
-									} catch (e) { /* ignore */ }
+										if (tiny.isValid()) {
+											bgColor = tiny.setAlpha(bgOpacity).toRgbString();
+										}
+									} catch (e) { /* ignore */
+									}
 								}
 								clonedElement.style.backgroundColor = bgColor;
 								clonedElement.style.borderRadius = (layer.backgroundCornerRadius || 0) + 'px';
@@ -569,6 +581,10 @@ class CanvasManager {
 				}); // *** END Re-apply ***
 			} // End onCloneNode
 		}; // End screenshotOptions
+		
+		if (!transparentBackground) {
+			// screenshotOptions.backgroundColor = '#ffffff'; // Set white background
+		}
 		
 		// --- Choose format and handle promise --- (same as before)
 		let screenshotPromise;
@@ -594,14 +610,18 @@ class CanvasManager {
 			// --- Restore original state --- (same as before)
 			hiddenLayerIds.forEach(id => {
 				const layer = this.layerManager.getLayerById(id);
-				if (layer && !layer.visible) { $(`#${id}`).hide(); }
+				if (layer && !layer.visible) {
+					$(`#${id}`).hide();
+				}
 			});
 			this.$canvas.css('transform', originalTransform);
-			this.$canvasWrapper.css({ width: originalWrapperWidth, height: originalWrapperHeight });
+			this.$canvasWrapper.css({width: originalWrapperWidth, height: originalWrapperHeight});
 			this.$canvasArea.scrollLeft(originalScrollLeft);
 			this.$canvasArea.scrollTop(originalScrollTop);
 			const selectedLayer = this.layerManager.getSelectedLayer();
-			if (selectedLayer) { $(`#${selectedLayer.id}`).addClass('selected'); }
+			if (selectedLayer) {
+				$(`#${selectedLayer.id}`).addClass('selected');
+			}
 			
 			if (this.$exportOverlay) {
 				this.$exportOverlay.hide();
@@ -716,7 +736,6 @@ class CanvasManager {
 	destroy() {
 		// Remove event listeners
 		this.$canvasArea.off('mousedown mousemove mouseup mouseleave');
-		this.$canvasArea.css('--canvas-zoom-x', '1'); // Or null
 		
 		$(document).off('.canvasManagerPan'); // Remove namespaced listeners
 		$('#zoom-in').off('click');
@@ -733,7 +752,6 @@ class CanvasManager {
 		this.$canvasArea = null;
 		this.$canvasWrapper = null;
 		this.$canvas = null;
-		this.canvasAreaDiv = null;
 		this.layerManager = null; // Break circular reference if any
 		this.historyManager = null;
 		this.onZoomChange = null;
