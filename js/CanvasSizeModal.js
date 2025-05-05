@@ -271,26 +271,21 @@ class CanvasSizeModal {
 		
 		const presetValue = this.$presetRadioGroup.filter(':checked').val();
 		const [presetWidthStr, presetHeightStr] = presetValue.split('x');
-		const presetWidth = parseInt(presetWidthStr, 10);
-		const presetHeight = parseInt(presetHeightStr, 10);
+		const frontWidth = parseInt(presetWidthStr, 10); // This is the front cover width
+		const finalHeight = parseInt(presetHeightStr, 10);
 		
-		if (isNaN(presetWidth) || isNaN(presetHeight)) {
+		if (isNaN(frontWidth) || isNaN(finalHeight)) {
 			console.error("Invalid preset dimensions parsed:", presetValue);
 			alert("An error occurred parsing the selected size.");
 			return;
 		}
 		
-		let finalWidth = presetWidth;
-		const finalHeight = presetHeight;
-		// --- UPDATED: Use new checkbox state ---
-		const addSpineAndBack = this.$addSpineAndBackCheckbox.is(':checked');
-		// --- END UPDATED ---
-		// --- REMOVED: Old back cover variable ---
-		// const addBackCover = this.$addBackCoverCheckbox.is(':checked');
-		// --- END REMOVED ---
+		let totalWidth = frontWidth;
 		let spineWidth = 0;
+		let backWidth = 0; // Initialize back width
 		
-		// --- UPDATED: Calculate final width based on new checkbox ---
+		const addSpineAndBack = this.$addSpineAndBackCheckbox.is(':checked');
+		
 		if (addSpineAndBack) {
 			const calculatedOrEnteredWidth = this._getSpineWidth();
 			if (calculatedOrEnteredWidth === null) {
@@ -299,30 +294,37 @@ class CanvasSizeModal {
 				return;
 			}
 			spineWidth = calculatedOrEnteredWidth;
-			// Add spine AND back cover width (back cover = front cover)
-			finalWidth = presetWidth + spineWidth + presetWidth;
-			console.log(`Calculating size: Front(${presetWidth}) + Spine(${spineWidth}) + Back(${presetWidth}) = ${finalWidth} x ${finalHeight}`);
+			backWidth = frontWidth; // Back cover width is same as front
+			totalWidth = frontWidth + spineWidth + backWidth;
+			console.log(`Calculating size: Back(${backWidth}) + Spine(${spineWidth}) + Front(${frontWidth}) = ${totalWidth} x ${finalHeight}`);
 		} else {
 			// Only front cover
-			finalWidth = presetWidth;
-			console.log(`Calculating size: Front(${presetWidth}) = ${finalWidth} x ${finalHeight}`);
+			console.log(`Calculating size: Front(${frontWidth}) = ${totalWidth} x ${finalHeight}`);
 		}
-		// --- END UPDATED ---
 		
 		const currentLayers = this.canvasManager.layerManager?.getLayers() || [];
 		let proceed = true;
 		if (currentLayers.length > 0) {
 			proceed = confirm(
 				"Changing the canvas size might require rearranging existing layers.\n\n" +
-				`The new canvas size will be ${finalWidth} x ${finalHeight} pixels.\n\n` +
+				`The new canvas size will be ${totalWidth} x ${finalHeight} pixels.\n\n` +
 				"Do you want to proceed?"
 			);
 		}
 		
 		if (proceed) {
-			console.log(`Applying new canvas size: ${finalWidth} x ${finalHeight}`);
-			this.canvasManager.setCanvasSize(finalWidth, finalHeight);
-			// this.canvasManager.setZoom(1.0);
+			console.log(`Applying new canvas size: ${totalWidth} x ${finalHeight}`);
+			// --- MODIFIED: Pass size configuration object ---
+			const sizeConfig = {
+				totalWidth: totalWidth,
+				height: finalHeight,
+				frontWidth: frontWidth,
+				spineWidth: spineWidth,
+				backWidth: backWidth
+			};
+			this.canvasManager.setCanvasSize(sizeConfig);
+			// --- END MODIFIED ---
+			// this.canvasManager.setZoom(1.0); // Keep existing zoom/centering
 			this.canvasManager.centerCanvas();
 			this.hide();
 		}

@@ -1058,3 +1058,15 @@ body {
 #canvasPreviewArea > #previewBack:not([style*="display: none"]) + #previewSpine {
     border-left: 1px dashed #adb5bd;
 }
+
+.canvas-guide {
+    position: absolute;
+    top: 0;
+    bottom: 0; /* Or height: 100% */
+    width: 1px; /* Adjust thickness if needed */
+    background-color: rgba(255, 0, 255, 0.7); /* Visible color (e.g., magenta) */
+    border-left: 1px dashed rgba(0, 0, 0, 0.5); /* Dashed line effect */
+    z-index: 500; /* Above canvas content, below moveable handles */
+    pointer-events: none; /* Make them non-interactive */
+    box-sizing: border-box;
+}

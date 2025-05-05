@@ -6,6 +6,8 @@ class CanvasManager {
 		this.$canvasWrapper = $canvasWrapper;
 		this.$canvas = $canvas;
 		this.$exportOverlay = $('#export-overlay');
+		this.$guideLeft = null; // Reference for left guide div
+		this.$guideRight = null; // Reference for right guide div
 		
 		// Dependencies
 		this.layerManager = options.layerManager; // Should be passed in App.js
@@ -27,10 +29,19 @@ class CanvasManager {
 		this.DEFAULT_CANVAS_HEIGHT = 2475;
 		this.currentCanvasWidth = this.DEFAULT_CANVAS_WIDTH; // Initialize
 		this.currentCanvasHeight = this.DEFAULT_CANVAS_HEIGHT;// Initialize
+		this.frontCoverWidth = this.DEFAULT_CANVAS_WIDTH; // Initially, front = total
+		this.spineWidth = 0;
+		this.backCoverWidth = 0;
 	}
 	
 	initialize() {
-		this.setCanvasSize(this.DEFAULT_CANVAS_WIDTH, this.DEFAULT_CANVAS_HEIGHT); // Set initial size
+		this.setCanvasSize({
+			totalWidth: this.DEFAULT_CANVAS_WIDTH,
+			height: this.DEFAULT_CANVAS_HEIGHT,
+			frontWidth: this.DEFAULT_CANVAS_WIDTH,
+			spineWidth: 0,
+			backWidth: 0
+		});
 		
 		if (this.$canvasArea && this.$canvasArea.length) {
 			this.inverseZoomMultiplier = 1 / this.currentZoom;
@@ -49,15 +60,71 @@ class CanvasManager {
 		}
 	}
 	
-	setCanvasSize(width, height) {
-		this.currentCanvasWidth = parseFloat(width) || this.DEFAULT_CANVAS_WIDTH;
+	setCanvasSize(config) {
+		// Destructure config with defaults
+		const {
+			totalWidth = this.DEFAULT_CANVAS_WIDTH,
+			height = this.DEFAULT_CANVAS_HEIGHT,
+			frontWidth = totalWidth, // Default front width to total if not provided
+			spineWidth = 0,
+			backWidth = 0
+		} = config;
+		
+		this.currentCanvasWidth = parseFloat(totalWidth) || this.DEFAULT_CANVAS_WIDTH;
 		this.currentCanvasHeight = parseFloat(height) || this.DEFAULT_CANVAS_HEIGHT;
+		this.frontCoverWidth = parseFloat(frontWidth) || this.currentCanvasWidth;
+		this.spineWidth = parseFloat(spineWidth) || 0;
+		this.backCoverWidth = parseFloat(backWidth) || 0;
+		
+		console.log("CanvasManager received size config:", {
+			totalWidth: this.currentCanvasWidth,
+			height: this.currentCanvasHeight,
+			frontWidth: this.frontCoverWidth,
+			spineWidth: this.spineWidth,
+			backWidth: this.backCoverWidth
+		});
+		
 		this.$canvas.css({
 			width: this.currentCanvasWidth + 'px',
 			height: this.currentCanvasHeight + 'px'
 		});
-		this.updateWrapperSize();
+		
+		this._updateCanvasGuides(); // Update guides based on new dimensions
+		this.updateWrapperSize(); // Update wrapper after guides (doesn't matter much)
 		this.centerCanvas();
+	}
+	
+	_updateCanvasGuides() {
+		// Remove existing guides first
+		if (this.$guideLeft) this.$guideLeft.remove();
+		if (this.$guideRight) this.$guideRight.remove();
+		this.$guideLeft = null;
+		this.$guideRight = null;
+		
+		// Only add guides if spine and back cover exist
+		if (this.spineWidth > 0 && this.backCoverWidth > 0) {
+			console.log("Adding canvas guides.");
+			const guideLeftPos = this.backCoverWidth;
+			const guideRightPos = this.backCoverWidth + this.spineWidth;
+			
+			this.$guideLeft = $('<div>')
+				.attr('id', 'canvas-guide-left')
+				.addClass('canvas-guide')
+				.css({
+					left: `${guideLeftPos}px`
+				})
+				.appendTo(this.$canvas);
+			
+			this.$guideRight = $('<div>')
+				.attr('id', 'canvas-guide-right')
+				.addClass('canvas-guide')
+				.css({
+					left: `${guideRightPos}px`
+				})
+				.appendTo(this.$canvas);
+		} else {
+			console.log("No spine/back cover, removing guides.");
+		}
 	}
 	
 	updateWrapperSize() {
@@ -443,7 +510,6 @@ class CanvasManager {
 			width: this.currentCanvasWidth,
 			height: this.currentCanvasHeight,
 			scale: 1,
-			// backgroundColor: '#ffffff',
 			quality: quality,
 			fetch: {
 				// mode: 'cors', // Generally not needed now fonts are embedded
@@ -453,6 +519,12 @@ class CanvasManager {
 					console.warn("onCloneNode did not receive the expected #canvas clone.");
 					return;
 				}
+				
+				const clonedGuideLeft = clonedNode.querySelector('#canvas-guide-left');
+				const clonedGuideRight = clonedNode.querySelector('#canvas-guide-right');
+				if (clonedGuideLeft) clonedGuideLeft.remove();
+				if (clonedGuideRight) clonedGuideRight.remove();
+				console.log("Removed guides from cloned node for export.");
 				
 				if (transparentBackground) {
 					clonedNode.style.backgroundColor = 'transparent';
@@ -636,17 +708,22 @@ class CanvasManager {
 		// Ensure layers are sorted by zIndex
 		const sortedLayers = [...this.layerManager.getLayers()].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		const designData = {
-			version: "1.2", // Increment version for new properties
+			version: "1.3", // Increment version for new canvas structure info
 			canvas: {
+				// Store both total and component dimensions
 				width: this.currentCanvasWidth,
-				height: this.currentCanvasHeight
+				height: this.currentCanvasHeight,
+				frontWidth: this.frontCoverWidth,
+				spineWidth: this.spineWidth,
+				backWidth: this.backCoverWidth
 			},
 			// Filter out temporary internal properties before saving
 			layers: sortedLayers.map(layer => {
-				const {shadowOffsetInternal, shadowAngleInternal, ...layerToSave} = layer;
+				const { shadowOffsetInternal, shadowAngleInternal, ...layerToSave } = layer;
 				return layerToSave;
 			})
 		};
+		
 		// ... (rest of save logic: JSON.stringify, Blob, download) ...
 		const jsonData = JSON.stringify(designData, null, 2);
 		const blob = new Blob([jsonData], {type: 'application/json'});
@@ -667,31 +744,51 @@ class CanvasManager {
 		const handleLoad = (designData) => {
 			try {
 				if (designData && designData.layers && designData.canvas) {
+					// --- MODIFIED: Use new canvas structure from JSON ---
+					let sizeConfig;
+					if (designData.canvas.frontWidth !== undefined) {
+						// New format with component widths
+						sizeConfig = {
+							totalWidth: designData.canvas.width,
+							height: designData.canvas.height,
+							frontWidth: designData.canvas.frontWidth,
+							spineWidth: designData.canvas.spineWidth || 0,
+							backWidth: designData.canvas.backWidth || 0
+						};
+					} else {
+						// Old format (assume only front cover)
+						sizeConfig = {
+							totalWidth: designData.canvas.width,
+							height: designData.canvas.height,
+							frontWidth: designData.canvas.width,
+							spineWidth: 0,
+							backWidth: 0
+						};
+					}
 					
 					if (!isTemplate) {
 						console.log("Loading full design: Clearing history and setting canvas size.");
 						this.historyManager.clear();
-						this.setCanvasSize(designData.canvas.width, designData.canvas.height);
+						this.setCanvasSize(sizeConfig); // Set size using config
 					} else {
 						console.log("Applying template: Keeping existing canvas size and non-text layers.");
-						// Text layers should have been removed *before* calling loadDesign for templates
-						// We just need to add the template layers.
+						// Templates don't change canvas size, but we still need to update guides
+						// based on the *current* canvas config after applying template layers.
+						// Guides will be updated implicitly if setCanvasSize was called before,
+						// or we can call _updateCanvasGuides explicitly if needed, but setLayers
+						// below doesn't change the canvas dimensions.
 					}
+					// --- END MODIFIED ---
 					
 					this.layerManager.setLayers(designData.layers, isTemplate); // Use isTemplate flag directly
 					
 					// --- Finalize ---
-					// Save the loaded/modified state as a single history point
 					this.historyManager.saveState();
-					
 					if (!isTemplate) {
-						this.setZoom(1.0); // Reset zoom to 100%
-						this.centerCanvas(); // Center the newly loaded canvas
+						this.setZoom(1.0);
+						this.centerCanvas();
 					}
-					
-					// Deselect any previously selected layer after load/template apply
 					this.layerManager.selectLayer(null);
-					
 					// alert(`Design ${isTemplate ? 'template' : ''} loaded successfully!`);
 				} else {
 					console.error("Invalid design data structure:", designData);
@@ -703,12 +800,12 @@ class CanvasManager {
 			}
 		};
 		
+		// ... (rest of loadDesign: file reading/fetching logic remains the same) ...
 		const handleError = (error, statusText = "") => {
 			console.error("Error loading design:", statusText, error);
 			alert(`Error reading or fetching the design file: ${statusText}`);
 		};
 		
-		// Check if source is a File object (from input) or a string (path for template)
 		if (source instanceof File) {
 			const reader = new FileReader();
 			reader.onload = (e) => {
@@ -722,7 +819,6 @@ class CanvasManager {
 			reader.onerror = () => handleError(reader.error, "File Reading Error");
 			reader.readAsText(source);
 		} else if (typeof source === 'string') {
-			// Assume source is a URL/path (used for templates)
 			$.getJSON(source)
 				.done((data) => handleLoad(data)) // isTemplate will be true here
 				.fail((jqXHR, textStatus, errorThrown) => handleError(errorThrown, `${textStatus} (${jqXHR.status})`));
@@ -747,6 +843,8 @@ class CanvasManager {
 			if ($(this).hasClass('ui-resizable')) $(this).resizable('destroy');
 		});
 		
+		if (this.$guideLeft) this.$guideLeft.remove();
+		if (this.$guideRight) this.$guideRight.remove();
 		
 		// Nullify references
 		this.$canvasArea = null;
