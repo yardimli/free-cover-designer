@@ -5,7 +5,6 @@ class CanvasManager {
 		this.$canvasArea = $canvasArea;
 		this.$canvasWrapper = $canvasWrapper;
 		this.$canvas = $canvas;
-		this.$exportOverlay = $('#export-overlay');
 		this.$guideLeft = null; // Reference for left guide div
 		this.$guideRight = null; // Reference for right guide div
 		
@@ -23,6 +22,12 @@ class CanvasManager {
 		this.lastPanX = 0;
 		this.lastPanY = 0;
 		this.inverseZoomMultiplier = 1;
+		this.showLoadingOverlay = options.showLoadingOverlay || function (msg) {
+			console.warn("showLoadingOverlay not provided to CanvasManager", msg);
+		};
+		this.hideLoadingOverlay = options.hideLoadingOverlay || function () {
+			console.warn("hideLoadingOverlay not provided to CanvasManager");
+		};
 		
 		// Default Canvas Size (can be overridden by loaded designs/templates)
 		this.DEFAULT_CANVAS_WIDTH = 1540;
@@ -54,10 +59,6 @@ class CanvasManager {
 		this.setZoom(this.currentZoom, false);
 		this.centerCanvas();
 		this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
-		
-		if (this.$exportOverlay) {
-			this.$exportOverlay.hide();
-		}
 	}
 	
 	setCanvasSize(config) {
@@ -466,9 +467,8 @@ class CanvasManager {
 	// --- Export ---
 	async exportCanvas(format = 'png', transparentBackground = false) { // Still async
 		
-		if (this.$exportOverlay) {
-			this.$exportOverlay.show();
-		}
+		this.showLoadingOverlay(`Exporting as ${format.toUpperCase()}...`);
+		
 		this.layerManager.selectLayer(null);
 		
 		// Store original state... (same as before)
@@ -694,10 +694,7 @@ class CanvasManager {
 			if (selectedLayer) {
 				$(`#${selectedLayer.id}`).addClass('selected');
 			}
-			
-			if (this.$exportOverlay) {
-				this.$exportOverlay.hide();
-			}
+			this.hideLoadingOverlay();
 			
 			console.log("Export process finished, restored original state.");
 		}
@@ -719,7 +716,7 @@ class CanvasManager {
 			},
 			// Filter out temporary internal properties before saving
 			layers: sortedLayers.map(layer => {
-				const { shadowOffsetInternal, shadowAngleInternal, ...layerToSave } = layer;
+				const {shadowOffsetInternal, shadowAngleInternal, ...layerToSave} = layer;
 				return layerToSave;
 			})
 		};
@@ -801,8 +798,7 @@ class CanvasManager {
 		if (typeof source === 'object' && source !== null && !(source instanceof File)) {
 			console.log("Loading design from pre-parsed object.");
 			handleLoad(source);
-		}
-		else if (source instanceof File) {
+		} else if (source instanceof File) {
 			const reader = new FileReader();
 			reader.onload = (e) => {
 				try {

@@ -6,6 +6,12 @@ class SidebarItemManager {
 		this.saveState = options.saveState;
 		this.layerManager = options.layerManager;
 		this.canvasManager = options.canvasManager;
+		this.showLoadingOverlay = options.showLoadingOverlay || function (msg) {
+			console.warn("showLoadingOverlay not provided", msg);
+		};
+		this.hideLoadingOverlay = options.hideLoadingOverlay || function () {
+			console.warn("hideLoadingOverlay not provided");
+		};
 		
 		// Upload specific elements (handled separately)
 		this.$uploadPreview = $(options.uploadPreviewSelector);
@@ -19,9 +25,9 @@ class SidebarItemManager {
 				type: 'templates',
 				dataElementId: 'templateData',
 				listSelector: '#templateList',
-				searchSelector: null, // No search for templates currently
+				searchSelector: '#templateSearch',
 				scrollAreaSelector: '#templatesPanel .panel-scrollable-content',
-				itemsToShow: 20, // Show more templates at once, less likely to scroll
+				itemsToShow: 12,
 				allData: [],
 				filteredData: [],
 				currentlyDisplayed: 0,
@@ -54,7 +60,6 @@ class SidebarItemManager {
 				},
 				filterFn: (item, term) => {
 					if (!term) return true;
-					// Simple name filter for templates
 					return item.name.toLowerCase().includes(term);
 				}
 			},
@@ -90,8 +95,10 @@ class SidebarItemManager {
 				},
 				handleClick: (itemData, manager) => {
 					const imgSrc = itemData.imagePath;
-					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager) {
+					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager && manager.showLoadingOverlay && manager.hideLoadingOverlay) {
 						console.log("Cover clicked:", imgSrc);
+						manager.showLoadingOverlay("Adding cover...");
+						
 						// Remove existing cover layers
 						console.log("Applying cover, removing existing cover layers...");
 						const existingLayers = manager.layerManager.getLayers();
@@ -107,29 +114,40 @@ class SidebarItemManager {
 						
 						const img = new Image();
 						img.onload = () => {
-							const canvasWidth = manager.canvasManager.currentCanvasWidth;
-							const canvasHeight = manager.canvasManager.currentCanvasHeight;
-							const newLayer = manager.addLayer('image', {
-								content: imgSrc,
-								x: 0,
-								y: 0,
-								width: canvasWidth,
-								height: canvasHeight,
-								name: `Cover ${manager.layerManager.uniqueIdCounter}`, // Use manager's counter
-								layerSubType: 'cover'
-							});
-							if (newLayer) {
-								manager.layerManager.moveLayer(newLayer.id, 'back');
-								manager.layerManager.toggleLockLayer(newLayer.id, false); // Don't save history yet
-								manager.layerManager.selectLayer(null);
-								manager.saveState(); // Save history once after all changes
-								this.closeSidebarPanel();
+							try {
+								const canvasWidth = manager.canvasManager.currentCanvasWidth;
+								const canvasHeight = manager.canvasManager.currentCanvasHeight;
+								const newLayer = manager.addLayer('image', {
+									content: imgSrc,
+									x: 0,
+									y: 0,
+									width: canvasWidth,
+									height: canvasHeight,
+									name: `Cover ${manager.layerManager.uniqueIdCounter}`, // Use manager's counter
+									layerSubType: 'cover'
+								});
+								if (newLayer) {
+									manager.layerManager.moveLayer(newLayer.id, 'back');
+									manager.layerManager.toggleLockLayer(newLayer.id, false); // Don't save history yet
+									manager.layerManager.selectLayer(null);
+									manager.saveState(); // Save history once after all changes
+									this.closeSidebarPanel();
+								}
+							} catch (error) {
+								console.error("Error processing cover image:", error);
+								alert("Error adding cover. Please try again.");
+							} finally {
+								manager.hideLoadingOverlay();
 							}
 						};
-						img.onerror = () => console.error("Failed to load cover image for clicking:", imgSrc);
+						img.onerror = () => {
+							console.error("Failed to load cover image for clicking:", imgSrc);
+							alert("Failed to load cover image. Please check the image path or try again.");
+							manager.hideLoadingOverlay();
+						};
 						img.src = imgSrc;
 					} else {
-						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for cover click.");
+						console.error("Missing dependencies for cover click (imgSrc, addLayer, canvasManager, layerManager, or overlay functions).");
 					}
 				},
 				filterFn: (item, term) => {
@@ -147,7 +165,7 @@ class SidebarItemManager {
 				type: 'elements',
 				dataElementId: 'elementData',
 				listSelector: '#elementList',
-				searchSelector: '#elementSearch', // Now exists in HTML
+				searchSelector: '#elementSearch',
 				scrollAreaSelector: '#elementsPanel .panel-scrollable-content',
 				itemsToShow: 12,
 				allData: [],
@@ -158,7 +176,7 @@ class SidebarItemManager {
 				searchTimeout: null,
 				searchDelay: 300,
 				thumbnailClass: 'element-thumbnail',
-				gridColumns: 2, // Specific grid style for elements
+				gridColumns: 2,
 				createThumbnail: (item) => `
                     <div class="item-thumbnail ${this.itemTypesConfig.elements.thumbnailClass} loading" title="${item.name}">
                         <div class="thumbnail-spinner-overlay">
@@ -166,49 +184,66 @@ class SidebarItemManager {
                                 <span class="visually-hidden">Loading...</span>
                             </div>
                         </div>
-                        <img src="${item.image}" alt="${item.name}">
-                        <!-- No span for name below element -->
+                        <img src="${item.thumbnailPath}" alt="${item.name}"> <!-- Use thumbnailPath, No span for name -->
                     </div>
                 `,
 				handleClick: (itemData, manager) => {
-					const imgSrc = itemData.image;
-					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager) {
+					const imgSrc = itemData.imagePath; // Use imagePath for the actual image
+					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager && manager.showLoadingOverlay && manager.hideLoadingOverlay) {
 						console.log("Element clicked:", imgSrc);
+						manager.showLoadingOverlay("Adding element...");
+						
 						const img = new Image();
 						img.onload = () => {
-							const elemWidth = Math.min(img.width, 150); // Default size
-							const elemHeight = (img.height / img.width) * elemWidth;
-							const canvasWidth = manager.canvasManager.currentCanvasWidth;
-							const canvasHeight = manager.canvasManager.currentCanvasHeight;
-							// Center the element
-							const finalX = Math.max(0, (canvasWidth / 2) - (elemWidth / 2));
-							const finalY = Math.max(0, (canvasHeight / 2) - (elemHeight / 2));
-							
-							const newLayer = manager.addLayer('image', {
-								content: imgSrc,
-								x: finalX,
-								y: finalY,
-								width: elemWidth,
-								height: elemHeight,
-								layerSubType: 'element',
-								name: `${itemData.name} ${manager.layerManager.uniqueIdCounter}` // Use element name + counter
-							});
-							if (newLayer) {
-								manager.layerManager.selectLayer(newLayer.id);
-								manager.saveState();
-								this.closeSidebarPanel();
+							try {
+								const elemWidth = Math.min(img.width, 150);
+								const elemHeight = (img.height / img.width) * elemWidth;
+								const canvasWidth = manager.canvasManager.currentCanvasWidth;
+								const canvasHeight = manager.canvasManager.currentCanvasHeight;
+								const finalX = Math.max(0, (canvasWidth / 2) - (elemWidth / 2));
+								const finalY = Math.max(0, (canvasHeight / 2) - (elemHeight / 2));
+								
+								const newLayer = manager.addLayer('image', {
+									content: imgSrc,
+									x: finalX,
+									y: finalY,
+									width: elemWidth,
+									height: elemHeight,
+									layerSubType: 'element',
+									name: `${itemData.name} ${manager.layerManager.uniqueIdCounter}`
+								});
+								if (newLayer) {
+									manager.layerManager.selectLayer(newLayer.id);
+									manager.saveState();
+									this.closeSidebarPanel();
+								}
+							} catch (error) {
+								console.error("Error processing element image:", error);
+								alert("Error adding element. Please try again.");
+							} finally {
+								manager.hideLoadingOverlay();
 							}
 						};
-						img.onerror = () => console.error("Failed to load element image for clicking:", imgSrc);
+						
+						img.onerror = () => {
+							console.error("Failed to load element image for clicking:", imgSrc);
+							alert("Failed to load element image. Please check the image path or try again.");
+							manager.hideLoadingOverlay();
+						};
 						img.src = imgSrc;
 					} else {
 						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for element click.");
 					}
 				},
-				filterFn: (item, term) => {
+				filterFn: (item, term) => { // Updated filter function
 					if (!term) return true;
-					// Simple name filter for elements
-					return item.name.toLowerCase().includes(term);
+					const searchKeywords = term.split(/\s+/).filter(Boolean);
+					const itemKeywordsLower = (item.keywords || []).map(k => k.toLowerCase());
+					const nameLower = item.name.toLowerCase();
+					return searchKeywords.every(searchTermPart =>
+						itemKeywordsLower.some(itemKeyword => itemKeyword.includes(searchTermPart)) ||
+						nameLower.includes(searchTermPart)
+					);
 				}
 			},
 			overlays: {
@@ -240,7 +275,7 @@ class SidebarItemManager {
                 `,
 				handleClick: (itemData, manager) => {
 					const imgSrc = itemData.imagePath; // Use the actual image path
-					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager) {
+					if (imgSrc && manager.addLayer && manager.canvasManager && manager.layerManager && manager.showLoadingOverlay && manager.hideLoadingOverlay) {
 						console.log("Overlay clicked:", imgSrc);
 						
 						// --- Confirmation Logic ---
@@ -261,63 +296,76 @@ class SidebarItemManager {
 						}
 						// --- End Confirmation ---
 						
+						manager.showLoadingOverlay("Adding overlay...");
+						
 						const img = new Image();
 						img.onload = () => {
-							const canvasWidth = manager.canvasManager.currentCanvasWidth;
-							const canvasHeight = manager.canvasManager.currentCanvasHeight;
-							const imgWidth = img.width;
-							const imgHeight = img.height;
-							
-							// Calculate centered position
-							const finalX = (canvasWidth - imgWidth) / 2;
-							const finalY = (canvasHeight - imgHeight) / 2;
-							
-							const newLayer = manager.addLayer('image', {
-								content: imgSrc,
-								x: finalX,
-								y: finalY,
-								width: imgWidth,
-								height: imgHeight,
-								blendMode: 'overlay', // Default blend mode for overlays
-								layerSubType: 'overlay',
-								name: `Overlay ${manager.layerManager.uniqueIdCounter}`
-							});
-							
-							if (newLayer) {
-								// --- Positioning Logic (Place above highest cover layer) ---
-								const allLayers = manager.layerManager.getLayers(); // Get layers *after* adding
-								const coverLayers = allLayers.filter(l => l.type === 'image' && l.layerSubType === 'cover');
-								const coverZIndex = coverLayers.length > 0 ? Math.max(...coverLayers.map(l => l.zIndex || 0)) : 0;
-								const targetZIndex = coverZIndex + 1; // Place just above the highest cover layer
+							try {
+								const canvasWidth = manager.canvasManager.currentCanvasWidth;
+								const canvasHeight = manager.canvasManager.currentCanvasHeight;
+								const imgWidth = img.width;
+								const imgHeight = img.height;
 								
-								console.log(`Positioning new overlay ${newLayer.id} at zIndex ${targetZIndex}`);
+								// Calculate centered position
+								const finalX = (canvasWidth - imgWidth) / 2;
+								const finalY = (canvasHeight - imgHeight) / 2;
 								
-								// Update zIndex values in the LayerManager's internal array
-								const addedLayerInData = manager.layerManager.layers.find(l => l.id === newLayer.id);
-								if (addedLayerInData) {
-									// Shift other layers up to make space
-									manager.layerManager.layers.forEach(layer => {
-										if (layer.zIndex >= targetZIndex && layer.id !== newLayer.id) {
-											layer.zIndex++;
-										}
-									});
-									// Set the target zIndex for the new layer
-									addedLayerInData.zIndex = targetZIndex;
-								} else {
-									console.error("Could not find newly added layer in internal array for zIndex update.");
+								const newLayer = manager.addLayer('image', {
+									content: imgSrc,
+									x: finalX,
+									y: finalY,
+									width: imgWidth,
+									height: imgHeight,
+									blendMode: 'overlay', // Default blend mode for overlays
+									layerSubType: 'overlay',
+									name: `Overlay ${manager.layerManager.uniqueIdCounter}`
+								});
+								
+								if (newLayer) {
+									// --- Positioning Logic (Place above highest cover layer) ---
+									const allLayers = manager.layerManager.getLayers(); // Get layers *after* adding
+									const coverLayers = allLayers.filter(l => l.type === 'image' && l.layerSubType === 'cover');
+									const coverZIndex = coverLayers.length > 0 ? Math.max(...coverLayers.map(l => l.zIndex || 0)) : 0;
+									const targetZIndex = coverZIndex + 1; // Place just above the highest cover layer
+									
+									console.log(`Positioning new overlay ${newLayer.id} at zIndex ${targetZIndex}`);
+									
+									// Update zIndex values in the LayerManager's internal array
+									const addedLayerInData = manager.layerManager.layers.find(l => l.id === newLayer.id);
+									if (addedLayerInData) {
+										// Shift other layers up to make space
+										manager.layerManager.layers.forEach(layer => {
+											if (layer.zIndex >= targetZIndex && layer.id !== newLayer.id) {
+												layer.zIndex++;
+											}
+										});
+										// Set the target zIndex for the new layer
+										addedLayerInData.zIndex = targetZIndex;
+									} else {
+										console.error("Could not find newly added layer in internal array for zIndex update.");
+									}
+									
+									// Apply the updated z-indices to the DOM elements and update the list
+									manager.layerManager._updateZIndices();
+									manager.layerManager.updateList();
+									// --- End Positioning ---
+									
+									manager.layerManager.selectLayer(newLayer.id); // Select the new layer
+									manager.saveState(); // Save history after all changes
+									this.closeSidebarPanel();
 								}
-								
-								// Apply the updated z-indices to the DOM elements and update the list
-								manager.layerManager._updateZIndices();
-								manager.layerManager.updateList();
-								// --- End Positioning ---
-								
-								manager.layerManager.selectLayer(newLayer.id); // Select the new layer
-								manager.saveState(); // Save history after all changes
-								this.closeSidebarPanel();
+							} catch (error) {
+								console.error("Error processing overlay image:", error);
+								alert("Error adding overlay. Please try again.");
+							} finally {
+								manager.hideLoadingOverlay();
 							}
 						};
-						img.onerror = () => console.error("Failed to load overlay image for clicking:", imgSrc);
+						img.onerror = () => {
+							console.error("Failed to load overlay image for clicking:", imgSrc);
+							alert("Failed to load overlay image. Please check the image path or try again.");
+							manager.hideLoadingOverlay();
+						};
 						img.src = imgSrc; // Load the actual image to get dimensions
 					} else {
 						console.error("Missing imgSrc, addLayer, canvasManager, or layerManager for overlay click.");
@@ -352,8 +400,8 @@ class SidebarItemManager {
 		});
 		this.initializeUpload();
 	}
-	
-	// --- Generic Item Loading and Display ---
+
+// --- Generic Item Loading and Display ---
 	
 	loadItems(type) {
 		const config = this.itemTypesConfig[type];
@@ -459,7 +507,7 @@ class SidebarItemManager {
 			const $thumb = $(config.createThumbnail(itemData));
 			$thumb.data('itemData', itemData); // Store the full item data
 			
-			$thumb.on('click', function() {
+			$thumb.on('click', function () {
 				const clickedItemData = $(this).data('itemData');
 				if (config.handleClick) {
 					config.handleClick(clickedItemData, self); // Pass item data and manager instance
@@ -513,7 +561,7 @@ class SidebarItemManager {
 		const self = this;
 		
 		// Attach namespaced listener
-		$scrollArea.off(`scroll.${type}Loader`).on(`scroll.${type}Loader`, function() {
+		$scrollArea.off(`scroll.${type}Loader`).on(`scroll.${type}Loader`, function () {
 			const scrolledElement = this; // 'this' is the .panel-scrollable-content div
 			const threshold = 200; // Pixels from bottom
 			
@@ -534,10 +582,10 @@ class SidebarItemManager {
 			}
 		});
 	}
-	
-	// --- Image Loading Helper (Unchanged) ---
+
+// --- Image Loading Helper (Unchanged) ---
 	_setupImageLoading($thumbnails) {
-		$thumbnails.each(function() {
+		$thumbnails.each(function () {
 			const $thumb = $(this);
 			const $img = $thumb.find('img');
 			const $spinnerOverlay = $thumb.find('.thumbnail-spinner-overlay');
@@ -576,8 +624,8 @@ class SidebarItemManager {
 			}
 		});
 	}
-	
-	// --- Upload (Unchanged) ---
+
+// --- Upload (Unchanged) ---
 	initializeUpload() {
 		const self = this;
 		this.$uploadInput.on('change', (event) => {
@@ -599,45 +647,63 @@ class SidebarItemManager {
 		});
 		
 		this.$addImageBtn.on('click', () => {
-			if (this.uploadedFile && self.addLayer && self.canvasManager && self.layerManager) {
+			if (this.uploadedFile && self.addLayer && self.canvasManager && self.layerManager && self.showLoadingOverlay && self.hideLoadingOverlay) {
 				console.log("Add Uploaded Image clicked");
+				self.showLoadingOverlay("Adding uploaded image...");
+				
 				const reader = new FileReader();
 				reader.onload = (e) => {
 					const img = new Image();
 					img.onload = () => {
-						const canvasWidth = self.canvasManager.currentCanvasWidth;
-						const canvasHeight = self.canvasManager.currentCanvasHeight;
-						// Calculate initial size (fit within 80% of canvas, max 300px wide)
-						const maxWidth = Math.min(canvasWidth * 0.8, 300);
-						let layerWidth = Math.min(img.width, maxWidth);
-						const aspectRatio = img.height / img.width;
-						let layerHeight = layerWidth * aspectRatio;
-						const maxHeight = canvasHeight * 0.8;
-						if (layerHeight > maxHeight) {
-							layerHeight = maxHeight;
-							layerWidth = layerHeight / aspectRatio;
-						}
-						// Center the uploaded image
-						const layerX = Math.max(0, (canvasWidth - layerWidth) / 2);
-						const layerY = Math.max(0, (canvasHeight - layerHeight) / 2);
-						
-						const newLayer = self.addLayer('image', {
-							content: e.target.result, // Use data URL from reader
-							x: layerX,
-							y: layerY,
-							width: layerWidth,
-							height: layerHeight,
-							layerSubType: 'upload',
-							name: `Upload ${self.layerManager.uniqueIdCounter}`
-						});
-						if (newLayer) {
-							self.layerManager.selectLayer(newLayer.id);
-							self.saveState();
+						try {
+							const canvasWidth = self.canvasManager.currentCanvasWidth;
+							const canvasHeight = self.canvasManager.currentCanvasHeight;
+							// Calculate initial size (fit within 80% of canvas, max 300px wide)
+							const maxWidth = Math.min(canvasWidth * 0.8, 300);
+							let layerWidth = Math.min(img.width, maxWidth);
+							const aspectRatio = img.height / img.width;
+							let layerHeight = layerWidth * aspectRatio;
+							const maxHeight = canvasHeight * 0.8;
+							if (layerHeight > maxHeight) {
+								layerHeight = maxHeight;
+								layerWidth = layerHeight / aspectRatio;
+							}
+							// Center the uploaded image
+							const layerX = Math.max(0, (canvasWidth - layerWidth) / 2);
+							const layerY = Math.max(0, (canvasHeight - layerHeight) / 2);
+							
+							const newLayer = self.addLayer('image', {
+								content: e.target.result, // Use data URL from reader
+								x: layerX,
+								y: layerY,
+								width: layerWidth,
+								height: layerHeight,
+								layerSubType: 'upload',
+								name: `Upload ${self.layerManager.uniqueIdCounter}`
+							});
+							if (newLayer) {
+								self.layerManager.selectLayer(newLayer.id);
+								self.saveState();
+							}
+						} catch (error) {
+							console.error("Error processing uploaded image for canvas:", error);
+							alert("Error adding uploaded image. Please try again.");
+						} finally {
+							self.hideLoadingOverlay();
 						}
 					};
-					img.onerror = () => console.error("Failed to load uploaded image data for adding to canvas.");
+					img.onerror = () => {
+						console.error("Failed to load uploaded image data for adding to canvas.");
+						alert("Failed to load uploaded image. Please check the image or try again.");
+						self.hideLoadingOverlay();
+					};
 					img.src = e.target.result;
 				}
+				reader.onerror = () => {
+					console.error("FileReader error while reading uploaded file.");
+					alert("Error reading uploaded file. Please try again.");
+					self.hideLoadingOverlay();
+				};
 				reader.readAsDataURL(this.uploadedFile);
 			} else {
 				console.error("Missing uploadedFile, addLayer, canvasManager, or layerManager for upload button click.");

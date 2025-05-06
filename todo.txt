@@ -19,8 +19,8 @@ add vertical alignment to text layers ..........................................
 change moving elements to something with guides and snapping ..............................OK
 make export start with transparent background .............................................OK
 move data from json to database ...........................................................OK
-update elements to load from database and have search
-add loader spinner for when selecting cover, overlay and images
+update elements to load from database and have search .....................................OK
+add loader spinner for when selecting cover, overlay and images ...........................OK
 create admin interface to add data
 duplicate text layer
 add trim size .............................................................................OK

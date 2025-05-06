@@ -114,6 +114,11 @@
 	<link rel="stylesheet" href="css/style.css">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+	<link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png">
+	<link rel="manifest" href="images/site.webmanifest">
 </head>
 <body>
 <div class="app-container d-flex flex-column vh-100">
@@ -264,7 +269,7 @@
 		<div class="spinner-border text-light" role="status">
 			<span class="visually-hidden">Loading...</span>
 		</div>
-		<p class="mt-2 text-light">Exporting your cover...</p>
+		<p class="mt-2 text-light" id="loading-overlay-message">Processing...</p>
 	</div>
 </div>
 

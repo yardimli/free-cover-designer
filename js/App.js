@@ -5,6 +5,8 @@ $(document).ready(function () {
 	const $canvasArea = $('#canvas-area');
 	const $canvasWrapper = $('#canvas-wrapper');
 	const $loadDesignInput = $('#loadDesignInput');
+	const $loadingOverlay = $('#export-overlay'); // Re-use the export overlay
+	const $loadingOverlayMessage = $('#loading-overlay-message');
 	const $inspectorPanelElement = $('#inspectorPanel');
 	
 	// Sidebar Panel References
@@ -15,7 +17,9 @@ $(document).ready(function () {
 	
 	// --- Instantiate Managers ---
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
-		onZoomChange: handleZoomChange
+		onZoomChange: handleZoomChange,
+		showLoadingOverlay: showGlobalLoadingOverlay,
+		hideLoadingOverlay: hideGlobalLoadingOverlay
 	});
 	
 	const canvasSizeModal = new CanvasSizeModal(canvasManager);
@@ -72,7 +76,9 @@ $(document).ready(function () {
 		addLayer: (type, props) => layerManager.addLayer(type, props),
 		saveState: () => historyManager.saveState(),
 		layerManager: layerManager,
-		canvasManager: canvasManager
+		canvasManager: canvasManager,
+		showLoadingOverlay: showGlobalLoadingOverlay,
+		hideLoadingOverlay: hideGlobalLoadingOverlay
 	});
 	
 	// Set cross-dependencies
@@ -84,17 +90,18 @@ $(document).ready(function () {
 	layerManager.initializeList();
 	canvasManager.initialize();
 	initializeGlobalActions();
-	initializeSidebarPanelControls(); // Init left panel sliding
+	initializeSidebarPanelControls();
 	
 	// --- Initial State ---
 	historyManager.saveState();
 	updateActionButtons();
-	inspectorPanel.hide(); // Ensure inspector starts hidden
+	hideGlobalLoadingOverlay();
+	inspectorPanel.hide();
 	
 	try {
 		const kindlePresetValue = "1600x2560"; // Match the value in PHP/HTML
 		// Show the modal, passing the default value
-		canvasSizeModal.show({ defaultPresetValue: kindlePresetValue });
+		canvasSizeModal.show({defaultPresetValue: kindlePresetValue});
 	} catch (error) {
 		console.error("Error showing initial canvas size modal:", error);
 	}
@@ -127,7 +134,7 @@ $(document).ready(function () {
 	
 	// --- Sidebar Panel Sliding Logic (Left Side) ---
 	function initializeSidebarPanelControls() {
-		$sidebarNavLinks.on('click', function(e) {
+		$sidebarNavLinks.on('click', function (e) {
 			e.preventDefault();
 			const $link = $(this);
 			const targetPanelId = $link.data('panel-target');
@@ -146,7 +153,7 @@ $(document).ready(function () {
 			}
 		});
 		
-		$closePanelBtns.on('click', function() {
+		$closePanelBtns.on('click', function () {
 			closeSidebarPanel();
 		});
 		
@@ -174,10 +181,27 @@ $(document).ready(function () {
 		$sidebarPanelsContainer.removeClass('open');
 		$sidebarNavLinks.removeClass('active');
 	}
+	
 	// --- END Sidebar Panel Logic ---
 	
 	
-	// --- Global Action Button Setup & Updates ---
+	// --- Global Loading Overlay Functions ---
+	function showGlobalLoadingOverlay(message = "Processing...") {
+		if ($loadingOverlay.length && $loadingOverlayMessage.length) {
+			$loadingOverlayMessage.text(message);
+			$loadingOverlay.show();
+		} else {
+			console.warn("Loading overlay elements not found.");
+		}
+	}
+	
+	function hideGlobalLoadingOverlay() {
+		if ($loadingOverlay.length) {
+			$loadingOverlay.hide();
+		}
+	}
+
+// --- Global Action Button Setup & Updates ---
 	function initializeGlobalActions() {
 		
 		// --- Helper to prevent action on disabled links ---
@@ -250,7 +274,7 @@ $(document).ready(function () {
 		let isAtBack = false;
 		if (hasSelection && layers.length > 1) {
 			// Sort by zIndex to determine position
-			const sortedLayers = [...layers].sort((a,b) => (a.zIndex || 0) - (b.zIndex || 0));
+			const sortedLayers = [...layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 			const selectedIndex = sortedLayers.findIndex(l => l.id === selectedLayer.id);
 			isAtBack = selectedIndex === 0;
 			isAtFront = selectedIndex === sortedLayers.length - 1;
