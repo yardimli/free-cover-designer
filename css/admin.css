@@ -1,0 +1,112 @@
+/* free-cover-designer/css/admin.css */
+body {
+    font-family: sans-serif;
+    padding-top: 70px; /* Account for fixed navbar */
+    padding-bottom: 50px; /* Add space at bottom */
+}
+
+.admin-container {
+    margin-top: 20px;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #f8f9fa;
+    border-bottom-color: #f8f9fa;
+}
+
+.tab-content {
+    border: 1px solid #dee2e6;
+    border-top: none;
+    padding: 20px; /* Increased padding */
+    background-color: #fdfdff;
+}
+
+/* Upload Forms */
+.upload-form {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    margin-bottom: 30px; /* Increased margin */
+}
+.upload-form h4 { margin-bottom: 15px; }
+.upload-form .form-label { font-weight: bold; }
+
+/* Search Forms */
+.search-form { margin-bottom: 15px; }
+
+/* Item Tables */
+.item-table {
+    margin-bottom: 20px; /* Space before pagination */
+}
+.item-table img.thumbnail-preview {
+    max-width: 60px;
+    max-height: 90px;
+    object-fit: contain;
+    border: 1px solid #eee;
+    background-color: #fff; /* Add background for transparent images */
+}
+.item-table img.thumbnail-preview.square {
+    max-height: 60px;
+}
+.table th, .table td {
+    vertical-align: middle;
+}
+.item-table td:last-child { /* Actions column */
+    white-space: nowrap; /* Prevent buttons wrapping */
+    width: auto; /* Allow it to take necessary width for 3 buttons */
+    /* width: 1%; /* Try to minimize width - this might be too small now */
+}
+.item-table td:last-child .btn {
+    padding: 0.25rem 0.5rem; /* Slightly smaller padding for more buttons */
+    font-size: 0.8rem; /* Slightly smaller font for icons */
+}
+.item-table td:last-child .btn i {
+    font-size: 0.9em; /* Adjust icon size within button if needed */
+}
+
+
+/* Keywords */
+.keywords-list span {
+    display: inline-block;
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 0.2em 0.5em;
+    margin-right: 0.3em;
+    margin-bottom: 0.3em;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+/* Alerts */
+.alert-messages {
+    position: fixed;
+    top: 70px; /* Below navbar */
+    right: 20px;
+    z-index: 1050;
+    min-width: 300px;
+    max-width: 90%;
+}
+
+/* Edit Modal Specifics */
+.edit-field {
+    display: none; /* Hide by default, JS will show */
+}
+#editCurrentImagePreview img,
+#editCurrentThumbnailPreview img {
+    max-width: 100%; /* Ensure preview fits modal */
+    max-height: 120px;
+    border: 1px solid #ddd;
+    margin-top: 5px;
+    object-fit: contain;
+}
+
+/* Pagination */
+.pagination {
+    margin-top: 20px;
+}
+
+/* Responsive table */
+.table-responsive {
+    margin-bottom: 1rem; /* Add space below table before pagination */
+}

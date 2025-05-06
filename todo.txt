@@ -21,7 +21,7 @@ make export start with transparent background ..................................
 move data from json to database ...........................................................OK
 update elements to load from database and have search .....................................OK
 add loader spinner for when selecting cover, overlay and images ...........................OK
-create admin interface to add data
+create admin interface to add data ........................................................OK
 duplicate text layer
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK

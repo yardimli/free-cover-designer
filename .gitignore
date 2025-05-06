@@ -11,3 +11,5 @@ composer.lock
 /overlays
 /shapes
 /elements
+/uploads
+openai_api_log.txt

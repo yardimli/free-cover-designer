@@ -1,0 +1,448 @@
+// free-cover-designer/js/admin.js
+$(document).ready(function() {
+	const API_URL = 'admin_actions.php';
+	const ITEMS_PER_PAGE = 30; // Should match ADMIN_ITEMS_PER_PAGE in PHP config if possible
+	let currentItemStates = {}; // Store page and search query for each type
+	
+	// --- Utility Functions ---
+	function showAlert(message, type = 'success') {
+		const alertId = 'alert-' + Date.now();
+		const alertHtml = `
+            <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+		$('#alert-messages-container').append(alertHtml);
+		setTimeout(() => {
+			$('#' + alertId).fadeOut(500, function() { $(this).remove(); });
+		}, 5000);
+	}
+	
+	function escapeHtml(unsafe) {
+		if (unsafe === null || typeof unsafe === 'undefined') return '';
+		return String(unsafe)
+			.replace(/&/g, "&")
+			.replace(/</g, "<")
+			.replace(/>/g, ">")
+			.replace(/"/g, "\"")
+			.replace(/'/g, "'");
+	}
+	
+	function capitalizeFirstLetter(string) {
+		return string.charAt(0).toUpperCase() + string.slice(1);
+	}
+	
+	function renderKeywords(keywords) {
+		if (!keywords || !Array.isArray(keywords) || keywords.length === 0) return '';
+		const escapedKeywords = keywords.map(k => typeof k === 'string' ? escapeHtml(k.trim()) : '');
+		return `<div class="keywords-list">${escapedKeywords.filter(k => k).map(k => `<span>${k}</span>`).join('')}</div>`;
+	}
+	
+	// --- State Management ---
+	function getCurrentState(itemType) {
+		return currentItemStates[itemType] || { page: 1, search: '' };
+	}
+	
+	function setCurrentState(itemType, page, search) {
+		currentItemStates[itemType] = { page, search };
+	}
+	
+	// --- Loading and Rendering Items ---
+	function loadItems(itemType, page = 1, searchQuery = '') {
+		const $tableBody = $(`#${itemType}Table tbody`);
+		const $paginationContainer = $(`#${itemType}Pagination`);
+		$tableBody.html('<tr><td colspan="100%" class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>');
+		$paginationContainer.empty();
+		setCurrentState(itemType, page, searchQuery);
+		
+		$.ajax({
+			url: API_URL,
+			type: 'GET',
+			data: {
+				action: 'list_items',
+				type: itemType,
+				page: page,
+				limit: ITEMS_PER_PAGE,
+				search: searchQuery
+			},
+			dataType: 'json',
+			success: function(response) {
+				if (response.success) {
+					$tableBody.empty();
+					const items = response.data.items;
+					const pagination = response.data.pagination;
+					
+					if (items.length === 0) {
+						const message = searchQuery ? `No ${itemType} found matching "${escapeHtml(searchQuery)}".` : `No ${itemType} found.`;
+						$tableBody.html(`<tr><td colspan="100%" class="text-center">${message}</td></tr>`);
+					} else {
+						items.forEach(item => {
+							let rowHtml = `<tr>`;
+							const thumbUrl = item.thumbnail_url || 'images/placeholder.png'; // Ensure placeholder exists
+							const isSquareThumb = itemType === 'elements' || itemType === 'overlays';
+							rowHtml += `<td><img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(item.name)}" class="thumbnail-preview ${isSquareThumb ? 'square' : ''}" loading="lazy"></td>`;
+							rowHtml += `<td>${escapeHtml(item.name)}</td>`;
+							
+							if (itemType === 'covers') {
+								rowHtml += `<td>${escapeHtml(item.caption || '')}</td>`;
+								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
+								rowHtml += `<td>${renderKeywords(item.categories)}</td>`;
+							} else if (itemType === 'elements' || itemType === 'overlays') {
+								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
+							} else if (itemType === 'templates') {
+								// Templates now can have keywords displayed
+								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
+							}
+							
+							// Action Buttons
+							rowHtml += `<td>
+                                <button class="btn btn-info btn-sm me-1 generate-ai-metadata" data-id="${item.id}" data-type="${itemType}" title="Generate AI Metadata">
+                                    <i class="fas fa-wand-magic-sparkles"></i>
+                                </button>
+                                <button class="btn btn-warning btn-sm me-1 edit-item" data-id="${item.id}" data-type="${itemType}" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm delete-item" data-id="${item.id}" data-type="${itemType}" title="Delete">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>`;
+							rowHtml += `</tr>`;
+							$tableBody.append(rowHtml);
+						});
+					}
+					renderPagination(itemType, pagination);
+				} else {
+					$tableBody.html(`<tr><td colspan="100%" class="text-center text-danger">Error loading ${itemType}: ${escapeHtml(response.message)}</td></tr>`);
+					showAlert(`Error loading ${itemType}: ${escapeHtml(response.message)}`, 'danger');
+				}
+			},
+			error: function(xhr, status, error) {
+				$tableBody.html(`<tr><td colspan="100%" class="text-center text-danger">AJAX Error loading ${itemType}. Check console.</td></tr>`);
+				showAlert(`AJAX Error loading ${itemType}: ${escapeHtml(xhr.responseText || error)}`, 'danger');
+				console.error("AJAX Error:", status, error, xhr.responseText);
+			}
+		});
+	}
+	
+	// --- Pagination Rendering ---
+	function renderPagination(itemType, pagination) {
+		// ... (existing function, no changes needed)
+		const { totalItems, itemsPerPage, currentPage, totalPages } = pagination;
+		const $paginationContainer = $(`#${itemType}Pagination`);
+		$paginationContainer.empty();
+		
+		if (totalPages <= 1) {
+			return;
+		}
+		
+		let paginationHtml = '';
+		paginationHtml += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                            <a class="page-link" href="#" data-page="${currentPage - 1}" data-type="${itemType}" aria-label="Previous">
+                                <span aria-hidden="true">«</span>
+                            </a>
+                           </li>`;
+		
+		const maxPagesToShow = 5;
+		let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+		let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+		startPage = Math.max(1, endPage - maxPagesToShow + 1);
+		
+		if (startPage > 1) {
+			paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="1" data-type="${itemType}">1</a></li>`;
+			if (startPage > 2) {
+				paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+			}
+		}
+		
+		for (let i = startPage; i <= endPage; i++) {
+			paginationHtml += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                                <a class="page-link" href="#" data-page="${i}" data-type="${itemType}">${i}</a>
+                               </li>`;
+		}
+		
+		if (endPage < totalPages) {
+			if (endPage < totalPages - 1) {
+				paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+			}
+			paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}" data-type="${itemType}">${totalPages}</a></li>`;
+		}
+		
+		paginationHtml += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                            <a class="page-link" href="#" data-page="${currentPage + 1}" data-type="${itemType}" aria-label="Next">
+                                <span aria-hidden="true">»</span>
+                            </a>
+                           </li>`;
+		$paginationContainer.html(paginationHtml);
+	}
+	
+	// --- Event Handlers ---
+	// Initial load for the active tab
+	const activeTabButton = $('#adminTab button[data-bs-toggle="tab"].active');
+	if (activeTabButton.length) {
+		const initialTargetPanelId = activeTabButton.data('bs-target');
+		const initialItemType = initialTargetPanelId.replace('#', '').replace('-panel', '');
+		loadItems(initialItemType);
+	} else {
+		loadItems('covers'); // Default if no active tab found (should not happen with Bootstrap)
+	}
+	
+	
+	$('#adminTab button[data-bs-toggle="tab"]').on('shown.bs.tab', function (event) {
+		const targetPanelId = $(event.target).data('bs-target');
+		const itemType = targetPanelId.replace('#', '').replace('-panel', '');
+		const state = getCurrentState(itemType);
+		loadItems(itemType, state.page, state.search);
+	});
+	
+	$('form[id^="upload"]').on('submit', function(e) {
+		// ... (existing function, no changes needed)
+		e.preventDefault();
+		const $form = $(this);
+		const itemType = $form.find('input[name="item_type"]').val();
+		const formData = new FormData(this);
+		formData.append('action', 'upload_item');
+		
+		const $submitButton = $form.find('button[type="submit"]');
+		const originalButtonText = $submitButton.html();
+		$submitButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Uploading...');
+		
+		$.ajax({
+			url: API_URL,
+			type: 'POST',
+			data: formData,
+			processData: false,
+			contentType: false,
+			dataType: 'json',
+			success: function(response) {
+				if (response.success) {
+					showAlert(`${capitalizeFirstLetter(itemType)} uploaded successfully!`, 'success');
+					$form[0].reset();
+					// If current tab is the one uploaded to, reload it. Otherwise, just reset its state.
+					const currentActiveItemType = $('#adminTab button.active').data('bs-target').replace('#', '').replace('-panel', '');
+					if (currentActiveItemType === itemType) {
+						loadItems(itemType, 1, '');
+					} else {
+						setCurrentState(itemType, 1, '');
+					}
+				} else {
+					showAlert(`Error uploading ${itemType}: ${escapeHtml(response.message)}`, 'danger');
+				}
+			},
+			error: function(xhr, status, error) {
+				showAlert(`AJAX Error uploading ${itemType}: ${escapeHtml(xhr.responseText || error)}`, 'danger');
+				console.error("AJAX Error:", status, error, xhr.responseText);
+			},
+			complete: function() {
+				$submitButton.prop('disabled', false).html(originalButtonText);
+			}
+		});
+	});
+	
+	$('.tab-content').on('click', '.delete-item', function() {
+		// ... (existing function, no changes needed)
+		const $button = $(this);
+		const itemId = $button.data('id');
+		const itemType = $button.data('type');
+		
+		if (confirm(`Are you sure you want to delete this ${itemType.slice(0, -1)} (ID: ${itemId})? This action cannot be undone.`)) {
+			const originalButtonHtml = $button.html();
+			$button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+			
+			$.ajax({
+				url: API_URL,
+				type: 'POST',
+				data: { action: 'delete_item', item_type: itemType, id: itemId },
+				dataType: 'json',
+				success: function(response) {
+					if (response.success) {
+						showAlert(`${capitalizeFirstLetter(itemType).slice(0,-1)} deleted successfully!`, 'success');
+						const state = getCurrentState(itemType);
+						loadItems(itemType, state.page, state.search);
+					} else {
+						showAlert(`Error deleting ${itemType}: ${escapeHtml(response.message)}`, 'danger');
+						$button.prop('disabled', false).html(originalButtonHtml);
+					}
+				},
+				error: function(xhr, status, error) {
+					showAlert(`AJAX Error deleting ${itemType}: ${escapeHtml(xhr.responseText || error)}`, 'danger');
+					$button.prop('disabled', false).html(originalButtonHtml);
+					console.error("AJAX Error:", status, error, xhr.responseText);
+				}
+			});
+		}
+	});
+	
+	$('.tab-content').on('click', '.pagination .page-link', function(e) {
+		// ... (existing function, no changes needed)
+		e.preventDefault();
+		const $link = $(this);
+		if ($link.parent().hasClass('disabled') || $link.parent().hasClass('active')) {
+			return;
+		}
+		const itemType = $link.data('type');
+		const page = $link.data('page');
+		const state = getCurrentState(itemType);
+		loadItems(itemType, page, state.search);
+	});
+	
+	$('.tab-content').on('submit', '.search-form', function(e) {
+		// ... (existing function, no changes needed)
+		e.preventDefault();
+		const $form = $(this);
+		const itemType = $form.data('type');
+		const searchQuery = $form.find('.search-input').val().trim();
+		loadItems(itemType, 1, searchQuery);
+	});
+	
+	// --- Edit Functionality ---
+	const $editModal = $('#editItemModal');
+	const $editForm = $('#editItemForm');
+	const editModal = new bootstrap.Modal($editModal[0]);
+	
+	$('.tab-content').on('click', '.edit-item', function() {
+		// ... (existing function, ensure it populates keywords for templates if editable)
+		const $button = $(this);
+		const itemId = $button.data('id');
+		const itemType = $button.data('type');
+		
+		$editModal.find('.modal-title').text(`Loading ${capitalizeFirstLetter(itemType).slice(0,-1)}...`);
+		$editForm[0].reset();
+		$('#editCurrentImagePreview').empty().hide();
+		$('#editCurrentThumbnailPreview').empty().hide();
+		$('#editCurrentJsonInfo').hide();
+		$('.edit-field').hide();
+		
+		$.ajax({
+			url: API_URL,
+			type: 'GET',
+			data: { action: 'get_item_details', item_type: itemType, id: itemId },
+			dataType: 'json',
+			success: function(response) {
+				if (response.success) {
+					const item = response.data;
+					$editModal.find('.modal-title').text(`Edit ${capitalizeFirstLetter(itemType).slice(0,-1)}: ${escapeHtml(item.name)}`);
+					$('#editItemId').val(item.id);
+					$('#editItemType').val(itemType);
+					$('#editItemName').val(item.name);
+					
+					$(`.edit-field-${itemType}`).show();
+					
+					if (itemType === 'covers') {
+						$('#editItemCaption').val(item.caption || '');
+						$('#editItemKeywords').val(item.keywords || ''); // keywords is comma-sep string from PHP
+						$('#editItemCategories').val(item.categories || ''); // categories is comma-sep string
+						if(item.image_url) { // Use image_url from get_item_details
+							$('#editCurrentImagePreview').html(`<p class="mb-1">Current Image:</p><img src="${escapeHtml(item.image_url)}" alt="Current Preview">`).show();
+						}
+					} else if (itemType === 'elements' || itemType === 'overlays') {
+						$('#editItemKeywords').val(item.keywords || '');
+						if(item.image_url) {
+							$('#editCurrentImagePreview').html(`<p class="mb-1">Current Image:</p><img src="${escapeHtml(item.image_url)}" alt="Current Preview">`).show();
+						}
+					} else if (itemType === 'templates') {
+						$('#editItemKeywords').val(item.keywords || ''); // For templates keywords
+						if(item.thumbnail_url) {
+							$('#editCurrentThumbnailPreview').html(`<p class="mb-1">Current Thumbnail:</p><img src="${escapeHtml(item.thumbnail_url)}" alt="Current Thumbnail">`).show();
+						}
+						$('#editCurrentJsonInfo').show();
+					}
+					editModal.show();
+				} else {
+					showAlert(`Error fetching details for ${itemType} ID ${itemId}: ${escapeHtml(response.message)}`, 'danger');
+				}
+			},
+			error: function(xhr, status, error) {
+				showAlert(`AJAX Error fetching details: ${escapeHtml(xhr.responseText || error)}`, 'danger');
+				console.error("AJAX Error:", status, error, xhr.responseText);
+			}
+		});
+	});
+	
+	$editForm.on('submit', function(e) {
+		// ... (existing function, no changes needed for AI button)
+		e.preventDefault();
+		const formData = new FormData(this);
+		formData.append('action', 'update_item');
+		const itemType = $('#editItemType').val();
+		const $submitButton = $('#saveEditButton');
+		const originalButtonText = $submitButton.html();
+		$submitButton.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+		
+		$.ajax({
+			url: API_URL,
+			type: 'POST',
+			data: formData,
+			processData: false,
+			contentType: false,
+			dataType: 'json',
+			success: function(response) {
+				if (response.success) {
+					showAlert(`${capitalizeFirstLetter(itemType).slice(0,-1)} updated successfully!`, 'success');
+					editModal.hide();
+					const state = getCurrentState(itemType);
+					loadItems(itemType, state.page, state.search);
+				} else {
+					showAlert(`Error updating ${itemType}: ${escapeHtml(response.message)}`, 'danger');
+				}
+			},
+			error: function(xhr, status, error) {
+				showAlert(`AJAX Error updating ${itemType}: ${escapeHtml(xhr.responseText || error)}`, 'danger');
+				console.error("AJAX Error:", status, error, xhr.responseText);
+			},
+			complete: function() {
+				$submitButton.prop('disabled', false).html(originalButtonText);
+			}
+		});
+	});
+	
+	$editModal.on('hidden.bs.modal', function () {
+		$('#editItemImageFile').val('');
+		$('#editItemThumbnailFile').val('');
+		$('#editItemJsonFile').val('');
+		// Clear previews more thoroughly
+		$('#editCurrentImagePreview').empty().hide();
+		$('#editCurrentThumbnailPreview').empty().hide();
+	});
+	
+	// --- NEW: AI Metadata Generation Handler ---
+	$('.tab-content').on('click', '.generate-ai-metadata', function() {
+		const $button = $(this);
+		const itemId = $button.data('id');
+		const itemType = $button.data('type');
+		
+		if (!confirm(`Are you sure you want to generate AI metadata for this ${itemType.slice(0, -1)} (ID: ${itemId})? This may overwrite existing caption, keywords, and categories with AI-generated values.`)) {
+			return;
+		}
+		
+		const originalButtonHtml = $button.html();
+		$button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> AI...');
+		
+		$.ajax({
+			url: API_URL,
+			type: 'POST',
+			data: {
+				action: 'generate_ai_metadata',
+				item_type: itemType,
+				id: itemId
+			},
+			dataType: 'json',
+			success: function(response) {
+				if (response.success) {
+					showAlert(`${capitalizeFirstLetter(itemType).slice(0,-1)} AI metadata generated/updated successfully!`, 'success');
+					const state = getCurrentState(itemType);
+					loadItems(itemType, state.page, state.search); // Reload to see changes
+				} else {
+					showAlert(`Error generating AI metadata for ${itemType}: ${escapeHtml(response.message)}`, 'danger');
+				}
+			},
+			error: function(xhr, status, error) {
+				showAlert(`AJAX Error generating AI metadata for ${itemType}: ${escapeHtml(xhr.responseText || error)}`, 'danger');
+				console.error("AJAX Error (AI Metadata):", status, error, xhr.responseText);
+			},
+			complete: function() {
+				$button.prop('disabled', false).html(originalButtonHtml);
+			}
+		});
+	});
+	
+});

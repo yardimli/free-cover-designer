@@ -30,6 +30,7 @@ CREATE TABLE `overlays` (
 CREATE TABLE `templates` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(255) NOT NULL,
+  `keywords` JSON NULL DEFAULT NULL, -- Use JSON type if MySQL 5.7+
   `thumbnail_path` VARCHAR(512) NOT NULL,
   `json_path` VARCHAR(512) NULL DEFAULT NULL, -- Store original path for reference if needed
   `json_content` JSON NOT NULL, -- Store the actual JSON data. Use LONGTEXT if JSON type not available/preferred.
