@@ -1105,11 +1105,6 @@ class LayerManager {
 			// Re-evaluate parent height if text content drives it
 			if (layerData.height === 'auto') $parentElement.css('height', 'auto');
 		}
-		
-		// Parent Border (If you want a border around the whole text box, independent of stroke)
-		// Example: if (layerData.boxBorderWidth > 0) { $parentElement.css(...) }
-		// For now, we only use the 'stroke' property on the text itself.
-		
 	}
 	
 	_applyStyles($element, layerData) {

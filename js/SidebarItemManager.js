@@ -43,12 +43,13 @@ class SidebarItemManager {
                     </div>
                 `,
 				handleClick: (itemData, manager) => {
-					if (itemData.jsonPath && manager.applyTemplate) {
-						console.log("Template clicked:", itemData.jsonPath);
-						manager.applyTemplate(itemData.jsonPath);
+					if (itemData.jsonData && manager.applyTemplate) {
+						console.log("Template clicked, applying data for:", itemData.name);
+						// Pass the actual JSON data object
+						manager.applyTemplate(itemData.jsonData);
 						this.closeSidebarPanel();
 					} else {
-						console.error("Missing jsonPath or applyTemplate callback for template click.");
+						console.error("Missing jsonData or applyTemplate callback for template click.", itemData);
 					}
 				},
 				filterFn: (item, term) => {

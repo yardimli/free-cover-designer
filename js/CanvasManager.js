@@ -744,10 +744,8 @@ class CanvasManager {
 		const handleLoad = (designData) => {
 			try {
 				if (designData && designData.layers && designData.canvas) {
-					// --- MODIFIED: Use new canvas structure from JSON ---
 					let sizeConfig;
 					if (designData.canvas.frontWidth !== undefined) {
-						// New format with component widths
 						sizeConfig = {
 							totalWidth: designData.canvas.width,
 							height: designData.canvas.height,
@@ -772,15 +770,9 @@ class CanvasManager {
 						this.setCanvasSize(sizeConfig); // Set size using config
 					} else {
 						console.log("Applying template: Keeping existing canvas size and non-text layers.");
-						// Templates don't change canvas size, but we still need to update guides
-						// based on the *current* canvas config after applying template layers.
-						// Guides will be updated implicitly if setCanvasSize was called before,
-						// or we can call _updateCanvasGuides explicitly if needed, but setLayers
-						// below doesn't change the canvas dimensions.
 					}
-					// --- END MODIFIED ---
 					
-					this.layerManager.setLayers(designData.layers, isTemplate); // Use isTemplate flag directly
+					this.layerManager.setLayers(designData.layers, isTemplate);
 					
 					// --- Finalize ---
 					this.historyManager.saveState();
@@ -806,7 +798,11 @@ class CanvasManager {
 			alert(`Error reading or fetching the design file: ${statusText}`);
 		};
 		
-		if (source instanceof File) {
+		if (typeof source === 'object' && source !== null && !(source instanceof File)) {
+			console.log("Loading design from pre-parsed object.");
+			handleLoad(source);
+		}
+		else if (source instanceof File) {
 			const reader = new FileReader();
 			reader.onload = (e) => {
 				try {

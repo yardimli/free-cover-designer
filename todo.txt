@@ -18,8 +18,10 @@ move lock, delete, move up/down layers to the inspector ........................
 add vertical alignment to text layers .....................................................OK
 change moving elements to something with guides and snapping ..............................OK
 make export start with transparent background .............................................OK
+move data from json to database ...........................................................OK
+update elements to load from database and have search
 add loader spinner for when selecting cover, overlay and images
-update elements to load lazy like covers with search from json file
+create admin interface to add data
 duplicate text layer
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK

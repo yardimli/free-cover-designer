@@ -9,10 +9,10 @@
 	}
 
 // --- Configuration ---
-	$sourceDir = 'overlays-input';       // Input directory with PNGs (and subfolders)
-	$outputDir = 'overlays';   // Output directory for processed files
-	$resultsFile = 'data/overlays.json'; // Results JSON file name
-	$thumbnailWidth = 512;         // Width for the generated thumbnails
+	$sourceDir = 'shapes';       // Input directory with PNGs (and subfolders)
+	$outputDir = 'elements';   // Output directory for processed files
+	$resultsFile = 'data/elements.json'; // Results JSON file name
+	$thumbnailWidth = 256;         // Width for the generated thumbnails
 // --- End Configuration ---
 
 // --- Helper Functions ---
@@ -31,17 +31,20 @@
 	}
 
 	/**
-	 * Creates a JPG thumbnail from a source image file.
+	 * Creates a 256px wide PNG thumbnail with transparent background from a source image file.
 	 *
 	 * @param string $sourcePath Full path to the source image (PNG, JPG, GIF).
-	 * @param string $destinationPath Full path to save the JPG thumbnail.
-	 * @param int $targetWidth The desired width of the thumbnail.
-	 * @param int $quality JPG quality (0-100).
+	 * @param string $destinationPath Full path to save the PNG thumbnail.
+	 * @param int $targetWidth Fixed at 256px for this function.
+	 * @param int $quality PNG compression level (0-9, 0 = no compression).
 	 * @return bool True on success, false on failure.
 	 */
-	function create_thumbnail($sourcePath, $destinationPath, $targetWidth, $quality = 85)
+	function create_thumbnail($sourcePath, $destinationPath, $targetWidth = 256, $quality = 6)
 	{
 		try {
+			// Force 256px width
+			$targetWidth = 256;
+
 			$imageInfo = @getimagesize($sourcePath);
 			if (!$imageInfo) {
 				local_log("Failed to get image size for: " . $sourcePath);
@@ -86,16 +89,11 @@
 				return false;
 			}
 
-			// Handle transparency for PNGs - fill background with white for JPG output
-			if ($mime == 'image/png') {
-				imagealphablending($thumbnail, false);
-				imagesavealpha($thumbnail, true);
-				$transparent = imagecolorallocatealpha($thumbnail, 255, 255, 255, 127); // Fully transparent - might not be needed if filling bg
-				$white = imagecolorallocate($thumbnail, 255, 255, 255); // White background
-				imagefilledrectangle($thumbnail, 0, 0, $targetWidth, $targetHeight, $white);
-				imagealphablending($thumbnail, true); // Re-enable blending for the copy
-			}
-
+			// Set up transparency for PNG output
+			imagealphablending($thumbnail, false);
+			imagesavealpha($thumbnail, true);
+			$transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
+			imagefilledrectangle($thumbnail, 0, 0, $targetWidth, $targetHeight, $transparent);
 
 			// Resize and copy the original image to the thumbnail canvas
 			if (!imagecopyresampled(
@@ -111,10 +109,9 @@
 				return false;
 			}
 
-
-			// Save the thumbnail as JPG
-			if (!imagejpeg($thumbnail, $destinationPath, $quality)) {
-				local_log("Failed to save JPG thumbnail to: " . $destinationPath);
+			// Save the thumbnail as PNG with transparency
+			if (!imagepng($thumbnail, $destinationPath, $quality)) {
+				local_log("Failed to save PNG thumbnail to: " . $destinationPath);
 				imagedestroy($sourceImage);
 				imagedestroy($thumbnail);
 				return false;
@@ -134,7 +131,6 @@
 			return false;
 		}
 	}
-
 
 	function call_openAI_question($messages, $temperature, $max_tokens, $model = 'gpt-4o-mini')
 	{
@@ -227,7 +223,7 @@
 
 	function generateKeywordsByImageBase64($base64_image, $mime_type = 'image/jpeg')
 	{
-		$keywordsPrompt = 'Generate a list of 20 relevant keywords for this image, suitable for search or tagging. Include single words and relevant two-word phrases (e.g., "dark forest", "abstract pattern"). Focus on visual elements, style, and potential use (e.g., "overlay", "texture"). Do not include any text written on the image. Output only a comma-separated list.';
+		$keywordsPrompt = 'Generate a list of 20 relevant keywords for this image, suitable for search or tagging. Include single words and relevant two-word phrases (e.g., "dark forest", "abstract pattern"). Focus on visual elements, style, and potential use (e.g., "elements", "shapes"). Do not include any text written on the image. Output only a comma-separated list.';
 
 		// Construct the data URI
 		$data_uri = "data:" . $mime_type . ";base64," . $base64_image;
@@ -262,7 +258,7 @@
 
 // --- Main Execution Logic ---
 
-	echo "<h2>Overlay Processing Script</h2>";
+	echo "<h2>Shapes/Elements Processing Script</h2>";
 
 // 1. Ensure output directory exists
 	if (!is_dir($outputDir)) {

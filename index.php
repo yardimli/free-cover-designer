@@ -1,139 +1,104 @@
 <?php
-	// --- PHP code for scanning templates, covers, elements, overlays remains the same ---
-	$template_dir = 'text-templates';
-	$templates = [];
-	if (is_dir($template_dir)) {
-		$files = scandir($template_dir);
-		foreach ($files as $file) {
-			if (pathinfo($file, PATHINFO_EXTENSION) === 'json') {
-				$name = pathinfo($file, PATHINFO_FILENAME);
-				$json_path = $template_dir . '/' . $file;
-				$thumb_path = $template_dir . '/' . $name . '.png';
-				if (file_exists($thumb_path)) {
-					$templates[] = [
-						'name' => ucwords(str_replace(['-', '_'], ' ', $name)),
-						'jsonPath' => $json_path,
-						'thumbnailPath' => $thumb_path
-					];
-				}
-			}
-		}
-	}
-	$templates_json = json_encode($templates);
+	require_once 'db.php'; // Include database connection
 
-	$covers_json_path = 'data/covers.json';
+	// --- Fetch Covers ---
 	$covers_data = [];
-	if (file_exists($covers_json_path)) {
-		try {
-			$json_content = file_get_contents($covers_json_path);
-			$raw_covers_data = json_decode($json_content, true);
-			if (is_array($raw_covers_data)) {
-				$covers_dir = 'covers';
-				foreach ($raw_covers_data as $preview_filename => $details) {
-					$base_name = pathinfo($preview_filename, PATHINFO_FILENAME);
-					if (str_ends_with(strtolower($base_name), '-preview')) {
-						$base_name = substr($base_name, 0, -8);
-					} else {
-						$base_name = pathinfo($preview_filename, PATHINFO_FILENAME);
-					}
-					$thumbnail_path = $covers_dir . '/' . $preview_filename;
-					$target_jpg_path = $covers_dir . '/' . $base_name . '.jpg';
-					$target_png_path = $covers_dir . '/' . $base_name . '.png';
-					$target_image_path = '';
-					if (file_exists($target_jpg_path)) {
-						$target_image_path = $target_jpg_path;
-					} elseif (file_exists($target_png_path)) {
-						$target_image_path = $target_png_path;
-					}
-
-					if (file_exists($thumbnail_path) && $target_image_path) {
-						$covers_data[] = [
-							'name' => ucwords(str_replace(['-', '_'], ' ', $base_name)),
-							'thumbnailPath' => $thumbnail_path,
-							'imagePath' => $target_image_path,
-							'keywords' => isset($details['keywords']) && is_array($details['keywords']) ? $details['keywords'] : [],
-							'caption' => isset($details['caption']) ? $details['caption'] : ''
-						];
-					}
-				}
-				usort($covers_data, function ($a, $b) {
-					return strcmp($a['name'], $b['name']);
-				});
-			} else {
-				error_log("Error: covers.json did not decode into an array.");
-			}
-		} catch (Exception $e) {
-			error_log("Error reading or parsing covers.json: " . $e->getMessage());
+	$sql_covers = "SELECT id, name, thumbnail_path, image_path, caption, keywords, categories FROM covers ORDER BY name ASC";
+	if ($result = $mysqlDBConn->query($sql_covers)) {
+		while ($row = $result->fetch_assoc()) {
+			// Adjust keys for JavaScript and decode JSON fields
+			$covers_data[] = [
+				'id' => $row['id'],
+				'name' => $row['name'],
+				'thumbnailPath' => $row['thumbnail_path'], // JS expects camelCase
+				'imagePath' => $row['image_path'],       // JS expects camelCase
+				'caption' => $row['caption'],
+				'keywords' => $row['keywords'] ? json_decode($row['keywords'], true) : [], // Decode JSON string to array
+				'categories' => $row['categories'] ? json_decode($row['categories'], true) : [] // Decode JSON string to array
+			];
 		}
+		$result->free();
 	} else {
-		error_log("Error: covers.json not found at path: " . $covers_json_path);
+		error_log("Error fetching covers from database: " . $mysqlDBConn->error);
 	}
 	$covers_json = json_encode($covers_data);
 
-	$shapes_dir = 'shapes';
-	$elements_data = [];
-	if (is_dir($shapes_dir)) {
-		$png_files = glob($shapes_dir . '/*.png');
-		if ($png_files === false) {
-			error_log("Error reading shapes directory: " . $shapes_dir);
-		} else {
-			foreach ($png_files as $file_path) {
-				$filename = basename($file_path);
-				$name = pathinfo($filename, PATHINFO_FILENAME);
-				$elements_data[] = ['name' => ucwords(str_replace(['-', '_'], ' ', $name)), 'image' => $file_path];
-			}
-			usort($elements_data, function ($a, $b) {
-				return strcmp($a['name'], $b['name']);
-			});
+
+	// --- Fetch Overlays ---
+	$overlays_data = [];
+	$sql_overlays = "SELECT id, name, thumbnail_path, image_path, keywords FROM overlays ORDER BY name ASC";
+	if ($result = $mysqlDBConn->query($sql_overlays)) {
+		while ($row = $result->fetch_assoc()) {
+			// Adjust keys for JavaScript and decode JSON fields
+			$overlays_data[] = [
+				'id' => $row['id'],
+				'name' => $row['name'],
+				'thumbnailPath' => $row['thumbnail_path'], // JS expects camelCase
+				'imagePath' => $row['image_path'],       // JS expects camelCase
+				'keywords' => $row['keywords'] ? json_decode($row['keywords'], true) : [] // Decode JSON string to array
+			];
 		}
+		$result->free();
 	} else {
-		error_log("Shapes directory not found: " . $shapes_dir);
+		error_log("Error fetching overlays from database: " . $mysqlDBConn->error);
+	}
+	$overlays_json = json_encode($overlays_data);
+
+
+	// --- Fetch Templates ---
+	$templates_data = [];
+	// Fetch the actual JSON content now
+	$sql_templates = "SELECT id, name, thumbnail_path, json_content FROM templates ORDER BY name ASC";
+	if ($result = $mysqlDBConn->query($sql_templates)) {
+		while ($row = $result->fetch_assoc()) {
+			// Decode JSON content here to pass as an object to JS
+			$jsonData = $row['json_content'] ? json_decode($row['json_content']) : null; // Decode to PHP object/array
+			if ($jsonData === null && json_last_error() !== JSON_ERROR_NONE) {
+				error_log("Error decoding JSON for template ID {$row['id']}: " . json_last_error_msg());
+				continue; // Skip this template if JSON is invalid
+			}
+
+			$templates_data[] = [
+				'id' => $row['id'],
+				'name' => $row['name'],
+				'thumbnailPath' => $row['thumbnail_path'], // JS expects camelCase
+				'jsonData' => $jsonData // Pass the decoded JSON object/array directly
+				// 'jsonPath' is no longer needed here as we pass the content
+			];
+		}
+		$result->free();
+	} else {
+		error_log("Error fetching templates from database: " . $mysqlDBConn->error);
+	}
+	$templates_json = json_encode($templates_data);
+
+
+	// --- Fetch Elements ---
+	$elements_data = [];
+	$sql_overlays = "SELECT id, name, thumbnail_path, image_path, keywords FROM elements ORDER BY name ASC";
+	if ($result = $mysqlDBConn->query($sql_overlays)) {
+		while ($row = $result->fetch_assoc()) {
+			// Adjust keys for JavaScript and decode JSON fields
+			$elements_data[] = [
+				'id' => $row['id'],
+				'name' => $row['name'],
+				'thumbnailPath' => $row['thumbnail_path'], // JS expects camelCase
+				'imagePath' => $row['image_path'],       // JS expects camelCase
+				'keywords' => $row['keywords'] ? json_decode($row['keywords'], true) : [] // Decode JSON string to array
+			];
+		}
+		$result->free();
+	} else {
+		error_log("Error fetching elements from database: " . $mysqlDBConn->error);
 	}
 	$elements_json = json_encode($elements_data);
 
-	$overlays_json_path = 'data/overlays.json';
-	$overlays_data = [];
-	if (file_exists($overlays_json_path)) {
-		try {
-			$json_content = file_get_contents($overlays_json_path);
-			$raw_overlays_data = json_decode($json_content, true);
-			if (is_array($raw_overlays_data)) {
-				$overlays_dir = 'new-overlays';
-				foreach ($raw_overlays_data as $preview_filename => $details) {
-					$base_name = pathinfo($preview_filename, PATHINFO_FILENAME);
-					if (str_ends_with(strtolower($base_name), '-preview')) {
-						$base_name = substr($base_name, 0, -8);
-					} else {
-						$base_name = pathinfo($preview_filename, PATHINFO_FILENAME);
-					}
-					$thumbnail_path = $overlays_dir . '/' . $preview_filename;
-					$target_png_path = $overlays_dir . '/' . $base_name . '.png';
-
-					if (file_exists($thumbnail_path) && file_exists($target_png_path)) {
-						$overlays_data[] = [
-							'name' => ucwords(str_replace(['-', '_'], ' ', $base_name)),
-							'thumbnailPath' => $thumbnail_path,
-							'imagePath' => $target_png_path,
-							'keywords' => isset($details['keywords']) && is_array($details['keywords']) ? $details['keywords'] : [],
-						];
-					} else {
-						if (!file_exists($thumbnail_path)) error_log("Overlay thumbnail missing: " . $thumbnail_path);
-						if (!file_exists($target_png_path)) error_log("Overlay target image missing: " . $target_png_path);
-					}
-				}
-				usort($overlays_data, function ($a, $b) {
-					return strcmp($a['name'], $b['name']);
-				});
-			} else {
-				error_log("Error: overlays.json did not decode into an array.");
-			}
-		} catch (Exception $e) {
-			error_log("Error reading or parsing overlays.json: " . $e->getMessage());
-		}
-	} else {
-		error_log("Error: overlays.json not found at path: " . $overlays_json_path);
+	// --- Close DB Connection ---
+	// It's good practice to close, though PHP often handles this at script end
+	if (isset($mysqlDBConn)) {
+		$mysqlDBConn->close();
 	}
-	$overlays_json = json_encode($overlays_data);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">

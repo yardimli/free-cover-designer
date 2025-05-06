@@ -54,8 +54,7 @@ $(document).ready(function () {
 		overlaysListSelector: '#overlayList', // Corrected selector name
 		overlaysSearchSelector: '#overlaySearch', // Corrected selector name
 		sidebarPanelsContainerSelector: '#sidebar-panels-container',
-		applyTemplate: (jsonPath) => {
-			// ... (apply template logic - remove text layers, load design) ...
+		applyTemplate: (jsonData) => {
 			console.log("Applying template via click, removing existing text layers...");
 			const existingLayers = layerManager.getLayers();
 			const textLayerIdsToDelete = existingLayers
@@ -63,12 +62,12 @@ $(document).ready(function () {
 				.map(layer => layer.id);
 			
 			if (textLayerIdsToDelete.length > 0) {
-				textLayerIdsToDelete.forEach(id => layerManager.deleteLayer(id, false)); // Don't save history per deletion
+				textLayerIdsToDelete.forEach(id => layerManager.deleteLayer(id, false));
 				console.log(`Removed ${textLayerIdsToDelete.length} text layers.`);
 			} else {
 				console.log("No existing text layers found to remove.");
 			}
-			canvasManager.loadDesign(jsonPath, true); // Load as template
+			canvasManager.loadDesign(jsonData, true); // Load as template
 		},
 		addLayer: (type, props) => layerManager.addLayer(type, props),
 		saveState: () => historyManager.saveState(),
