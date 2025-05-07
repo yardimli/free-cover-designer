@@ -4,16 +4,13 @@ body {
     padding-top: 70px; /* Account for fixed navbar */
     padding-bottom: 50px; /* Add space at bottom */
 }
-
 .admin-container {
     margin-top: 20px;
 }
-
 .nav-tabs .nav-link.active {
     background-color: #f8f9fa;
     border-bottom-color: #f8f9fa;
 }
-
 .tab-content {
     border: 1px solid #dee2e6;
     border-top: none;
@@ -29,11 +26,22 @@ body {
     border-radius: 5px;
     margin-bottom: 30px; /* Increased margin */
 }
-.upload-form h4 { margin-bottom: 15px; }
-.upload-form .form-label { font-weight: bold; }
+.upload-form h4 {
+    margin-bottom: 15px;
+}
+.upload-form .form-label {
+    font-weight: bold;
+}
 
 /* Search Forms */
-.search-form { margin-bottom: 15px; }
+.search-form {
+    margin-bottom: 15px;
+}
+/* Add some spacing for the filter dropdown if it's in the same row as search */
+.search-form .cover-type-filter {
+    /* margin-top: 0.5rem; /* Or use Bootstrap's g-3 on the row for spacing */
+}
+
 
 /* Item Tables */
 .item-table {

@@ -5,8 +5,15 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Admin - Cover Designer</title>
 	<link href="vendors/bootstrap5.3.5/css/bootstrap.min.css" rel="stylesheet">
-	<link rel="stylesheet" href="vendors/fontawesome-free-6.7.2/css/all.min.css"> <!-- Ensure correct path -->
+	<link rel="stylesheet" href="vendors/fontawesome-free-6.7.2/css/all.min.css">
 	<link rel="stylesheet" href="css/admin.css">
+
+
+	<link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png">
+	<link rel="manifest" href="images/site.webmanifest">
+
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
@@ -44,12 +51,19 @@
 				<form id="uploadCoverForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="covers">
 					<div class="mb-3">
-						<label for="coverName" class="form-label">Name (will be derived from filename if files are selected)</label>
-						<input type="text" class="form-control" id="coverName" name="name" required>
+						<label for="coverName" class="form-label">Name (will be derived from filename if left blank)</label>
+						<input type="text" class="form-control" id="coverName" name="name">
 					</div>
 					<div class="mb-3">
 						<label for="coverImage" class="form-label">Cover Image(s) (PNG, JPG, GIF)</label>
 						<input type="file" class="form-control" id="coverImage" name="image_file" accept="image/png, image/jpeg, image/gif" required multiple>
+					</div>
+					<div class="mb-3">
+						<label for="coverCoverType" class="form-label">Cover Type</label>
+						<select class="form-select admin-cover-type-dropdown" id="coverCoverType" name="cover_type_id">
+							<option value="">Select Cover Type</option>
+							<!-- Populated by JS -->
+						</select>
 					</div>
 					<div class="mb-3">
 						<label for="coverCaption" class="form-label">Caption (Optional, applies to all selected files)</label>
@@ -66,12 +80,21 @@
 					<button type="submit" class="btn btn-primary">Upload Cover(s)</button>
 				</form>
 			</div>
+
 			<!-- Existing Items -->
 			<h4>Existing Covers</h4>
-			<form class="mb-3 search-form" data-type="covers">
-				<div class="input-group">
-					<input type="search" class="form-control search-input" placeholder="Search Covers (Name, Caption, Keywords, Categories)..." aria-label="Search Covers">
-					<button class="btn btn-outline-secondary" type="submit">Search</button>
+			<form class="mb-3 search-form row g-3 align-items-center" data-type="covers">
+				<div class="col-md-9">
+					<div class="input-group">
+						<input type="search" class="form-control search-input" placeholder="Search Covers (Name, Caption, Keywords, Categories)..." aria-label="Search Covers">
+						<button class="btn btn-outline-secondary" type="submit">Search</button>
+					</div>
+				</div>
+				<div class="col-md-3">
+					<select class="form-select cover-type-filter admin-cover-type-dropdown" data-type="covers" aria-label="Filter by Cover Type">
+						<option value="">All Cover Types</option>
+						<!-- Populated by JS -->
+					</select>
 				</div>
 			</form>
 			<div class="table-responsive">
@@ -80,6 +103,7 @@
 					<tr>
 						<th>Preview</th>
 						<th>Name</th>
+						<th>Cover Type</th>
 						<th>Caption</th>
 						<th>Keywords</th>
 						<th>Categories</th>
@@ -102,8 +126,8 @@
 				<form id="uploadTemplateForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="templates">
 					<div class="mb-3">
-						<label for="templateName" class="form-label">Name (will be derived from JSON filename if files are selected)</label>
-						<input type="text" class="form-control" id="templateName" name="name" required>
+						<label for="templateName" class="form-label">Name (will be derived from JSON filename if files if left blank)</label>
+						<input type="text" class="form-control" id="templateName" name="name">
 					</div>
 					<div class="mb-3">
 						<label for="templateJson" class="form-label">Template JSON File(s) (.json)</label>
@@ -115,6 +139,13 @@
 						<div class="form-text">Select the same number of thumbnail files as JSON files, in the same order.</div>
 					</div>
 					<div class="mb-3">
+						<label for="templateCoverType" class="form-label">Cover Type</label>
+						<select class="form-select admin-cover-type-dropdown" id="templateCoverType" name="cover_type_id">
+							<option value="">Select Cover Type</option>
+							<!-- Populated by JS -->
+						</select>
+					</div>
+					<div class="mb-3">
 						<label for="templateKeywords" class="form-label">Keywords (comma-separated, optional, applies to all selected files)</label>
 						<input type="text" class="form-control" id="templateKeywords" name="keywords">
 					</div>
@@ -122,10 +153,18 @@
 				</form>
 			</div>
 			<h4>Existing Templates</h4>
-			<form class="mb-3 search-form" data-type="templates">
-				<div class="input-group">
-					<input type="search" class="form-control search-input" placeholder="Search Templates (Name, Keywords)..." aria-label="Search Templates">
-					<button class="btn btn-outline-secondary" type="submit">Search</button>
+			<form class="mb-3 search-form row g-3 align-items-center" data-type="templates">
+				<div class="col-md-9">
+					<div class="input-group">
+						<input type="search" class="form-control search-input" placeholder="Search Templates (Name, Keywords)..." aria-label="Search Templates">
+						<button class="btn btn-outline-secondary" type="submit">Search</button>
+					</div>
+				</div>
+				<div class="col-md-3">
+					<select class="form-select cover-type-filter admin-cover-type-dropdown" data-type="templates" aria-label="Filter by Cover Type">
+						<option value="">All Cover Types</option>
+						<!-- Populated by JS -->
+					</select>
 				</div>
 			</form>
 			<div class="table-responsive">
@@ -134,8 +173,9 @@
 					<tr>
 						<th>Preview</th>
 						<th>Name</th>
+						<th>Cover Type</th>
 						<th>Keywords</th>
-						<th>Actions</th> <!-- Actions column will now hold 4 buttons for templates -->
+						<th>Actions</th>
 					</tr>
 					</thead>
 					<tbody></tbody>
@@ -154,8 +194,8 @@
 				<form id="uploadElementForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="elements">
 					<div class="mb-3">
-						<label for="elementName" class="form-label">Name (will be derived from filename if files are selected)</label>
-						<input type="text" class="form-control" id="elementName" name="name" required>
+						<label for="elementName" class="form-label">Name (will be derived from filename if left blank)</label>
+						<input type="text" class="form-control" id="elementName" name="name">
 					</div>
 					<div class="mb-3">
 						<label for="elementImage" class="form-label">Element Image(s) (PNG, JPG, GIF)</label>
@@ -201,8 +241,8 @@
 				<form id="uploadOverlayForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="overlays">
 					<div class="mb-3">
-						<label for="overlayName" class="form-label">Name (will be derived from filename if files are selected)</label>
-						<input type="text" class="form-control" id="overlayName" name="name" required>
+						<label for="overlayName" class="form-label">Name (will be derived from filename if left blank)</label>
+						<input type="text" class="form-control" id="overlayName" name="name">
 					</div>
 					<div class="mb-3">
 						<label for="overlayImage" class="form-label">Overlay Image(s) (PNG, JPG, GIF)</label>
@@ -254,10 +294,21 @@
 				<div class="modal-body">
 					<input type="hidden" name="id" id="editItemId">
 					<input type="hidden" name="item_type" id="editItemType">
+
 					<div class="mb-3">
 						<label for="editItemName" class="form-label">Name</label>
 						<input type="text" class="form-control" id="editItemName" name="name" required>
 					</div>
+
+					<!-- Cover Type Dropdown (for Covers and Templates) -->
+					<div class="mb-3 edit-field edit-field-covers edit-field-templates">
+						<label for="editItemCoverType" class="form-label">Cover Type</label>
+						<select class="form-select admin-cover-type-dropdown" id="editItemCoverType" name="cover_type_id">
+							<option value="">Select Cover Type</option>
+							<!-- Populated by JS -->
+						</select>
+					</div>
+
 					<!-- Fields specific to Covers -->
 					<div class="mb-3 edit-field edit-field-covers">
 						<label for="editItemCaption" class="form-label">Caption</label>
@@ -267,25 +318,29 @@
 						<label for="editItemCategories" class="form-label">Categories (comma-separated)</label>
 						<input type="text" class="form-control" id="editItemCategories" name="categories">
 					</div>
+
 					<!-- Fields specific to Covers, Elements, Overlays, AND TEMPLATES (for keywords) -->
 					<div class="mb-3 edit-field edit-field-covers edit-field-elements edit-field-overlays edit-field-templates">
 						<label for="editItemKeywords" class="form-label">Keywords (comma-separated)</label>
 						<input type="text" class="form-control" id="editItemKeywords" name="keywords">
 					</div>
+
 					<!-- Image Upload (Covers, Elements, Overlays) -->
 					<div class="mb-3 edit-field edit-field-covers edit-field-elements edit-field-overlays">
 						<label for="editItemImageFile" class="form-label">Replace Image (Optional)</label>
 						<input type="file" class="form-control" id="editItemImageFile" name="image_file" accept="image/png, image/jpeg, image/gif">
 						<div class="form-text">Leave empty to keep the current image. Uploading a new image will replace the original and regenerate the thumbnail.</div>
-						<div id="editCurrentImagePreview" class="mt-2" style="max-height: 120px; overflow: hidden;"><!-- Content via JS --></div>
+						<div id="editCurrentImagePreview" class="mt-2" style="max-height: 180px; overflow: hidden;"><!-- Content via JS --></div>
 					</div>
+
 					<!-- Thumbnail Upload (Templates) -->
 					<div class="mb-3 edit-field edit-field-templates">
 						<label for="editItemThumbnailFile" class="form-label">Replace Thumbnail (Optional)</label>
 						<input type="file" class="form-control" id="editItemThumbnailFile" name="thumbnail_file" accept="image/png, image/jpeg, image/gif">
 						<div class="form-text">Leave empty to keep the current thumbnail.</div>
-						<div id="editCurrentThumbnailPreview" class="mt-2" style="max-height: 120px; overflow: hidden;"><!-- Content via JS --></div>
+						<div id="editCurrentThumbnailPreview" class="mt-2" style="max-height: 180px; overflow: hidden;"><!-- Content via JS --></div>
 					</div>
+
 					<!-- JSON Upload (Templates) -->
 					<div class="mb-3 edit-field edit-field-templates">
 						<label for="editItemJsonFile" class="form-label">Replace JSON File (Optional)</label>
@@ -314,11 +369,7 @@
 				</div>
 				<div class="modal-body">
 					<input type="hidden" id="aiOriginalTemplateId" name="original_template_id">
-					<!-- Storing full JSON in a hidden input might be problematic if it's very large.
-							 It's better to re-fetch or pass only ID and let backend re-fetch.
-							 For this implementation, we'll fetch it on modal open and pass it. -->
 					<input type="hidden" id="aiOriginalTemplateJsonContent" name="original_json_content">
-
 					<div class="mb-3">
 						<p><strong>Original Template (for reference):</strong></p>
 						<pre id="aiOriginalTemplatePreview" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; white-space: pre-wrap; word-break: break-all;">Loading original template...</pre>
@@ -338,8 +389,8 @@
 	</div>
 </div>
 
-<script src="vendors/jquery-ui-1.14.1/external/jquery/jquery.js"></script> <!-- Ensure correct path -->
-<script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script> <!-- Ensure correct path -->
+<script src="vendors/jquery-ui-1.14.1/external/jquery/jquery.js"></script>
+<script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

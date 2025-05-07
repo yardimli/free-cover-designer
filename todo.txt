@@ -16,6 +16,7 @@ find transparent png images for elements, load them from folder instead of json 
 add layer name to inspector ...............................................................OK
 move lock, delete, move up/down layers to the inspector ...................................OK
 add vertical alignment to text layers .....................................................OK
+add magnetic lines when moving elements and snap to grid ..................................OK
 change moving elements to something with guides and snapping ..............................OK
 make export start with transparent background .............................................OK
 move data from json to database ...........................................................OK
@@ -24,15 +25,17 @@ add loader spinner for when selecting cover, overlay and images ................
 create admin interface to add data ........................................................OK
 add multiple items at once in admin .......................................................OK
 use ai to create template json files in admin .............................................OK
-in admin multiple template dimensions, add template type (book, album, spine, back)
-in admin multiple cover types (front, back, spine, album)
-in ui panels use css rules for width and height for template and cover types
+in admin add table for template and cover types ...........................................OK
+add types for template and cover types: book, album, spine, back ..........................OK
+in ui panels use css rules for width and height for template and cover types ..............OK
 in ui snap back to left, cover to right and spine to center when adding.
-in ui add dropdown for type in search template and cover panels
+in ui add dropdown for type in search template and cover panels ...........................OK
 duplicate text layer
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK
 add dark/light mode to ui
 make responsive ui
-add magnetic lines when moving elements and snap to grid
-fix rulers to start from canvas position on top and left
+
+v0.2
+add selecting multiple elements and move them together (https://github.com/daybrush/selecto)
+group elements

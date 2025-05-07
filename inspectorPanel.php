@@ -41,24 +41,24 @@
 			<!-- Opacity -->
 			<div class="mb-2">
 				<label for="inspector-opacity" class="form-label">Opacity</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-opacity" min="0" max="1" step="0.01" value="1">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-opacity" min="0" max="1" step="0.01" value="1">
 					<span class="input-group-text opacity-label" id="inspector-opacity-value">100%</span>
 				</div>
 			</div>
 			<!-- Rotation -->
 			<div class="mb-2">
 				<label for="inspector-rotation" class="form-label">Rotation</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-rotation" min="0" max="360" step="1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-rotation" min="0" max="360" step="1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-rotation-value">0°</span>
 				</div>
 			</div>
 			<!-- Scale -->
 			<div class="mb-2">
 				<label for="inspector-scale" class="form-label">Scale</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-scale" min="1" max="500" step="1" value="100">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-scale" min="1" max="500" step="1" value="100">
 					<span class="input-group-text opacity-label" id="inspector-scale-value">100%</span>
 				</div>
 			</div>
@@ -135,15 +135,15 @@
 		<div class="section-content">
 			<div class="color-input-group mb-2">
 				<input type="color" class="form-control form-control-color me-2" id="inspector-fill-color" value="#000000" title="Fill Color">
-				<div class="input-group input-group-sm flex-grow-1">
+				<div class="d-flex align-items-center">
 					<span class="input-group-text">#</span>
 					<input type="text" class="form-control" id="inspector-fill-hex" maxlength="6" placeholder="000000">
 				</div>
 			</div>
 			<!-- Opacity for Fill (Handled by RGBA now, keep slider for potential future use or remove) -->
 			<label for="inspector-fill-opacity" class="form-label visually-hidden">Fill Opacity</label>
-			<div class="input-group input-group-sm visually-hidden">
-				<input type="range" class="form-range" id="inspector-fill-opacity" min="0" max="1" step="0.01" value="1">
+			<div class="d-flex align-items-center visually-hidden">
+				<input type="range" class="form-range flex-grow-1 me-2" id="inspector-fill-opacity" min="0" max="1" step="0.01" value="1">
 				<span class="input-group-text opacity-label" id="inspector-fill-opacity-value">100%</span>
 			</div>
 		</div>
@@ -156,22 +156,22 @@
 			<!-- Border Color -->
 			<div class="color-input-group mb-2">
 				<input type="color" class="form-control form-control-color me-2" id="inspector-border-color" value="#000000" title="Border Color">
-				<div class="input-group input-group-sm flex-grow-1">
+				<div class="d-flex align-items-center">
 					<span class="input-group-text">#</span>
 					<input type="text" class="form-control" id="inspector-border-hex" maxlength="6" placeholder="000000">
 				</div>
 			</div>
 			<!-- Border Opacity (Handled by RGBA now) -->
 			<label for="inspector-border-opacity" class="form-label visually-hidden">Border Opacity</label>
-			<div class="input-group input-group-sm mb-2 visually-hidden">
-				<input type="range" class="form-range" id="inspector-border-opacity" min="0" max="1" step="0.01" value="1">
+			<div class="d-flex align-items-center mb-2 visually-hidden">
+				<input type="range" class="form-range flex-grow-1 me-2" id="inspector-border-opacity" min="0" max="1" step="0.01" value="1">
 				<span class="input-group-text opacity-label" id="inspector-border-opacity-value">100%</span>
 			</div>
 			<!-- Border Weight -->
 			<div class="mb-2">
 				<label for="inspector-border-weight" class="form-label">Weight</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-border-weight" min="0" max="50" step="0.5" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-border-weight" min="0" max="50" step="0.5" value="0">
 					<span class="input-group-text opacity-label" id="inspector-border-weight-value">0</span>
 				</div>
 			</div>
@@ -191,38 +191,38 @@
 			<!-- Shading Color -->
 			<div class="color-input-group mb-2">
 				<input type="color" class="form-control form-control-color me-2" id="inspector-shading-color" value="#000000" title="Shadow Color">
-				<div class="input-group input-group-sm flex-grow-1">
+				<div class="d-flex align-items-center">
 					<span class="input-group-text">#</span>
 					<input type="text" class="form-control" id="inspector-shading-hex" maxlength="6" placeholder="000000">
 				</div>
 			</div>
 			<!-- Shading Opacity (Handled by RGBA now) -->
 			<label for="inspector-shading-opacity" class="form-label visually-hidden">Shadow Opacity</label>
-			<div class="input-group input-group-sm mb-2 visually-hidden">
-				<input type="range" class="form-range" id="inspector-shading-opacity" min="0" max="1" step="0.01" value="0.5">
+			<div class="d-flex align-items-center mb-2 visually-hidden">
+				<input type="range" class="form-range flex-grow-1 me-2" id="inspector-shading-opacity" min="0" max="1" step="0.01" value="0.5">
 				<span class="input-group-text opacity-label" id="inspector-shading-opacity-value">50%</span>
 			</div>
 			<!-- Shading Blur -->
 			<div class="mb-2">
 				<label for="inspector-shading-blur" class="form-label">Blur</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-shading-blur" min="0" max="100" step="1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-shading-blur" min="0" max="100" step="1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-shading-blur-value">0</span>
 				</div>
 			</div>
 			<!-- Shading Offset -->
 			<div class="mb-2">
 				<label for="inspector-shading-offset" class="form-label">Offset</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-shading-offset" min="0" max="100" step="1" value="5">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-shading-offset" min="0" max="100" step="1" value="5">
 					<span class="input-group-text opacity-label" id="inspector-shading-offset-value">5</span>
 				</div>
 			</div>
 			<!-- Shading Angle -->
 			<div class="mb-2">
 				<label for="inspector-shading-angle" class="form-label">Angle</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-shading-angle" min="-180" max="180" step="1" value="45">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-shading-angle" min="-180" max="180" step="1" value="45">
 					<span class="input-group-text opacity-label" id="inspector-shading-angle-value">45</span>
 				</div>
 			</div>
@@ -242,30 +242,30 @@
 			<!-- Background Color -->
 			<div class="color-input-group mb-2">
 				<input type="color" class="form-control form-control-color me-2" id="inspector-background-color" value="#FFFFFF" title="Background Color">
-				<div class="input-group input-group-sm flex-grow-1">
+				<div class="d-flex align-items-center">
 					<span class="input-group-text">#</span>
 					<input type="text" class="form-control" id="inspector-background-hex" maxlength="6" placeholder="FFFFFF">
 				</div>
 			</div>
 			<!-- Background Opacity -->
 			<label for="inspector-background-opacity" class="form-label">Background Opacity</label>
-			<div class="input-group input-group-sm mb-2">
-				<input type="range" class="form-range" id="inspector-background-opacity" min="0" max="1" step="0.01" value="1">
+			<div class="d-flex align-items-center mb-2">
+				<input type="range" class="form-range flex-grow-1 me-2" id="inspector-background-opacity" min="0" max="1" step="0.01" value="1">
 				<span class="input-group-text opacity-label" id="inspector-background-opacity-value">100%</span>
 			</div>
 			<!-- Background Padding -->
 			<div class="mb-2">
 				<label for="inspector-background-padding" class="form-label">Padding</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-background-padding" min="0" max="200" step="1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-background-padding" min="0" max="200" step="1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-background-padding-value">0</span>
 				</div>
 			</div>
 			<!-- Background Corner Radius -->
 			<div class="mb-2">
 				<label for="inspector-background-radius" class="form-label">Corner Radius</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-background-radius" min="0" max="100" step="0.5" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-background-radius" min="0" max="100" step="0.5" value="0">
 					<span class="input-group-text opacity-label" id="inspector-background-radius-value">0</span>
 				</div>
 			</div>
@@ -279,56 +279,56 @@
 			<!-- Brightness -->
 			<div class="mb-2">
 				<label for="inspector-filter-brightness" class="form-label">Brightness</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-brightness" min="0" max="200" step="1" value="100">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-brightness" min="0" max="200" step="1" value="100">
 					<span class="input-group-text opacity-label" id="inspector-filter-brightness-value">100</span>
 				</div>
 			</div>
 			<!-- Contrast -->
 			<div class="mb-2">
 				<label for="inspector-filter-contrast" class="form-label">Contrast</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-contrast" min="0" max="200" step="1" value="100">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-contrast" min="0" max="200" step="1" value="100">
 					<span class="input-group-text opacity-label" id="inspector-filter-contrast-value">100</span>
 				</div>
 			</div>
 			<!-- Saturation -->
 			<div class="mb-2">
 				<label for="inspector-filter-saturation" class="form-label">Saturation</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-saturation" min="0" max="200" step="1" value="100">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-saturation" min="0" max="200" step="1" value="100">
 					<span class="input-group-text opacity-label" id="inspector-filter-saturation-value">100</span>
 				</div>
 			</div>
 			<!-- Grayscale -->
 			<div class="mb-2">
 				<label for="inspector-filter-grayscale" class="form-label">Grayscale</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-grayscale" min="0" max="100" step="1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-grayscale" min="0" max="100" step="1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-filter-grayscale-value">0</span>
 				</div>
 			</div>
 			<!-- Sepia -->
 			<div class="mb-2">
 				<label for="inspector-filter-sepia" class="form-label">Sepia</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-sepia" min="0" max="100" step="1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-sepia" min="0" max="100" step="1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-filter-sepia-value">0</span>
 				</div>
 			</div>
 			<!-- Hue Rotate -->
 			<div class="mb-2">
 				<label for="inspector-filter-hue-rotate" class="form-label">Hue Rotate</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-hue-rotate" min="0" max="360" step="1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-hue-rotate" min="0" max="360" step="1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-filter-hue-rotate-value">0</span>
 				</div>
 			</div>
 			<!-- Blur -->
 			<div class="mb-2">
 				<label for="inspector-filter-blur" class="form-label">Blur</label>
-				<div class="input-group input-group-sm">
-					<input type="range" class="form-range" id="inspector-filter-blur" min="0" max="20" step="0.1" value="0">
+				<div class="d-flex align-items-center">
+					<input type="range" class="form-range flex-grow-1 me-2" id="inspector-filter-blur" min="0" max="20" step="0.1" value="0">
 					<span class="input-group-text opacity-label" id="inspector-filter-blur-value">0.0</span>
 				</div>
 			</div>

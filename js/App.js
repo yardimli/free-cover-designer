@@ -13,7 +13,6 @@ $(document).ready(function () {
 	const $sidebarPanelsContainer = $('#sidebar-panels-container');
 	const $sidebarPanels = $('.sidebar-panel');
 	const $sidebarNavLinks = $('.sidebar-nav .nav-link[data-panel-target]');
-	const $closePanelBtns = $('.close-panel-btn');
 	
 	// --- Instantiate Managers ---
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
@@ -153,12 +152,9 @@ $(document).ready(function () {
 			}
 		});
 		
-		$closePanelBtns.on('click', function () {
+		$canvasArea.on('mousedown', function(e) {
 			closeSidebarPanel();
 		});
-		
-		// REMOVED: Canvas click listener that closed left panels.
-		// $canvasArea.on('mousedown', function(e) { ... });
 	}
 	
 	function openSidebarPanel(panelId) {

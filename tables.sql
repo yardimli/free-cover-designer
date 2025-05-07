@@ -1,12 +1,13 @@
 -- Table for Covers
 CREATE TABLE `covers` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `cover_type_id` INT(11) NULL DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
   `thumbnail_path` VARCHAR(512) NOT NULL,
   `image_path` VARCHAR(512) NOT NULL,
   `caption` TEXT NULL DEFAULT NULL,
-  `keywords` JSON NULL DEFAULT NULL, -- Use JSON type if MySQL 5.7+
-  `categories` JSON NULL DEFAULT NULL, -- Use JSON type if MySQL 5.7+
+  `keywords` JSON NULL DEFAULT NULL,
+  `categories` JSON NULL DEFAULT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -19,7 +20,7 @@ CREATE TABLE `overlays` (
   `name` VARCHAR(255) NOT NULL,
   `thumbnail_path` VARCHAR(512) NOT NULL,
   `image_path` VARCHAR(512) NOT NULL,
-  `keywords` JSON NULL DEFAULT NULL, -- Use JSON type if MySQL 5.7+
+  `keywords` JSON NULL DEFAULT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -29,11 +30,12 @@ CREATE TABLE `overlays` (
 -- Table for Templates
 CREATE TABLE `templates` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `cover_type_id` INT(11) NULL DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
-  `keywords` JSON NULL DEFAULT NULL, -- Use JSON type if MySQL 5.7+
+  `keywords` JSON NULL DEFAULT NULL,
   `thumbnail_path` VARCHAR(512) NOT NULL,
-  `json_path` VARCHAR(512) NULL DEFAULT NULL, -- Store original path for reference if needed
-  `json_content` JSON NOT NULL, -- Store the actual JSON data. Use LONGTEXT if JSON type not available/preferred.
+  `json_path` VARCHAR(512) NULL DEFAULT NULL,
+  `json_content` JSON NOT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -46,9 +48,23 @@ CREATE TABLE `elements` (
   `name` VARCHAR(255) NOT NULL,
   `thumbnail_path` VARCHAR(512) NOT NULL,
   `image_path` VARCHAR(512) NOT NULL,
-  `keywords` JSON NULL DEFAULT NULL, -- Use JSON type if MySQL 5.7+
+  `keywords` JSON NULL DEFAULT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   INDEX `idx_elements_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `cover_types` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type_name` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `type_name_unique` (`type_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Populate initial cover types
+INSERT INTO `cover_types` (`type_name`) VALUES
+('Book Cover'),
+('Spine'),
+('Back Cover'),
+('Album Cover');

@@ -2,7 +2,8 @@
 $(document).ready(function() {
 	const API_URL = 'admin_actions.php';
 	const ITEMS_PER_PAGE = 30; // Should match ADMIN_ITEMS_PER_PAGE in PHP config if possible
-	let currentItemStates = {}; // Store page and search query for each type
+	let currentItemStates = {}; // Store page, search query, and cover type filter for each type
+	let allCoverTypes = []; // Store fetched cover types
 	
 	// --- Utility Functions ---
 	function showAlert(message, type = 'success') {
@@ -21,11 +22,11 @@ $(document).ready(function() {
 	function escapeHtml(unsafe) {
 		if (unsafe === null || typeof unsafe === 'undefined') return '';
 		return String(unsafe)
-			.replace(/&/g, "&") // Changed & to &
-			.replace(/</g, "<")  // Changed < to <
-			.replace(/>/g, ">")  // Changed > to >
-			.replace(/"/g, "\"") // Changed " to "
-			.replace(/'/g, "'"); // Changed ' to '
+			.replace(/&/g, "&")
+			.replace(/</g, "<")
+			.replace(/>/g, ">")
+			.replace(/"/g, "\"")
+			.replace(/'/g, "'");
 	}
 	
 	function capitalizeFirstLetter(string) {
@@ -35,11 +36,11 @@ $(document).ready(function() {
 	function deriveNameFromFilename(filename) {
 		let name = filename;
 		const lastDot = filename.lastIndexOf('.');
-		if (lastDot > 0) { // Ensure dot is not the first character and exists
+		if (lastDot > 0) {
 			name = filename.substring(0, lastDot);
 		}
 		name = name.replace(/[-_]/g, ' ');
-		name = name.replace(/\s+/g, ' ').trim(); // Replace multiple spaces with single and trim
+		name = name.replace(/\s+/g, ' ').trim();
 		return capitalizeFirstLetter(name);
 	}
 	
@@ -49,33 +50,77 @@ $(document).ready(function() {
 		return `<div class="keywords-list">${escapedKeywords.filter(k => k).map(k => `<span>${k}</span>`).join('')}</div>`;
 	}
 	
-	// --- State Management ---
-	function getCurrentState(itemType) {
-		return currentItemStates[itemType] || { page: 1, search: '' };
+	// --- Cover Type Functions ---
+	function fetchCoverTypes() {
+		return $.ajax({ // Return the promise
+			url: API_URL,
+			type: 'GET',
+			data: { action: 'list_cover_types' },
+			dataType: 'json',
+			success: function(response) {
+				if (response.success && response.data.cover_types) {
+					allCoverTypes = response.data.cover_types;
+					populateAllCoverTypeDropdowns();
+				} else {
+					showAlert('Error fetching cover types: ' + escapeHtml(response.message), 'danger');
+				}
+			},
+			error: function(xhr, status, error) {
+				showAlert('Failed to connect to server to fetch cover types: ' + escapeHtml(xhr.responseText || error), 'danger');
+			}
+		});
 	}
 	
-	function setCurrentState(itemType, page, search) {
-		currentItemStates[itemType] = { page, search };
+	function populateAllCoverTypeDropdowns() {
+		$('.admin-cover-type-dropdown').each(function() {
+			const $dropdown = $(this);
+			const isFilterDropdown = $dropdown.hasClass('cover-type-filter');
+			const firstOptionValue = $dropdown.find('option:first-child').val();
+			const firstOptionText = $dropdown.find('option:first-child').text();
+			
+			$dropdown.empty(); // Clear all options
+			$dropdown.append(`<option value="${firstOptionValue}">${firstOptionText}</option>`); // Add back the placeholder
+			
+			allCoverTypes.forEach(function(type) {
+				$dropdown.append(`<option value="${escapeHtml(type.id)}">${escapeHtml(type.type_name)}</option>`);
+			});
+		});
+	}
+	
+	
+	// --- State Management ---
+	function getCurrentState(itemType) {
+		return currentItemStates[itemType] || { page: 1, search: '', coverTypeId: '' };
+	}
+	
+	function setCurrentState(itemType, page, search, coverTypeId) {
+		currentItemStates[itemType] = { page, search, coverTypeId };
 	}
 	
 	// --- Loading and Rendering Items ---
-	function loadItems(itemType, page = 1, searchQuery = '') {
+	function loadItems(itemType, page = 1, searchQuery = '', coverTypeIdFilter = '') {
 		const $tableBody = $(`#${itemType}Table tbody`);
 		const $paginationContainer = $(`#${itemType}Pagination`);
 		$tableBody.html('<tr><td colspan="100%" class="text-center"><span class="spinner-border spinner-border-sm"></span> Loading...</td></tr>');
 		$paginationContainer.empty();
-		setCurrentState(itemType, page, searchQuery);
+		setCurrentState(itemType, page, searchQuery, coverTypeIdFilter);
+		
+		let ajaxData = {
+			action: 'list_items',
+			type: itemType,
+			page: page,
+			limit: ITEMS_PER_PAGE,
+			search: searchQuery
+		};
+		
+		if (coverTypeIdFilter && (itemType === 'covers' || itemType === 'templates')) {
+			ajaxData.cover_type_id = coverTypeIdFilter;
+		}
 		
 		$.ajax({
 			url: API_URL,
 			type: 'GET',
-			data: {
-				action: 'list_items',
-				type: itemType,
-				page: page,
-				limit: ITEMS_PER_PAGE,
-				search: searchQuery
-			},
+			data: ajaxData,
 			dataType: 'json',
 			success: function(response) {
 				if (response.success) {
@@ -84,23 +129,27 @@ $(document).ready(function() {
 					const pagination = response.data.pagination;
 					
 					if (items.length === 0) {
-						const message = searchQuery ? `No ${itemType} found matching "${escapeHtml(searchQuery)}".` : `No ${itemType} found.`;
+						let message = `No ${itemType} found.`;
+						if (searchQuery) message = `No ${itemType} found matching "${escapeHtml(searchQuery)}".`;
+						if (coverTypeIdFilter) message += ` for the selected cover type.`;
 						$tableBody.html(`<tr><td colspan="100%" class="text-center">${message}</td></tr>`);
 					} else {
 						items.forEach(item => {
 							let rowHtml = `<tr>`;
-							const thumbUrl = item.thumbnail_url || 'images/placeholder.png'; // Ensure placeholder exists
+							const thumbUrl = item.thumbnail_url || 'images/placeholder.png';
 							const isSquareThumb = itemType === 'elements' || itemType === 'overlays';
 							rowHtml += `<td><img src="${escapeHtml(thumbUrl)}" alt="${escapeHtml(item.name)}" class="thumbnail-preview ${isSquareThumb ? 'square' : ''}" loading="lazy"></td>`;
 							rowHtml += `<td>${escapeHtml(item.name)}</td>`;
 							
 							if (itemType === 'covers') {
+								rowHtml += `<td>${escapeHtml(item.cover_type_name || 'N/A')}</td>`;
 								rowHtml += `<td>${escapeHtml(item.caption || '')}</td>`;
 								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
 								rowHtml += `<td>${renderKeywords(item.categories)}</td>`;
-							} else if (itemType === 'elements' || itemType === 'overlays') {
-								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
 							} else if (itemType === 'templates') {
+								rowHtml += `<td>${escapeHtml(item.cover_type_name || 'N/A')}</td>`;
+								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
+							} else if (itemType === 'elements' || itemType === 'overlays') {
 								rowHtml += `<td>${renderKeywords(item.keywords)}</td>`;
 							}
 							
@@ -142,7 +191,6 @@ $(document).ready(function() {
 	}
 	
 	// --- Pagination Rendering ---
-	// ... (renderPagination function remains the same)
 	function renderPagination(itemType, pagination) {
 		const { totalItems, itemsPerPage, currentPage, totalPages } = pagination;
 		const $paginationContainer = $(`#${itemType}Pagination`);
@@ -195,22 +243,34 @@ $(document).ready(function() {
 	
 	
 	// --- Event Handlers ---
-	// Initial load for the active tab
-	const activeTabButton = $('#adminTab button[data-bs-toggle="tab"].active');
-	if (activeTabButton.length) {
-		const initialTargetPanelId = activeTabButton.data('bs-target');
-		const initialItemType = initialTargetPanelId.replace('#', '').replace('-panel', '');
-		loadItems(initialItemType);
-	} else {
-		loadItems('covers'); // Default if no active tab found
-	}
+	fetchCoverTypes().then(() => { // Ensure types are fetched before initial load
+		const activeTabButton = $('#adminTab button[data-bs-toggle="tab"].active');
+		if (activeTabButton.length) {
+			const initialTargetPanelId = activeTabButton.data('bs-target');
+			const initialItemType = initialTargetPanelId.replace('#', '').replace('-panel', '');
+			const state = getCurrentState(initialItemType);
+			loadItems(initialItemType, state.page, state.search, state.coverTypeId);
+		} else {
+			loadItems('covers'); // Default if no active tab found
+		}
+	});
+	
 	
 	$('#adminTab button[data-bs-toggle="tab"]').on('shown.bs.tab', function (event) {
 		const targetPanelId = $(event.target).data('bs-target');
 		const itemType = targetPanelId.replace('#', '').replace('-panel', '');
 		const state = getCurrentState(itemType);
-		loadItems(itemType, state.page, state.search);
+		loadItems(itemType, state.page, state.search, state.coverTypeId);
 	});
+	
+	// Cover Type Filter Change
+	$(document).on('change', '.cover-type-filter', function() {
+		const itemType = $(this).data('type');
+		const coverTypeId = $(this).val();
+		const state = getCurrentState(itemType);
+		loadItems(itemType, 1, state.search, coverTypeId); // Reset to page 1 on filter change
+	});
+	
 	
 	$('form[id^="upload"]').on('submit', function(e) {
 		e.preventDefault();
@@ -234,8 +294,13 @@ $(document).ready(function() {
 				}
 			}
 		}
+		// Ensure cover_type_id is included if present in the form
+		if ($form.find('select[name="cover_type_id"]').length) {
+			commonFormDataFields['cover_type_id'] = $form.find('select[name="cover_type_id"]').val();
+		}
 		
-		let nameInputVal = $form.find('input[name="name"]').val(); // Get name from input field
+		
+		let nameInputVal = $form.find('input[name="name"]').val();
 		
 		if (itemType === 'covers' || itemType === 'elements' || itemType === 'overlays') {
 			const imageFilesInput = $form.find('input[name="image_file"]')[0];
@@ -249,7 +314,6 @@ $(document).ready(function() {
 				filesToUpload.push({
 					type: 'image',
 					file: imageFiles[i],
-					// Use input name if provided and only one file, else derive
 					derivedName: (imageFiles.length === 1 && nameInputVal) ? nameInputVal : deriveNameFromFilename(imageFiles[i].name)
 				});
 			}
@@ -274,7 +338,6 @@ $(document).ready(function() {
 					type: 'template',
 					json_file: jsonFiles[i],
 					thumbnail_file: thumbnailFiles[i],
-					// Use input name if provided and only one file, else derive
 					derivedName: (jsonFiles.length === 1 && nameInputVal) ? nameInputVal : deriveNameFromFilename(jsonFiles[i].name)
 				});
 			}
@@ -296,7 +359,7 @@ $(document).ready(function() {
 			const formData = new FormData();
 			formData.append('action', 'upload_item');
 			formData.append('item_type', itemType);
-			formData.append('name', uploadItem.derivedName); // Use derived/input name
+			formData.append('name', uploadItem.derivedName);
 			
 			for (const key in commonFormDataFields) {
 				formData.append(key, commonFormDataFields[key]);
@@ -338,10 +401,11 @@ $(document).ready(function() {
 			if (successCount > 0) {
 				$form[0].reset();
 				const currentActiveItemType = $('#adminTab button.active').data('bs-target').replace('#', '').replace('-panel', '');
+				const state = getCurrentState(itemType); // Get current state including coverTypeId
 				if (currentActiveItemType === itemType) {
-					loadItems(itemType, 1, ''); // Reload to first page, clear search
+					loadItems(itemType, 1, '', state.coverTypeId); // Reload to first page, keep filter
 				} else {
-					setCurrentState(itemType, 1, '');
+					setCurrentState(itemType, 1, '', state.coverTypeId);
 				}
 			}
 			
@@ -371,7 +435,7 @@ $(document).ready(function() {
 					if (response.success) {
 						showAlert(`${capitalizeFirstLetter(itemType).slice(0,-1)} deleted successfully!`, 'success');
 						const state = getCurrentState(itemType);
-						loadItems(itemType, state.page, state.search); // Reload current page and search
+						loadItems(itemType, state.page, state.search, state.coverTypeId);
 					} else {
 						showAlert(`Error deleting ${itemType}: ${escapeHtml(response.message)}`, 'danger');
 						$button.prop('disabled', false).html(originalButtonHtml);
@@ -395,7 +459,7 @@ $(document).ready(function() {
 		const itemType = $link.data('type');
 		const page = $link.data('page');
 		const state = getCurrentState(itemType);
-		loadItems(itemType, page, state.search);
+		loadItems(itemType, page, state.search, state.coverTypeId);
 	});
 	
 	$('.tab-content').on('submit', '.search-form', function(e) {
@@ -403,7 +467,8 @@ $(document).ready(function() {
 		const $form = $(this);
 		const itemType = $form.data('type');
 		const searchQuery = $form.find('.search-input').val().trim();
-		loadItems(itemType, 1, searchQuery); // Search always goes to page 1
+		const coverTypeId = $form.find('.cover-type-filter').val(); // Get filter value
+		loadItems(itemType, 1, searchQuery, coverTypeId);
 	});
 	
 	// --- Edit Functionality ---
@@ -421,7 +486,7 @@ $(document).ready(function() {
 		$('#editCurrentImagePreview').empty().hide();
 		$('#editCurrentThumbnailPreview').empty().hide();
 		$('#editCurrentJsonInfo').hide();
-		$('.edit-field').hide(); // Hide all conditional fields initially
+		$('.edit-field').hide();
 		
 		$.ajax({
 			url: API_URL,
@@ -436,13 +501,13 @@ $(document).ready(function() {
 					$('#editItemType').val(itemType);
 					$('#editItemName').val(item.name);
 					
-					// Show relevant fields based on itemType
 					$(`.edit-field-${itemType}`).show();
 					
 					if (itemType === 'covers') {
 						$('#editItemCaption').val(item.caption || '');
-						$('#editItemKeywords').val(item.keywords || ''); // keywords is comma-sep string from PHP
-						$('#editItemCategories').val(item.categories || ''); // categories is comma-sep string
+						$('#editItemKeywords').val(item.keywords || '');
+						$('#editItemCategories').val(item.categories || '');
+						$('#editItemCoverType').val(item.cover_type_id || ''); // Set cover type
 						if(item.image_url) {
 							$('#editCurrentImagePreview').html(`<p class="mb-1">Current Image:</p><img src="${escapeHtml(item.image_url)}" alt="Current Preview">`).show();
 						}
@@ -452,7 +517,8 @@ $(document).ready(function() {
 							$('#editCurrentImagePreview').html(`<p class="mb-1">Current Image:</p><img src="${escapeHtml(item.image_url)}" alt="Current Preview">`).show();
 						}
 					} else if (itemType === 'templates') {
-						$('#editItemKeywords').val(item.keywords || ''); // For templates keywords
+						$('#editItemKeywords').val(item.keywords || '');
+						$('#editItemCoverType').val(item.cover_type_id || ''); // Set cover type
 						if(item.thumbnail_url) {
 							$('#editCurrentThumbnailPreview').html(`<p class="mb-1">Current Thumbnail:</p><img src="${escapeHtml(item.thumbnail_url)}" alt="Current Thumbnail">`).show();
 						}
@@ -473,7 +539,7 @@ $(document).ready(function() {
 	$editForm.on('submit', function(e) {
 		e.preventDefault();
 		const formData = new FormData(this);
-		formData.append('action', 'update_item'); // Action for update
+		formData.append('action', 'update_item');
 		const itemType = $('#editItemType').val();
 		const $submitButton = $('#saveEditButton');
 		const originalButtonText = $submitButton.html();
@@ -491,7 +557,7 @@ $(document).ready(function() {
 					showAlert(`${capitalizeFirstLetter(itemType).slice(0,-1)} updated successfully!`, 'success');
 					editModal.hide();
 					const state = getCurrentState(itemType);
-					loadItems(itemType, state.page, state.search); // Reload to see changes
+					loadItems(itemType, state.page, state.search, state.coverTypeId);
 				} else {
 					showAlert(`Error updating ${itemType}: ${escapeHtml(response.message)}`, 'danger');
 				}
@@ -507,13 +573,12 @@ $(document).ready(function() {
 	});
 	
 	$editModal.on('hidden.bs.modal', function () {
-		// Clear file inputs when modal is hidden
 		$('#editItemImageFile').val('');
 		$('#editItemThumbnailFile').val('');
 		$('#editItemJsonFile').val('');
-		// Clear previews more thoroughly
 		$('#editCurrentImagePreview').empty().hide();
 		$('#editCurrentThumbnailPreview').empty().hide();
+		$('#editItemCoverType').val(''); // Reset cover type dropdown in edit modal
 	});
 	
 	
@@ -538,7 +603,7 @@ $(document).ready(function() {
 				if (response.success) {
 					showAlert(`${capitalizeFirstLetter(itemType).slice(0,-1)} AI metadata generated/updated successfully!`, 'success');
 					const state = getCurrentState(itemType);
-					loadItems(itemType, state.page, state.search); // Reload to see changes
+					loadItems(itemType, state.page, state.search, state.coverTypeId);
 				} else {
 					showAlert(`Error generating AI metadata for ${itemType}: ${escapeHtml(response.message)}`, 'danger');
 				}
@@ -560,9 +625,8 @@ $(document).ready(function() {
 	
 	$('.tab-content').on('click', '.generate-similar-template', function() {
 		const itemId = $(this).data('id');
-		// Fetch original template details to get JSON content
 		$('#aiOriginalTemplatePreview').text('Loading original template...');
-		$('#aiTemplatePrompt').val(''); // Clear previous prompt
+		$('#aiTemplatePrompt').val('');
 		
 		$.ajax({
 			url: API_URL,
@@ -573,17 +637,16 @@ $(document).ready(function() {
 				if (response.success && response.data.json_content) {
 					const item = response.data;
 					$('#aiOriginalTemplateId').val(item.id);
-					$('#aiOriginalTemplateJsonContent').val(item.json_content); // Store raw JSON
+					$('#aiOriginalTemplateJsonContent').val(item.json_content);
 					
 					try {
 						const prettyJson = JSON.stringify(JSON.parse(item.json_content), null, 2);
 						$('#aiOriginalTemplatePreview').text(prettyJson);
 					} catch (e) {
-						$('#aiOriginalTemplatePreview').text(item.json_content); // Show raw if not parsable
+						$('#aiOriginalTemplatePreview').text(item.json_content);
 						showAlert('Original template JSON is not valid, showing raw content.', 'warning');
 					}
 					
-					// Pre-fill prompt
 					const defaultPrompt = `Create a JSON file similar to the example above. Make sure all fields are present. Change the resolution to 3000x3000 and update the theme to something new.`;
 					$('#aiTemplatePrompt').val(defaultPrompt);
 					
@@ -609,9 +672,9 @@ $(document).ready(function() {
 		
 		const formData = {
 			action: 'generate_similar_template',
-			item_type: 'templates', // Though not strictly needed if ID is for template
+			item_type: 'templates',
 			original_template_id: $('#aiOriginalTemplateId').val(),
-			original_json_content: $('#aiOriginalTemplateJsonContent').val(), // Send original JSON
+			original_json_content: $('#aiOriginalTemplateJsonContent').val(),
 			user_prompt: $('#aiTemplatePrompt').val()
 		};
 		
