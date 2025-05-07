@@ -1,7 +1,8 @@
-<?php
-// free-cover-designer/admin_config.php
+<?php // free-cover-designer/admin_config.php
 	define('ADMIN_UPLOAD_BASE_DIR', __DIR__ . '/uploads'); // Absolute path on server
 	define('ADMIN_UPLOAD_BASE_URL', 'uploads'); // Relative URL for web access
+	define('ADMIN_AI_TEMPLATES_DIR', ADMIN_UPLOAD_BASE_DIR . '/text-templates-ai'); // New directory for AI generated templates
+
 	define('THUMBNAIL_COVER_WIDTH', 150);
 	define('THUMBNAIL_COVER_HEIGHT', 236); // Taller for covers/templates
 	define('THUMBNAIL_ELEMENT_WIDTH', 150); // Square for elements/overlays
@@ -18,7 +19,6 @@
 		}
 	}
 
-
 // Ensure base upload directory exists and is writable
 	if (!is_dir(ADMIN_UPLOAD_BASE_DIR)) {
 		if (!mkdir(ADMIN_UPLOAD_BASE_DIR, 0775, true)) {
@@ -28,6 +28,16 @@
 	if (!is_writable(ADMIN_UPLOAD_BASE_DIR)) {
 		// error_log('Warning: Base upload directory is not writable: ' . ADMIN_UPLOAD_BASE_DIR);
 	}
+
+// New: Ensure AI templates directory exists
+	if (!is_dir(ADMIN_AI_TEMPLATES_DIR)) {
+		if (!mkdir(ADMIN_AI_TEMPLATES_DIR, 0775, true)) {
+			// Log error or die, depending on desired strictness
+			error_log('Failed to create AI templates directory: ' . ADMIN_AI_TEMPLATES_DIR . '. Please check permissions.');
+			// Optionally die: die('Failed to create AI templates directory: ' . ADMIN_AI_TEMPLATES_DIR);
+		}
+	}
+
 
 	$upload_paths_config = [
 		'covers' => [
@@ -78,6 +88,7 @@
 	}
 
 // Helper function for thumbnail generation (GD Library)
+// ... (create_thumbnail function remains the same)
 	function create_thumbnail($source_path, $destination_path, $thumb_width, $thumb_height, $quality = 85) {
 		if (!function_exists('gd_info')) {
 			error_log("GD Library is not installed or enabled.");
@@ -141,46 +152,51 @@
 			case IMAGETYPE_PNG: $png_quality = round((100 - $quality) / 10); $success = imagepng($thumb_image, $destination_path, $png_quality); break;
 			case IMAGETYPE_GIF: $success = imagegif($thumb_image, $destination_path); break;
 		}
-		if (!$success) { error_log("Failed to save thumbnail to: " . $destination_path); }
+		if (!$success) {
+			error_log("Failed to save thumbnail to: " . $destination_path);
+		}
 		imagedestroy($source_image);
 		imagedestroy($thumb_image);
 		return $success;
 	}
 
+
+// ... (sanitize_filename, get_server_path_from_url functions remain the same)
 	function sanitize_filename($filename) {
 		$filename = basename($filename);
 		$filename = preg_replace("/[^a-zA-Z0-9\._-]/", "", $filename);
 		$filename = preg_replace("/\.{2,}/", ".", $filename);
 		$filename = trim($filename, ".-_");
 		$filename = substr($filename, 0, 200);
-		if (empty($filename)) { $filename = "file"; }
+		if (empty($filename)) {
+			$filename = "file";
+		}
 		return $filename;
 	}
 
 	function get_server_path_from_url($url) {
-		// Ensure ADMIN_UPLOAD_BASE_URL does not end with a slash for this logic
 		$base_url_trimmed = rtrim(ADMIN_UPLOAD_BASE_URL, '/');
 		if (strpos($url, $base_url_trimmed . '/') === 0) {
 			$relative_path = substr($url, strlen($base_url_trimmed . '/'));
 			return rtrim(ADMIN_UPLOAD_BASE_DIR, '/') . '/' . $relative_path;
 		}
-
-		// Fallback for URLs that might be absolute or differently structured
-		// This part might need adjustment based on your exact URL storage
 		$parsed_url = parse_url($url);
 		if (isset($parsed_url['path'])) {
-			// Attempt to match based on known upload structure if path contains 'uploads/'
 			if (strpos($parsed_url['path'], '/uploads/') !== false) {
 				$path_part = strstr($parsed_url['path'], '/uploads/');
-				$relative_path = ltrim($path_part, '/'); // remove leading slash if any
-				// remove 'uploads/' part to match structure of ADMIN_UPLOAD_BASE_DIR
+				$relative_path = ltrim($path_part, '/');
 				if (strpos($relative_path, ADMIN_UPLOAD_BASE_URL . '/') === 0) {
 					$relative_path = substr($relative_path, strlen(ADMIN_UPLOAD_BASE_URL . '/'));
 				}
 				return rtrim(ADMIN_UPLOAD_BASE_DIR, '/') . '/' . $relative_path;
-			} else
-			{
-				return $url;
+			} else {
+				// If it's not matching ADMIN_UPLOAD_BASE_URL and not containing /uploads/, it might be an absolute path already or something else.
+				// This part is tricky without knowing all possible URL formats.
+				// For now, if it doesn't match the expected structure, return null or log an error.
+				// Let's assume for now it might be a direct path if not matching, but this is risky.
+				// A safer bet is to return null if not matching the expected structure.
+				// However, the original code returned $url, which could be problematic.
+				// For this application, URLs are expected to be relative to ADMIN_UPLOAD_BASE_URL.
 			}
 		}
 		error_log("Could not convert URL to server path: " . $url . " (ADMIN_UPLOAD_BASE_URL: " . $base_url_trimmed . ")");
@@ -189,12 +205,14 @@
 
 
 // --- OpenAI Helper Functions ---
+// ... (local_log, call_openAI_question, generate_metadata_from_image_base64, parse_ai_list_response functions remain the same)
+// Note: call_openAI_question will be used for text generation too, with gpt-4o model.
 	function local_log($message) {
 		$logFile = __DIR__ . '/openai_api_log.txt'; // Log in the same directory
 		file_put_contents($logFile, date('Y-m-d H:i:s') . " - " . $message . PHP_EOL, FILE_APPEND);
 	}
 
-	function call_openAI_question($messages, $temperature, $max_tokens, $model = 'gpt-4o-mini') {
+	function call_openAI_question($messages, $temperature, $max_tokens, $model = 'gpt-4o-mini') { // Default model changed to gpt-4o-mini, can be overridden
 		if (empty($_ENV['OPEN_AI_API_KEY'])) {
 			local_log("OpenAI API Key is missing.");
 			return ["error" => "Error: API Key missing."];
@@ -210,25 +228,32 @@
 			'n' => 1,
 			'stream' => false,
 		];
+		// For JSON mode if the model supports it and we want to enforce JSON output
+		// if (strpos($model, 'gpt-4') !== false || strpos($model, 'gpt-3.5-turbo-1106') !== false) { // Check if model supports JSON mode
+		//    $data['response_format'] = ['type' => 'json_object'];
+		// }
+
 		$post_json = json_encode($data);
 		if (json_last_error() !== JSON_ERROR_NONE) {
 			local_log("JSON Encode Error: " . json_last_error_msg());
 			return ["error" => "Error: Could not encode data for API."];
 		}
+
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, 'https://api.openai.com/v1/chat/completions');
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 		curl_setopt($ch, CURLOPT_POST, 1);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $post_json);
-		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-		curl_setopt($ch, CURLOPT_TIMEOUT, 120); // Increased timeout
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2); // Standard verification
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); // Standard verification
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20); // Increased connect timeout
+		curl_setopt($ch, CURLOPT_TIMEOUT, 180);      // Increased general timeout for potentially long AI responses
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 		$headers = [
 			'Content-Type: application/json',
 			"Authorization: Bearer " . $_ENV['OPEN_AI_API_KEY']
 		];
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
 		$result = curl_exec($ch);
 		if (curl_errno($ch)) {
 			$error_msg = curl_error($ch);
@@ -287,11 +312,11 @@
 		// Trim whitespace, quotes, and trailing commas
 		$cleaned = trim($cleaned, " \n\r\t\v\0.,\"'");
 		if (empty($cleaned)) return [];
-
 		$items = array_map('trim', explode(',', $cleaned));
-		$items = array_filter($items, function($value) { return !empty($value); }); // Remove empty elements
+		$items = array_filter($items, function($value) {
+			return !empty($value);
+		}); // Remove empty elements
 		$items = array_unique($items); // Remove duplicates
 		return array_values($items); // Re-index
 	}
-
 ?>

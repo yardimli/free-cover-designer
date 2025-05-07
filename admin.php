@@ -40,30 +40,30 @@
 			<h3>Manage Covers</h3>
 			<!-- Upload Form -->
 			<div class="upload-form mb-4">
-				<h4>Upload New Cover</h4>
+				<h4>Upload New Cover(s)</h4>
 				<form id="uploadCoverForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="covers">
 					<div class="mb-3">
-						<label for="coverName" class="form-label">Name</label>
+						<label for="coverName" class="form-label">Name (will be derived from filename if files are selected)</label>
 						<input type="text" class="form-control" id="coverName" name="name" required>
 					</div>
 					<div class="mb-3">
-						<label for="coverImage" class="form-label">Cover Image (PNG, JPG, GIF)</label>
-						<input type="file" class="form-control" id="coverImage" name="image_file" accept="image/png, image/jpeg, image/gif" required>
+						<label for="coverImage" class="form-label">Cover Image(s) (PNG, JPG, GIF)</label>
+						<input type="file" class="form-control" id="coverImage" name="image_file" accept="image/png, image/jpeg, image/gif" required multiple>
 					</div>
 					<div class="mb-3">
-						<label for="coverCaption" class="form-label">Caption (Optional)</label>
+						<label for="coverCaption" class="form-label">Caption (Optional, applies to all selected files)</label>
 						<textarea class="form-control" id="coverCaption" name="caption" rows="2"></textarea>
 					</div>
 					<div class="mb-3">
-						<label for="coverKeywords" class="form-label">Keywords (comma-separated)</label>
+						<label for="coverKeywords" class="form-label">Keywords (comma-separated, applies to all selected files)</label>
 						<input type="text" class="form-control" id="coverKeywords" name="keywords">
 					</div>
 					<div class="mb-3">
-						<label for="coverCategories" class="form-label">Categories (comma-separated)</label>
+						<label for="coverCategories" class="form-label">Categories (comma-separated, applies to all selected files)</label>
 						<input type="text" class="form-control" id="coverCategories" name="categories">
 					</div>
-					<button type="submit" class="btn btn-primary">Upload Cover</button>
+					<button type="submit" class="btn btn-primary">Upload Cover(s)</button>
 				</form>
 			</div>
 			<!-- Existing Items -->
@@ -98,26 +98,27 @@
 		<div class="tab-pane fade" id="templates-panel" role="tabpanel" aria-labelledby="templates-tab">
 			<h3>Manage Templates</h3>
 			<div class="upload-form mb-4">
-				<h4>Upload New Template</h4>
+				<h4>Upload New Template(s)</h4>
 				<form id="uploadTemplateForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="templates">
 					<div class="mb-3">
-						<label for="templateName" class="form-label">Name</label>
+						<label for="templateName" class="form-label">Name (will be derived from JSON filename if files are selected)</label>
 						<input type="text" class="form-control" id="templateName" name="name" required>
 					</div>
 					<div class="mb-3">
-						<label for="templateJson" class="form-label">Template JSON File (.json)</label>
-						<input type="file" class="form-control" id="templateJson" name="json_file" accept=".json" required>
+						<label for="templateJson" class="form-label">Template JSON File(s) (.json)</label>
+						<input type="file" class="form-control" id="templateJson" name="json_file" accept=".json" required multiple>
 					</div>
 					<div class="mb-3">
-						<label for="templateThumbnail" class="form-label">Thumbnail Image (PNG, JPG, GIF)</label>
-						<input type="file" class="form-control" id="templateThumbnail" name="thumbnail_file" accept="image/png, image/jpeg, image/gif" required>
+						<label for="templateThumbnail" class="form-label">Corresponding Thumbnail Image(s) (PNG, JPG, GIF)</label>
+						<input type="file" class="form-control" id="templateThumbnail" name="thumbnail_file" accept="image/png, image/jpeg, image/gif" required multiple>
+						<div class="form-text">Select the same number of thumbnail files as JSON files, in the same order.</div>
 					</div>
-					<div class="mb-3"> <!-- Added Keywords for Template Upload -->
-						<label for="templateKeywords" class="form-label">Keywords (comma-separated, optional)</label>
+					<div class="mb-3">
+						<label for="templateKeywords" class="form-label">Keywords (comma-separated, optional, applies to all selected files)</label>
 						<input type="text" class="form-control" id="templateKeywords" name="keywords">
 					</div>
-					<button type="submit" class="btn btn-primary">Upload Template</button>
+					<button type="submit" class="btn btn-primary">Upload Template(s)</button>
 				</form>
 			</div>
 			<h4>Existing Templates</h4>
@@ -133,8 +134,8 @@
 					<tr>
 						<th>Preview</th>
 						<th>Name</th>
-						<th>Keywords</th> <!-- Added Keywords Column -->
-						<th>Actions</th>
+						<th>Keywords</th>
+						<th>Actions</th> <!-- Actions column will now hold 4 buttons for templates -->
 					</tr>
 					</thead>
 					<tbody></tbody>
@@ -149,22 +150,22 @@
 		<div class="tab-pane fade" id="elements-panel" role="tabpanel" aria-labelledby="elements-tab">
 			<h3>Manage Elements</h3>
 			<div class="upload-form mb-4">
-				<h4>Upload New Element</h4>
+				<h4>Upload New Element(s)</h4>
 				<form id="uploadElementForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="elements">
 					<div class="mb-3">
-						<label for="elementName" class="form-label">Name</label>
+						<label for="elementName" class="form-label">Name (will be derived from filename if files are selected)</label>
 						<input type="text" class="form-control" id="elementName" name="name" required>
 					</div>
 					<div class="mb-3">
-						<label for="elementImage" class="form-label">Element Image (PNG, JPG, GIF)</label>
-						<input type="file" class="form-control" id="elementImage" name="image_file" accept="image/png, image/jpeg, image/gif" required>
+						<label for="elementImage" class="form-label">Element Image(s) (PNG, JPG, GIF)</label>
+						<input type="file" class="form-control" id="elementImage" name="image_file" accept="image/png, image/jpeg, image/gif" required multiple>
 					</div>
 					<div class="mb-3">
-						<label for="elementKeywords" class="form-label">Keywords (comma-separated)</label>
+						<label for="elementKeywords" class="form-label">Keywords (comma-separated, applies to all selected files)</label>
 						<input type="text" class="form-control" id="elementKeywords" name="keywords">
 					</div>
-					<button type="submit" class="btn btn-primary">Upload Element</button>
+					<button type="submit" class="btn btn-primary">Upload Element(s)</button>
 				</form>
 			</div>
 			<h4>Existing Elements</h4>
@@ -196,22 +197,22 @@
 		<div class="tab-pane fade" id="overlays-panel" role="tabpanel" aria-labelledby="overlays-tab">
 			<h3>Manage Overlays</h3>
 			<div class="upload-form mb-4">
-				<h4>Upload New Overlay</h4>
+				<h4>Upload New Overlay(s)</h4>
 				<form id="uploadOverlayForm" enctype="multipart/form-data">
 					<input type="hidden" name="item_type" value="overlays">
 					<div class="mb-3">
-						<label for="overlayName" class="form-label">Name</label>
+						<label for="overlayName" class="form-label">Name (will be derived from filename if files are selected)</label>
 						<input type="text" class="form-control" id="overlayName" name="name" required>
 					</div>
 					<div class="mb-3">
-						<label for="overlayImage" class="form-label">Overlay Image (PNG, JPG, GIF)</label>
-						<input type="file" class="form-control" id="overlayImage" name="image_file" accept="image/png, image/jpeg, image/gif" required>
+						<label for="overlayImage" class="form-label">Overlay Image(s) (PNG, JPG, GIF)</label>
+						<input type="file" class="form-control" id="overlayImage" name="image_file" accept="image/png, image/jpeg, image/gif" required multiple>
 					</div>
 					<div class="mb-3">
-						<label for="overlayKeywords" class="form-label">Keywords (comma-separated)</label>
+						<label for="overlayKeywords" class="form-label">Keywords (comma-separated, applies to all selected files)</label>
 						<input type="text" class="form-control" id="overlayKeywords" name="keywords">
 					</div>
-					<button type="submit" class="btn btn-primary">Upload Overlay</button>
+					<button type="submit" class="btn btn-primary">Upload Overlay(s)</button>
 				</form>
 			</div>
 			<h4>Existing Overlays</h4>
@@ -257,7 +258,6 @@
 						<label for="editItemName" class="form-label">Name</label>
 						<input type="text" class="form-control" id="editItemName" name="name" required>
 					</div>
-
 					<!-- Fields specific to Covers -->
 					<div class="mb-3 edit-field edit-field-covers">
 						<label for="editItemCaption" class="form-label">Caption</label>
@@ -267,13 +267,11 @@
 						<label for="editItemCategories" class="form-label">Categories (comma-separated)</label>
 						<input type="text" class="form-control" id="editItemCategories" name="categories">
 					</div>
-
 					<!-- Fields specific to Covers, Elements, Overlays, AND TEMPLATES (for keywords) -->
 					<div class="mb-3 edit-field edit-field-covers edit-field-elements edit-field-overlays edit-field-templates">
 						<label for="editItemKeywords" class="form-label">Keywords (comma-separated)</label>
 						<input type="text" class="form-control" id="editItemKeywords" name="keywords">
 					</div>
-
 					<!-- Image Upload (Covers, Elements, Overlays) -->
 					<div class="mb-3 edit-field edit-field-covers edit-field-elements edit-field-overlays">
 						<label for="editItemImageFile" class="form-label">Replace Image (Optional)</label>
@@ -281,7 +279,6 @@
 						<div class="form-text">Leave empty to keep the current image. Uploading a new image will replace the original and regenerate the thumbnail.</div>
 						<div id="editCurrentImagePreview" class="mt-2" style="max-height: 120px; overflow: hidden;"><!-- Content via JS --></div>
 					</div>
-
 					<!-- Thumbnail Upload (Templates) -->
 					<div class="mb-3 edit-field edit-field-templates">
 						<label for="editItemThumbnailFile" class="form-label">Replace Thumbnail (Optional)</label>
@@ -289,7 +286,6 @@
 						<div class="form-text">Leave empty to keep the current thumbnail.</div>
 						<div id="editCurrentThumbnailPreview" class="mt-2" style="max-height: 120px; overflow: hidden;"><!-- Content via JS --></div>
 					</div>
-
 					<!-- JSON Upload (Templates) -->
 					<div class="mb-3 edit-field edit-field-templates">
 						<label for="editItemJsonFile" class="form-label">Replace JSON File (Optional)</label>
@@ -301,6 +297,41 @@
 				<div class="modal-footer">
 					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 					<button type="submit" class="btn btn-primary" id="saveEditButton">Save Changes</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+<!-- Generate Similar Template Modal -->
+<div class="modal fade" id="generateSimilarTemplateModal" tabindex="-1" aria-labelledby="generateSimilarTemplateModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg">
+		<div class="modal-content">
+			<form id="generateSimilarTemplateForm">
+				<div class="modal-header">
+					<h5 class="modal-title" id="generateSimilarTemplateModalLabel">Generate Similar Template with AI</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
+				<div class="modal-body">
+					<input type="hidden" id="aiOriginalTemplateId" name="original_template_id">
+					<!-- Storing full JSON in a hidden input might be problematic if it's very large.
+							 It's better to re-fetch or pass only ID and let backend re-fetch.
+							 For this implementation, we'll fetch it on modal open and pass it. -->
+					<input type="hidden" id="aiOriginalTemplateJsonContent" name="original_json_content">
+
+					<div class="mb-3">
+						<p><strong>Original Template (for reference):</strong></p>
+						<pre id="aiOriginalTemplatePreview" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; white-space: pre-wrap; word-break: break-all;">Loading original template...</pre>
+					</div>
+					<div class="mb-3">
+						<label for="aiTemplatePrompt" class="form-label">Your Prompt for AI:</label>
+						<textarea class="form-control" id="aiTemplatePrompt" name="user_prompt" rows="6" required></textarea>
+						<div class="form-text">Guide the AI to modify the template. E.g., "Change theme to cyberpunk, main color to neon pink, and add a placeholder for a subtitle."</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+					<button type="submit" class="btn btn-primary" id="submitAiGenerateTemplateButton">Generate & Save File</button>
 				</div>
 			</form>
 		</div>

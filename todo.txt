@@ -22,6 +22,13 @@ move data from json to database ................................................
 update elements to load from database and have search .....................................OK
 add loader spinner for when selecting cover, overlay and images ...........................OK
 create admin interface to add data ........................................................OK
+add multiple items at once in admin .......................................................OK
+use ai to create template json files in admin .............................................OK
+in admin multiple template dimensions, add template type (book, album, spine, back)
+in admin multiple cover types (front, back, spine, album)
+in ui panels use css rules for width and height for template and cover types
+in ui snap back to left, cover to right and spine to center when adding.
+in ui add dropdown for type in search template and cover panels
 duplicate text layer
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK

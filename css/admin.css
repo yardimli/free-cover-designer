@@ -40,14 +40,14 @@ body {
     margin-bottom: 20px; /* Space before pagination */
 }
 .item-table img.thumbnail-preview {
-    max-width: 60px;
-    max-height: 90px;
+    max-width: 120px;
+    max-height: 180px;
     object-fit: contain;
     border: 1px solid #eee;
     background-color: #fff; /* Add background for transparent images */
 }
 .item-table img.thumbnail-preview.square {
-    max-height: 60px;
+    max-height: 120px;
 }
 .table th, .table td {
     vertical-align: middle;
