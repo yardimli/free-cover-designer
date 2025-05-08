@@ -751,7 +751,6 @@ class CanvasManager {
 							backWidth: designData.canvas.backWidth || 0
 						};
 					} else {
-						// Old format (assume only front cover)
 						sizeConfig = {
 							totalWidth: designData.canvas.width,
 							height: designData.canvas.height,
@@ -761,24 +760,90 @@ class CanvasManager {
 						};
 					}
 					
+					if (isTemplate) {
+						console.log("Applying template: Calculating centering offset.");
+						
+						if (designData.layers.length > 0) {
+							// 1. Calculate bounding box of template layers
+							let templateMinX = Infinity;
+							let templateMinY = Infinity;
+							let templateMaxX = -Infinity;
+							let templateMaxY = -Infinity;
+							
+							designData.layers.forEach(layer => {
+								const x = parseFloat(layer.x) || 0;
+								const y = parseFloat(layer.y) || 0;
+								
+								let width, height;
+								
+								if (layer.width === 'auto' || isNaN(parseFloat(layer.width))) {
+									// For 'auto' width, treat its width as 0 for bounding box extent.
+									// The layer will be centered based on its 'x' coordinate.
+									width = 0;
+								} else {
+									width = parseFloat(layer.width);
+								}
+								
+								if (layer.height === 'auto' || isNaN(parseFloat(layer.height))) {
+									// Similar for 'auto' height.
+									height = 0;
+								} else {
+									height = parseFloat(layer.height);
+								}
+								
+								templateMinX = Math.min(templateMinX, x);
+								templateMinY = Math.min(templateMinY, y);
+								templateMaxX = Math.max(templateMaxX, x + width);
+								templateMaxY = Math.max(templateMaxY, y + height);
+							});
+							
+							const templateEffectiveWidth = (templateMaxX === -Infinity) ? 0 : templateMaxX - templateMinX;
+							const templateEffectiveHeight = (templateMaxY === -Infinity) ? 0 : templateMaxY - templateMinY;
+							
+							// 2. Calculate offset to center this bounding box on the current canvas
+							const canvasCenterX = this.currentCanvasWidth / 2;
+							const canvasCenterY = this.currentCanvasHeight / 2;
+							
+							const templateCenterX = templateMinX + templateEffectiveWidth / 2;
+							const templateCenterY = templateMinY + templateEffectiveHeight / 2;
+							
+							const offsetX = canvasCenterX - templateCenterX;
+							const offsetY = canvasCenterY - templateCenterY;
+							
+							console.log(`Template original bounds: minX=${templateMinX}, minY=${templateMinY}, maxX=${templateMaxX}, maxY=${templateMaxY}`);
+							console.log(`Template effective dims: width=${templateEffectiveWidth}, height=${templateEffectiveHeight}`);
+							console.log(`Canvas center: X=${canvasCenterX}, Y=${canvasCenterY}`);
+							console.log(`Template center: X=${templateCenterX}, Y=${templateCenterY}`);
+							console.log(`Calculated offset: dX=${offsetX}, dY=${offsetY}`);
+							
+							// 3. Apply offset to each layer in the template
+							designData.layers.forEach(layer => {
+								layer.x = (parseFloat(layer.x) || 0) + offsetX;
+								layer.y = (parseFloat(layer.y) || 0) + offsetY;
+							});
+						}
+					}
+					
+					
 					if (!isTemplate) {
 						console.log("Loading full design: Clearing history and setting canvas size.");
 						this.historyManager.clear();
-						this.setCanvasSize(sizeConfig); // Set size using config
+						this.setCanvasSize(sizeConfig);
 					} else {
 						console.log("Applying template: Keeping existing canvas size and non-text layers.");
+						// Note: App.js handles removing existing text layers before calling this.
 					}
 					
-					this.layerManager.setLayers(designData.layers, isTemplate);
+					this.layerManager.setLayers(designData.layers, isTemplate); // Pass the (potentially offset) layers
 					
-					// --- Finalize ---
 					this.historyManager.saveState();
 					if (!isTemplate) {
-						this.setZoom(1.0);
+						this.setZoom(1.0); // Or a fit-to-screen zoom
 						this.centerCanvas();
 					}
 					this.layerManager.selectLayer(null);
 					// alert(`Design ${isTemplate ? 'template' : ''} loaded successfully!`);
+					
 				} else {
 					console.error("Invalid design data structure:", designData);
 					alert('Invalid design file format. Check console for details.');
@@ -789,7 +854,6 @@ class CanvasManager {
 			}
 		};
 		
-		// ... (rest of loadDesign: file reading/fetching logic remains the same) ...
 		const handleError = (error, statusText = "") => {
 			console.error("Error loading design:", statusText, error);
 			alert(`Error reading or fetching the design file: ${statusText}`);
@@ -803,16 +867,16 @@ class CanvasManager {
 			reader.onload = (e) => {
 				try {
 					const designData = JSON.parse(e.target.result);
-					handleLoad(designData); // isTemplate will be false here
+					handleLoad(designData); // isTemplate will be false here by default from file load
 				} catch (parseError) {
 					handleError(parseError, "JSON Parsing Error");
 				}
 			};
 			reader.onerror = () => handleError(reader.error, "File Reading Error");
 			reader.readAsText(source);
-		} else if (typeof source === 'string') {
+		} else if (typeof source === 'string') { // Assuming URL for templates
 			$.getJSON(source)
-				.done((data) => handleLoad(data)) // isTemplate will be true here
+				.done((data) => handleLoad(data)) // isTemplate is passed from the caller (App.js via SidebarItemManager)
 				.fail((jqXHR, textStatus, errorThrown) => handleError(errorThrown, `${textStatus} (${jqXHR.status})`));
 		} else {
 			alert('Invalid source type for loading design.');

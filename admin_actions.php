@@ -3,7 +3,7 @@
 	require_once 'admin_config.php'; // Defines constants, helper functions, and now OpenAI functions
 	header('Content-Type: application/json');
 
-// Basic input retrieval and sanitization
+	// Basic input retrieval and sanitization
 	$action = (isset($_REQUEST['action']) && is_scalar($_REQUEST['action'])) ? strip_tags($_REQUEST['action']) : null;
 	$item_type = (isset($_REQUEST['item_type']) && is_scalar($_REQUEST['item_type'])) ? strip_tags($_REQUEST['item_type']) : null;
 	$item_id = null;
@@ -19,23 +19,26 @@
 		}
 	}
 
-// Ensure OPEN_AI_API_KEY is available
+	// Ensure OPEN_AI_API_KEY is available
 	if (empty($_ENV['OPEN_AI_API_KEY']) && in_array($action, ['generate_ai_metadata', 'generate_similar_template'])) {
 		respond_error('OpenAI API Key is not configured on the server.');
 	}
 
-	function respond_error($message, $details = [], $http_code = 400) {
+	function respond_error($message, $details = [], $http_code = 400)
+	{
 		http_response_code($http_code);
 		echo json_encode(['success' => false, 'message' => $message, 'details' => $details]);
 		exit;
 	}
 
-	function respond_success($message, $data = []) {
+	function respond_success($message, $data = [])
+	{
 		echo json_encode(['success' => true, 'message' => $message, 'data' => $data]);
 		exit;
 	}
 
-	function delete_associated_files($item, $item_type, $path_config) {
+	function delete_associated_files($item, $item_type, $path_config)
+	{
 		$deleted_files = [];
 		$config = $path_config[$item_type] ?? null;
 		if (!$config) return $deleted_files;
@@ -87,9 +90,10 @@
 			respond_error('Invalid action specified.');
 	}
 
-// --- Action Handlers ---
+	// --- Action Handlers ---
 
-	function handle_list_cover_types($db) {
+	function handle_list_cover_types($db)
+	{
 		$sql = "SELECT id, type_name FROM `cover_types` ORDER BY type_name ASC";
 		$types = [];
 		if ($result = $db->query($sql)) {
@@ -103,7 +107,8 @@
 		}
 	}
 
-	function handle_list_items($db, $path_config) {
+	function handle_list_items($db, $path_config)
+	{
 		$type = (isset($_GET['type']) && is_scalar($_GET['type'])) ? strip_tags($_GET['type']) : null;
 		$page = 1;
 		if (isset($_GET['page'])) {
@@ -187,7 +192,7 @@
 		$select_fields_list = [];
 		if ($type === 'templates') {
 			$template_fields = ["id", "name", "thumbnail_path", "keywords", "created_at", "updated_at", "cover_type_id"];
-			foreach($template_fields as $field) {
+			foreach ($template_fields as $field) {
 				$select_fields_list[] = "`{$table_name}`.`{$field}`";
 			}
 		} else {
@@ -242,7 +247,8 @@
 		respond_success(ucfirst($type) . ' listed successfully.', ['items' => $items, 'pagination' => $pagination_data]);
 	}
 
-	function handle_upload_item($db, $item_type, $path_config) {
+	function handle_upload_item($db, $item_type, $path_config)
+	{
 		if (!$item_type || !isset($path_config[$item_type])) {
 			respond_error('Invalid item type for upload.');
 		}
@@ -301,13 +307,15 @@
 				$thumbnail_file_url = $original_file_url;
 				$thumbnail_file_path_on_server = $original_file_path_on_server;
 			}
-		} elseif ($item_type !== 'templates' && (!isset($_FILES[$image_file_key]) || $_FILES[$image_file_key]['error'] !== UPLOAD_ERR_OK) ) {
+		} elseif ($item_type !== 'templates' && (!isset($_FILES[$image_file_key]) || $_FILES[$image_file_key]['error'] !== UPLOAD_ERR_OK)) {
 			respond_error('Image file is required for ' . $item_type);
-		} elseif ($item_type === 'templates' && (!isset($_FILES[$image_file_key]) || $_FILES[$image_file_key]['error'] !== UPLOAD_ERR_OK) ) {
+		} elseif ($item_type === 'templates' && (!isset($_FILES[$image_file_key]) || $_FILES[$image_file_key]['error'] !== UPLOAD_ERR_OK)) {
 			respond_error('Thumbnail file is required for templates');
 		}
 
-		$sql = ""; $types = ""; $params = [];
+		$sql = "";
+		$types = "";
+		$params = [];
 		if ($item_type === 'covers') {
 			$caption = (isset($_POST['caption']) && is_scalar($_POST['caption'])) ? strip_tags($_POST['caption']) : null;
 			$categories_str = (isset($_POST['categories']) && is_scalar($_POST['categories'])) ? strip_tags($_POST['categories']) : '';
@@ -359,7 +367,8 @@
 		}
 	}
 
-	function handle_delete_item($db, $item_type, $path_config, $id) {
+	function handle_delete_item($db, $item_type, $path_config, $id)
+	{
 		if (!$id && $id !== 0) {
 			respond_error('Invalid ID for deletion.');
 		}
@@ -396,7 +405,8 @@
 		$stmt_delete->close();
 	}
 
-	function handle_get_item_details($db, $item_type, $id) {
+	function handle_get_item_details($db, $item_type, $id)
+	{
 		if (!$id && $id !== 0) {
 			respond_error('Invalid ID for fetching details.');
 		}
@@ -452,7 +462,8 @@
 		}
 	}
 
-	function handle_update_item($db, $item_type, $path_config, $id) {
+	function handle_update_item($db, $item_type, $path_config, $id)
+	{
 		if (!$id && $id !== 0) {
 			respond_error('Invalid ID for update.');
 		}
@@ -555,7 +566,9 @@
 			$json_content_str = $new_json_content_str;
 		}
 
-		$sql_update = ""; $types_update = ""; $params_update = [];
+		$sql_update = "";
+		$types_update = "";
+		$params_update = [];
 		if ($item_type === 'covers') {
 			$sql_update = "UPDATE `covers` SET name = ?, thumbnail_path = ?, image_path = ?, caption = ?, keywords = ?, categories = ?, cover_type_id = ? WHERE id = ?";
 			$types_update = "ssssssii"; // Added i for cover_type_id
@@ -600,99 +613,221 @@
 		}
 	}
 
-	function handle_generate_ai_metadata($db, $item_type, $id, $path_config) {
+	function handle_generate_ai_metadata($db, $item_type, $id, $path_config)
+	{
 		// ... (existing function - no direct changes for cover_type_id, as AI doesn't generate this)
 		// For brevity, this function is not re-pasted entirely. Assume it remains as is.
-		if (!$id && $id !== 0) { respond_error('Invalid ID for AI metadata generation.'); }
-		if (!$item_type || !isset($path_config[$item_type])) { respond_error('Invalid item type for AI metadata generation.'); }
-		if (empty($_ENV['OPEN_AI_API_KEY'])) { respond_error('OpenAI API Key is not configured on the server.');}
+		if (!$id && $id !== 0) {
+			respond_error('Invalid ID for AI metadata generation.');
+		}
+		if (!$item_type || !isset($path_config[$item_type])) {
+			respond_error('Invalid item type for AI metadata generation.');
+		}
+
 		$table_name = $db->real_escape_string($item_type);
 		$stmt_select = $db->prepare("SELECT * FROM `{$table_name}` WHERE id = ?");
 		if (!$stmt_select) respond_error("DB prepare select error: " . $db->error);
-		$stmt_select->bind_param("i", $id); $stmt_select->execute(); $result = $stmt_select->get_result(); $item = $result->fetch_assoc(); $stmt_select->close();
-		if (!$item) { respond_error(ucfirst($item_type) . ' not found.', [], 404); }
+		$stmt_select->bind_param("i", $id);
+		$stmt_select->execute();
+		$result = $stmt_select->get_result();
+		$item = $result->fetch_assoc();
+		$stmt_select->close();
+		if (!$item) {
+			respond_error(ucfirst($item_type) . ' not found.', [], 404);
+		}
 		$image_url_for_ai = null;
-		if ($item_type === 'templates') { $image_url_for_ai = $item['thumbnail_path'] ?? null; } else { $image_url_for_ai = $item['image_path'] ?? $item['thumbnail_path'] ?? null; }
-		if (!$image_url_for_ai) { respond_error('No image found for this item to send to AI.'); }
+		if ($item_type === 'templates') {
+			$image_url_for_ai = $item['thumbnail_path'] ?? null;
+		} else {
+			$image_url_for_ai = $item['image_path'] ?? $item['thumbnail_path'] ?? null;
+		}
+		if (!$image_url_for_ai) {
+			respond_error('No image found for this item to send to AI.');
+		}
 		$server_image_path = get_server_path_from_url($image_url_for_ai);
-		if (!$server_image_path || !file_exists($server_image_path)) { respond_error('Image file not found on server: ' . htmlspecialchars($server_image_path ?? 'path not resolved') . ' (URL: ' . htmlspecialchars($image_url_for_ai) . ')'); }
+		if (!$server_image_path || !file_exists($server_image_path)) {
+			respond_error('Image file not found on server: ' . htmlspecialchars($server_image_path ?? 'path not resolved') . ' (URL: ' . htmlspecialchars($image_url_for_ai) . ')');
+		}
 		$image_content = @file_get_contents($server_image_path);
-		if ($image_content === false) { respond_error('Could not read image file: ' . htmlspecialchars($server_image_path)); }
-		$base64_image = base64_encode($image_content); $finfo = new finfo(FILEINFO_MIME_TYPE); $mime_type = $finfo->file($server_image_path) ?: 'image/jpeg';
+		if ($image_content === false) {
+			respond_error('Could not read image file: ' . htmlspecialchars($server_image_path));
+		}
+		$base64_image = base64_encode($image_content);
+		$finfo = new finfo(FILEINFO_MIME_TYPE);
+		$mime_type = $finfo->file($server_image_path) ?: 'image/jpeg';
 		$common_keywords_prompt = "Generate a list of 10-15 relevant keywords for this image, suitable for search or tagging. Include single words and relevant two-word phrases. Focus on visual elements, style, and potential use case. Output only a comma-separated list.";
-		$ai_generated_data = []; local_log("AI: Requesting keywords for {$item_type} ID {$id}");
+		$ai_generated_data = [];
+		local_log("AI: Requesting keywords for {$item_type} ID {$id}");
 		$keywords_response = generate_metadata_from_image_base64($common_keywords_prompt, $base64_image, $mime_type, 'gpt-4o-mini');
 		if (isset($keywords_response['content'])) {
 			$parsed_keywords = parse_ai_list_response($keywords_response['content']);
-			if (!empty($parsed_keywords)) { $ai_generated_data['keywords'] = json_encode($parsed_keywords); local_log("AI: Keywords for {$item_type} ID {$id}: " . $ai_generated_data['keywords']); }
-			else { local_log("AI: Empty keywords after parsing for {$item_type} ID {$id}. Response: " . $keywords_response['content']); }
-		} elseif (isset($keywords_response['error'])) { local_log("AI: Error generating keywords for {$item_type} ID {$id}: " . $keywords_response['error']); }
+			if (!empty($parsed_keywords)) {
+				$ai_generated_data['keywords'] = json_encode($parsed_keywords);
+				local_log("AI: Keywords for {$item_type} ID {$id}: " . $ai_generated_data['keywords']);
+			} else {
+				local_log("AI: Empty keywords after parsing for {$item_type} ID {$id}. Response: " . $keywords_response['content']);
+			}
+		} elseif (isset($keywords_response['error'])) {
+			local_log("AI: Error generating keywords for {$item_type} ID {$id}: " . $keywords_response['error']);
+		}
 		if ($item_type === 'covers') {
 			$caption_prompt = "Describe this book cover image concisely for use as an alt text or short caption. Focus on the main visual elements and mood. Do not include or describe any text visible on the image. Maximum 140 characters.";
 			local_log("AI: Requesting caption for cover ID {$id}");
 			$caption_response = generate_metadata_from_image_base64($caption_prompt, $base64_image, $mime_type, 'gpt-4o-mini');
-			if (isset($caption_response['content'])) { $ai_generated_data['caption'] = trim($caption_response['content']); if (strlen($ai_generated_data['caption']) > 255) { $ai_generated_data['caption'] = substr($ai_generated_data['caption'], 0, 252) . '...'; } local_log("AI: Caption for cover ID {$id}: " . $ai_generated_data['caption']); }
-			elseif (isset($caption_response['error'])) { local_log("AI: Error generating caption for cover ID {$id}: " . $caption_response['error']); }
+			if (isset($caption_response['content'])) {
+				$ai_generated_data['caption'] = trim($caption_response['content']);
+				if (strlen($ai_generated_data['caption']) > 255) {
+					$ai_generated_data['caption'] = substr($ai_generated_data['caption'], 0, 252) . '...';
+				}
+				local_log("AI: Caption for cover ID {$id}: " . $ai_generated_data['caption']);
+			} elseif (isset($caption_response['error'])) {
+				local_log("AI: Error generating caption for cover ID {$id}: " . $caption_response['error']);
+			}
 			$categories_prompt = "Categorize this book cover image into 1-3 relevant genres from the following list: Mystery, Thriller & Suspense, Fantasy, Science Fiction, Horror, Romance, Erotica, Children's, Action & Adventure, Chick Lit, Historical Fiction, Literary Fiction, Teen & Young Adult, Royal Romance, Western, Surreal, Paranormal & Urban, Apocalyptic, Nature, Poetry, Travel, Religion & Spirituality, Business, Self-Improvement, Education, Health & Wellness, Cookbooks & Food, Environment, Politics & Society, Family & Parenting, Abstract, Medical, Fitness, Sports, Science, Music. Output only a comma-separated list of the chosen categories.";
 			local_log("AI: Requesting categories for cover ID {$id}");
 			$categories_response = generate_metadata_from_image_base64($categories_prompt, $base64_image, $mime_type, 'gpt-4o-mini');
 			if (isset($categories_response['content'])) {
 				$parsed_categories = parse_ai_list_response($categories_response['content']);
-				if (!empty($parsed_categories)) { $ai_generated_data['categories'] = json_encode($parsed_categories); local_log("AI: Categories for cover ID {$id}: " . $ai_generated_data['categories']); }
-				else { local_log("AI: Empty categories after parsing for cover ID {$id}. Response: " . $categories_response['content']); }
-			} elseif (isset($categories_response['error'])) { local_log("AI: Error generating categories for cover ID {$id}: " . $categories_response['error']); }
+				if (!empty($parsed_categories)) {
+					$ai_generated_data['categories'] = json_encode($parsed_categories);
+					local_log("AI: Categories for cover ID {$id}: " . $ai_generated_data['categories']);
+				} else {
+					local_log("AI: Empty categories after parsing for cover ID {$id}. Response: " . $categories_response['content']);
+				}
+			} elseif (isset($categories_response['error'])) {
+				local_log("AI: Error generating categories for cover ID {$id}: " . $categories_response['error']);
+			}
 		}
-		if (empty($ai_generated_data)) { respond_error('AI did not return any usable metadata or an error occurred. Check logs.'); }
-		$set_clauses = []; $update_params = []; $update_types = "";
-		if (isset($ai_generated_data['keywords'])) { $set_clauses[] = "keywords = ?"; $update_params[] = $ai_generated_data['keywords']; $update_types .= "s"; }
+		if (empty($ai_generated_data)) {
+			respond_error('AI did not return any usable metadata or an error occurred. Check logs.');
+		}
+		$set_clauses = [];
+		$update_params = [];
+		$update_types = "";
+		if (isset($ai_generated_data['keywords'])) {
+			$set_clauses[] = "keywords = ?";
+			$update_params[] = $ai_generated_data['keywords'];
+			$update_types .= "s";
+		}
 		if ($item_type === 'covers') {
-			if (isset($ai_generated_data['caption'])) { $set_clauses[] = "caption = ?"; $update_params[] = $ai_generated_data['caption']; $update_types .= "s"; }
-			if (isset($ai_generated_data['categories'])) { $set_clauses[] = "categories = ?"; $update_params[] = $ai_generated_data['categories']; $update_types .= "s"; }
+			if (isset($ai_generated_data['caption'])) {
+				$set_clauses[] = "caption = ?";
+				$update_params[] = $ai_generated_data['caption'];
+				$update_types .= "s";
+			}
+			if (isset($ai_generated_data['categories'])) {
+				$set_clauses[] = "categories = ?";
+				$update_params[] = $ai_generated_data['categories'];
+				$update_types .= "s";
+			}
 		}
-		if (empty($set_clauses)) { respond_success('No new metadata generated by AI to update, or all AI requests failed.', ['no_changes' => true]); return; }
+		if (empty($set_clauses)) {
+			respond_success('No new metadata generated by AI to update, or all AI requests failed.', ['no_changes' => true]);
+			return;
+		}
 		$sql_update_ai = "UPDATE `{$table_name}` SET " . implode(", ", $set_clauses) . " WHERE id = ?";
-		$update_params[] = $id; $update_types .= "i";
+		$update_params[] = $id;
+		$update_types .= "i";
 		if ($stmt_update_ai = $db->prepare($sql_update_ai)) {
 			$stmt_update_ai->bind_param($update_types, ...$update_params);
-			if ($stmt_update_ai->execute()) { respond_success(ucfirst($item_type) . ' metadata updated successfully by AI.'); }
-			else { respond_error('Database error updating with AI metadata: ' . $stmt_update_ai->error); }
+			if ($stmt_update_ai->execute()) {
+				respond_success(ucfirst($item_type) . ' metadata updated successfully by AI.');
+			} else {
+				respond_error('Database error updating with AI metadata: ' . $stmt_update_ai->error);
+			}
 			$stmt_update_ai->close();
-		} else { respond_error("DB prepare error (AI update {$item_type}): " . $db->error); }
+		} else {
+			respond_error("DB prepare error (AI update {$item_type}): " . $db->error);
+		}
 	}
 
-	function handle_generate_similar_template($db, $original_template_id) {
-		// ... (existing function - no direct changes for cover_type_id, as AI doesn't generate this)
-		// For brevity, this function is not re-pasted entirely. Assume it remains as is.
-		if (!$original_template_id && $original_template_id !== 0) { respond_error('Invalid Original Template ID for AI generation.'); }
-		if (empty($_ENV['OPEN_AI_API_KEY'])) { respond_error('OpenAI API Key is not configured on the server.'); }
+	function handle_generate_similar_template($db, $original_template_id)
+	{
+
+		include_once 'googleFonts.php';
+		$google_font_string = '';
+		foreach ($googleFonts as $font => $font_data) {
+			$google_font_string .= $font . ', ';
+		}
+
+		if (!$original_template_id && $original_template_id !== 0) {
+			respond_error('Invalid Original Template ID for AI generation.');
+		}
+
+
 		$user_prompt_text = isset($_POST['user_prompt']) ? strip_tags($_POST['user_prompt']) : '';
-		if (empty($user_prompt_text)) { respond_error('User prompt is required.'); }
+		if (empty($user_prompt_text)) {
+			respond_error('User prompt is required.');
+		}
+
 		$original_json_content = isset($_POST['original_json_content']) ? $_POST['original_json_content'] : null;
+
 		if (!$original_json_content) {
 			$stmt_select = $db->prepare("SELECT json_content, name FROM `templates` WHERE id = ?");
 			if (!$stmt_select) respond_error("DB prepare select error: " . $db->error);
-			$stmt_select->bind_param("i", $original_template_id); $stmt_select->execute(); $result = $stmt_select->get_result(); $original_template_item = $result->fetch_assoc(); $stmt_select->close();
-			if (!$original_template_item || empty($original_template_item['json_content'])) { respond_error('Original template not found or has no JSON content.', [], 404); }
+			$stmt_select->bind_param("i", $original_template_id);
+			$stmt_select->execute();
+			$result = $stmt_select->get_result();
+			$original_template_item = $result->fetch_assoc();
+			$stmt_select->close();
+			if (!$original_template_item || empty($original_template_item['json_content'])) {
+				respond_error('Original template not found or has no JSON content.', [], 404);
+			}
 			$original_json_content = $original_template_item['json_content'];
 		}
-		json_decode($original_json_content); if (json_last_error() !== JSON_ERROR_NONE) { respond_error('Original template content is not valid JSON: ' . json_last_error_msg()); }
-		$system_message = "You are an expert JSON template designer. Based on the provided example JSON and the user's request, generate a new, complete, and valid JSON object. The output MUST be ONLY the raw JSON content, without any surrounding text, explanations, or markdown ```json ... ``` tags. Ensure all structural elements from the example are considered and adapted according to the user's request.";
+		json_decode($original_json_content);
+		if (json_last_error() !== JSON_ERROR_NONE) {
+			respond_error('Original template content is not valid JSON: ' . json_last_error_msg());
+		}
+
+		$system_message = "You are an expert JSON template designer. Based on the provided example JSON and the user's request, generate a new, complete, and valid JSON object. The output MUST be ONLY the raw JSON content, without any surrounding text, explanations, or markdown ```json ... ``` tags. Ensure all structural elements from the example are considered and adapted according to the user's request. Choose suitable fonts to substitute the example from the following google fonts based on the users request: {$google_font_string}";
+
 		$user_message_content = "User Request: \"{$user_prompt_text}\"\n\nExample JSON:\n{$original_json_content}";
-		$messages = [ ["role" => "system", "content" => $system_message], ["role" => "user", "content" => $user_message_content] ];
+
+		$messages = [["role" => "system", "content" => $system_message], ["role" => "user", "content" => $user_message_content]];
+
 		local_log("AI Similar Template: Requesting generation for template ID {$original_template_id}. User prompt: {$user_prompt_text}");
+
 		$ai_response = call_openAI_question($messages, 0.6, 4000, 'gpt-4o');
-		if (isset($ai_response['error'])) { local_log("AI Similar Template: Error for ID {$original_template_id}: " . $ai_response['error']); respond_error("AI Error: " . $ai_response['error']); }
-		$generated_json_string = $ai_response['content']; local_log("AI Similar Template: Raw response for ID {$original_template_id}: " . $generated_json_string);
-		if (preg_match('/```json\s*([\s\S]*?)\s*```/', $generated_json_string, $matches)) { $generated_json_string = $matches[1]; }
-		$generated_json_string = trim($generated_json_string); $decoded_json = json_decode($generated_json_string);
-		if (json_last_error() !== JSON_ERROR_NONE) { local_log("AI Similar Template: Invalid JSON response for ID {$original_template_id}. Error: " . json_last_error_msg() . ". Raw: " . $ai_response['content']); respond_error('AI returned invalid JSON: ' . json_last_error_msg() . ". Please try rephrasing your prompt or try again. Raw AI output: " . htmlspecialchars(substr($ai_response['content'],0, 200))."..."); }
+
+		if (isset($ai_response['error'])) {
+			local_log("AI Similar Template: Error for ID {$original_template_id}: " . $ai_response['error']);
+			respond_error("AI Error: " . $ai_response['error']);
+		}
+
+		$generated_json_string = $ai_response['content'];
+		local_log("AI Similar Template: Raw response for ID {$original_template_id}: " . $generated_json_string);
+		if (preg_match('/```json\s*([\s\S]*?)\s*```/', $generated_json_string, $matches)) {
+			$generated_json_string = $matches[1];
+		}
+
+		$generated_json_string = trim($generated_json_string);
+		$decoded_json = json_decode($generated_json_string);
+		if (json_last_error() !== JSON_ERROR_NONE) {
+			local_log("AI Similar Template: Invalid JSON response for ID {$original_template_id}. Error: " . json_last_error_msg() . ". Raw: " . $ai_response['content']);
+			respond_error('AI returned invalid JSON: ' . json_last_error_msg() . ". Please try rephrasing your prompt or try again. Raw AI output: " . htmlspecialchars(substr($ai_response['content'], 0, 200)) . "...");
+		}
+
 		$ai_templates_dir = ADMIN_AI_TEMPLATES_DIR;
-		if (!is_dir($ai_templates_dir)) { if (!@mkdir($ai_templates_dir, 0775, true)) { local_log("AI Similar Template: Failed to create directory {$ai_templates_dir}"); respond_error('Could not create directory for AI-generated templates.'); } }
-		$timestamp = time(); $filename = "template_ai_origID{$original_template_id}_{$timestamp}.json"; $filepath = $ai_templates_dir . '/' . $filename;
+		if (!is_dir($ai_templates_dir)) {
+			if (!@mkdir($ai_templates_dir, 0775, true)) {
+				local_log("AI Similar Template: Failed to create directory {$ai_templates_dir}");
+				respond_error('Could not create directory for AI-generated templates.');
+			}
+		}
+
+		$timestamp = time();
+		$filename = "template_ai_origID{$original_template_id}_{$timestamp}.json";
+		$filepath = $ai_templates_dir . '/' . $filename;
 		$pretty_json_to_save = json_encode($decoded_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-		if (file_put_contents($filepath, $pretty_json_to_save) === false) { local_log("AI Similar Template: Failed to write file {$filepath}"); respond_error('Failed to save AI-generated template file.'); }
+
+		if (file_put_contents($filepath, $pretty_json_to_save) === false) {
+			local_log("AI Similar Template: Failed to write file {$filepath}");
+			respond_error('Failed to save AI-generated template file.');
+		}
+
 		local_log("AI Similar Template: Successfully generated and saved {$filename}");
-		respond_success('AI-generated template file created successfully.', ['filename' => $filename, 'directory' => basename(ADMIN_AI_TEMPLATES_DIR)]);
+		respond_success('AI-generated template file created successfully.', ['filename' => $filename, 'directory' => basename(ADMIN_AI_TEMPLATES_DIR), 'google_fonts' => $google_font_string]);
 	}
 
 	$mysqlDBConn->close();

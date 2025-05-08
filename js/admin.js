@@ -647,7 +647,7 @@ $(document).ready(function() {
 						showAlert('Original template JSON is not valid, showing raw content.', 'warning');
 					}
 					
-					const defaultPrompt = `Create a JSON file similar to the example above. Make sure all fields are present. Change the resolution to 3000x3000 and update the theme to something new.`;
+					const defaultPrompt = `Create a JSON file similar to the example above. Make sure all fields for each layer are present. Change the resolution to 3000x3000 and update the theme to something new. Change fonts, colors, shadows and other properties to make it unique.`;
 					$('#aiTemplatePrompt').val(defaultPrompt);
 					
 					$generateSimilarTemplateModal.find('.modal-title').text(`Generate Similar to: ${escapeHtml(item.name)}`);
