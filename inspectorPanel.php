@@ -12,6 +12,7 @@
 		<div class="section-content">
 			<div class="btn-group btn-group-sm w-100" role="group" aria-label="Layer Actions">
 				<button type="button" class="btn btn-outline-secondary" id="lockBtn" title="Lock/Unlock Selected"><i class="fas fa-lock-open"></i></button>
+				<button type="button" class="btn btn-outline-secondary" id="visibilityBtn" title="Toggle Visibility"><i class="fas fa-eye"></i></button>
 				<button type="button" class="btn btn-outline-secondary" id="bringToFrontBtn" title="Bring to Front"><i class="fas fa-arrow-up"></i></button>
 				<button type="button" class="btn btn-outline-secondary" id="sendToBackBtn" title="Send to Back"><i class="fas fa-arrow-down"></i></button>
 				<button type="button" class="btn btn-outline-danger" id="deleteBtn" title="Delete Selected"><i class="fas fa-trash-alt"></i></button>
@@ -272,6 +273,31 @@
 		</div>
 	</div>
 
+	<!-- Image Blend Mode -->
+	<div id="inspector-image-blend-mode" class="inspector-section" style="display: none;">
+		<div class="section-header">Blend Mode</div>
+		<div class="section-content">
+			<select id="inspector-blend-mode" class="form-select form-select-sm">
+				<option value="normal">Normal</option>
+				<option value="multiply">Multiply</option>
+				<option value="screen">Screen</option>
+				<option value="overlay">Overlay</option>
+				<option value="darken">Darken</option>
+				<option value="lighten">Lighten</option>
+				<option value="color-dodge">Color Dodge</option>
+				<option value="color-burn">Color Burn</option>
+				<option value="hard-light">Hard Light</option>
+				<option value="soft-light">Soft Light</option>
+				<option value="difference">Difference</option>
+				<option value="exclusion">Exclusion</option>
+				<option value="hue">Hue</option>
+				<option value="saturation">Saturation</option>
+				<option value="color">Color</option>
+				<option value="luminosity">Luminosity</option>
+			</select>
+		</div>
+	</div>
+
 	<!-- Image Filters -->
 	<div id="inspector-image-filters" class="inspector-section" style="display: none;">
 		<div class="section-header">Filters</div>
@@ -335,29 +361,5 @@
 		</div>
 	</div>
 
-	<!-- Image Blend Mode -->
-	<div id="inspector-image-blend-mode" class="inspector-section" style="display: none;">
-		<div class="section-header">Blend Mode</div>
-		<div class="section-content">
-			<select id="inspector-blend-mode" class="form-select form-select-sm">
-				<option value="normal">Normal</option>
-				<option value="multiply">Multiply</option>
-				<option value="screen">Screen</option>
-				<option value="overlay">Overlay</option>
-				<option value="darken">Darken</option>
-				<option value="lighten">Lighten</option>
-				<option value="color-dodge">Color Dodge</option>
-				<option value="color-burn">Color Burn</option>
-				<option value="hard-light">Hard Light</option>
-				<option value="soft-light">Soft Light</option>
-				<option value="difference">Difference</option>
-				<option value="exclusion">Exclusion</option>
-				<option value="hue">Hue</option>
-				<option value="saturation">Saturation</option>
-				<option value="color">Color</option>
-				<option value="luminosity">Luminosity</option>
-			</select>
-		</div>
-	</div>
 
 </div>

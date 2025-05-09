@@ -443,8 +443,8 @@ class LayerManager {
 				// console.log("Programmatic update detected, updating Moveable rect for", layerId);
 				this.moveableInstance.updateRect();
 			}
-			// Update guidelines if layer visibility/lock status changed
-			if (newData.visible !== undefined || newData.locked !== undefined) {
+			// Update guidelines if layer visibility status changed
+			if (newData.visible !== undefined) {
 				this._updateMoveableGuidelines();
 			}
 		}
@@ -562,7 +562,7 @@ class LayerManager {
 			
 			// --- Initialize Moveable for the new selection ---
 			this.moveableTargetElement = $element[0]; // Get the DOM element
-			if (this.moveableTargetElement && !selectedLayer.locked && selectedLayer.visible) {
+			if (this.moveableTargetElement && selectedLayer.visible) {
 				this._createMoveableInstance(this.moveableTargetElement, selectedLayer);
 			}
 		}
@@ -775,9 +775,9 @@ class LayerManager {
 		const verticalGuidelines = [0, canvasWidth / 2, canvasWidth];
 		const horizontalGuidelines = [0, canvasHeight / 2, canvasHeight];
 		
-		// Element Guidelines (other visible, unlocked layers)
+		// Element Guidelines (other visible)
 		const elementGuidelines = this.layers
-			.filter(l => l.id !== currentLayerId && l.visible && !l.locked)
+			.filter(l => l.id !== currentLayerId && l.visible)
 			.map(l => document.getElementById(l.id))
 			.filter(el => el); // Filter out nulls if element not found
 		
@@ -845,45 +845,65 @@ class LayerManager {
 		}
 	}
 	
-	// --- Layer Order (Z-Index) ---
-	moveLayer(layerId, direction) {
-		const layerIndex = this.layers.findIndex(l => l.id === layerId);
-		if (layerIndex === -1) return;
-		const currentLayers = [...this.layers];
-		const layerToMove = currentLayers.splice(layerIndex, 1)[0];
-		if (direction === 'front') {
-			currentLayers.push(layerToMove);
-		} else if (direction === 'back') {
-			currentLayers.unshift(layerToMove);
-		} else if (direction === 'up' && layerIndex < this.layers.length - 1) {
-			const originalNextLayerId = this.layers[layerIndex + 1].id;
-			const insertBeforeIndex = currentLayers.findIndex(l => l.id === originalNextLayerId);
-			if (insertBeforeIndex !== -1) {
-				currentLayers.splice(insertBeforeIndex + 1, 0, layerToMove);
-			} else {
-				currentLayers.push(layerToMove);
-			}
-		} else if (direction === 'down' && layerIndex > 0) {
-			const originalPrevLayerId = this.layers[layerIndex - 1].id;
-			const insertBeforeIndex = currentLayers.findIndex(l => l.id === originalPrevLayerId);
-			if (insertBeforeIndex !== -1) {
-				currentLayers.splice(insertBeforeIndex, 0, layerToMove);
-			} else {
-				currentLayers.unshift(layerToMove);
-			}
-		} else {
-			currentLayers.splice(layerIndex, 0, layerToMove);
-			return;
+	toggleSelectedLayerVisibility() {
+		if (this.selectedLayerId) {
+			this.toggleLayerVisibility(this.selectedLayerId);
 		}
-		currentLayers.forEach((layer, index) => {
-			layer.zIndex = index + 1;
-		});
-		this.layers = currentLayers;
-		this._updateZIndices();
-		this.updateList();
-		this.saveState();
 	}
 	
+	// --- Layer Order (Z-Index) ---
+	moveLayer(layerId, direction) {
+		// Ensure this.layers is sorted by zIndex, which should be maintained by other operations.
+		const layerIndex = this.layers.findIndex(l => l.id === layerId);
+		if (layerIndex === -1) return;
+		
+		const currentLayers = [...this.layers]; // Create a mutable copy
+		
+		if (direction === 'front') {
+			if (layerIndex === currentLayers.length - 1) return; // Already at front
+			const layerToMove = currentLayers.splice(layerIndex, 1)[0];
+			currentLayers.push(layerToMove);
+		} else if (direction === 'back') {
+			if (layerIndex === 0) return; // Already at back
+			const layerToMove = currentLayers.splice(layerIndex, 1)[0];
+			currentLayers.unshift(layerToMove);
+		} else if (direction === 'up') {
+			if (layerIndex < currentLayers.length - 1) { // Can move up
+				// Swap with the element at currentLayers[layerIndex + 1]
+				const temp = currentLayers[layerIndex + 1];
+				currentLayers[layerIndex + 1] = currentLayers[layerIndex];
+				currentLayers[layerIndex] = temp;
+			} else {
+				return; // Already at the top
+			}
+		} else if (direction === 'down') {
+			if (layerIndex > 0) { // Can move down
+				// Swap with the element at currentLayers[layerIndex - 1]
+				const temp = currentLayers[layerIndex - 1];
+				currentLayers[layerIndex - 1] = currentLayers[layerIndex];
+				currentLayers[layerIndex] = temp;
+			} else {
+				return; // Already at the bottom
+			}
+		} else {
+			console.warn("Unknown moveLayer direction:", direction);
+			return;
+		}
+		
+		// Update the main layers array with the new order
+		this.layers = currentLayers;
+		
+		// Re-assign zIndex based on the new order in this.layers
+		this.layers.forEach((layer, index) => {
+			layer.zIndex = index + 1; // Assign 1-based zIndex
+		});
+		
+		// _updateZIndices will sort by zIndex (which is now consistent with array order)
+		// and update CSS z-index for all layers.
+		this._updateZIndices();
+		this.updateList();    // Update the visual layer list panel
+		this.saveState();     // Save history
+	}
 	
 	moveSelectedLayer(direction) {
 		if (this.selectedLayerId) {
@@ -897,7 +917,7 @@ class LayerManager {
 	_updateZIndices() {
 		this.layers.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 		this.layers.forEach((layer, index) => {
-			// layer.zIndex = index + 1; // Uncomment if strict 1-based index is needed
+			// layer.zIndex = index + 1; // This line is now handled before calling _updateZIndices
 			$(`#${layer.id}`).css('z-index', layer.zIndex || 0);
 		});
 	}
@@ -986,20 +1006,19 @@ class LayerManager {
 	_updateElementInteractivity($element, layerData) {
 		const isLocked = layerData.locked;
 		const isHidden = !layerData.visible;
-		const isDisabled = isLocked || isHidden;
 		
-		$element.toggleClass('interactions-disabled', isDisabled);
+		$element.toggleClass('interactions-disabled', isHidden);
 		$element.css('cursor', isLocked ? 'default' : 'grab');
 		
 		// If the layer is currently selected AND becomes disabled, destroy Moveable
-		if (this.selectedLayerId === layerData.id && isDisabled && this.moveableInstance) {
+		if (this.selectedLayerId === layerData.id && isHidden && this.moveableInstance) {
 			console.log("Destroying Moveable for disabled/locked layer:", layerData.id);
 			this.moveableInstance.destroy();
 			this.moveableInstance = null;
 			this.moveableTargetElement = null;
 		}
 		// If the layer is currently selected AND becomes enabled, create Moveable (if not already present)
-		else if (this.selectedLayerId === layerData.id && !isDisabled && !this.moveableInstance) {
+		else if (this.selectedLayerId === layerData.id && !isHidden && !this.moveableInstance) {
 			console.log("Recreating Moveable for enabled layer:", layerData.id);
 			this.moveableTargetElement = $element[0];
 			this._createMoveableInstance(this.moveableTargetElement, layerData);

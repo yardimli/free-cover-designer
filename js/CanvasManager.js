@@ -149,8 +149,7 @@ class CanvasManager {
 			
 			// Find the layer element if clicked inside one
 			const $clickedLayerElement = $(e.target).closest('#canvas .canvas-element');
-			let isClickOnUnlockedLayer = false;
-			let isClickOnLockedLayer = false; // Added flag
+			let isClickOnLayer = false;
 			
 			if ($clickedLayerElement.length > 0 && !isMiddleMouse) {
 				const layerId = $clickedLayerElement.data('layerId');
@@ -158,35 +157,19 @@ class CanvasManager {
 				if (this.layerManager) {
 					const layer = this.layerManager.getLayerById(layerId);
 					if (layer) {
-						if (!layer.locked) {
-							isClickOnUnlockedLayer = true;
-						} else {
-							isClickOnLockedLayer = true; // Set flag if layer is locked
-						}
-					} else {
-						// Layer element exists but no data found? Treat as unlocked to be safe.
-						console.warn(`Layer data not found for element ID: ${layerId}`);
-						isClickOnUnlockedLayer = true;
+						isClickOnLayer = true;
 					}
-				} else {
-					console.warn("LayerManager not available in CanvasManager mousedown handler.");
-					// Fallback: treat click on any layer as potentially unlocked if manager missing
-					isClickOnUnlockedLayer = true;
 				}
 			}
 			
-			// Prevent panning ONLY if clicking on an UNLOCKED layer (and not middle mouse)
-			if (isClickOnUnlockedLayer) {
-				// Let the layer handle the click/drag (selection, etc.)
-				// Do NOT preventDefault here, as the layer's draggable/click needs it.
+			// Prevent panning ONLY if clicking on non-layer (and not middle mouse)
+			if (isClickOnLayer) {
+				console.log("Click on layer: " + $clickedLayerElement.attr('id'));
 				return;
 			}
 			
 			// Allow panning if:
-			// 1. Clicking background (isBackgroundClick is true)
-			// 2. Using middle mouse (isMiddleMouse is true)
-			// 3. Clicking a LOCKED layer (isClickOnLockedLayer is true)
-			if (isBackgroundClick || isMiddleMouse || isClickOnLockedLayer) {
+			if (isBackgroundClick || isMiddleMouse) {
 				
 				// --- Start Panning ---
 				this.isPanning = true;
@@ -195,17 +178,8 @@ class CanvasManager {
 				this.$canvasArea.addClass('panning');
 				// Prevent default browser actions (like text selection or image drag) ONLY when panning
 				e.preventDefault();
-				
-				// Deselect layer AND hide inspector if clicking background OR a locked layer
-				// (and not using middle mouse, as middle mouse shouldn't change selection)
-				// Also ensure something *is* selected before trying to deselect.
-				if (!isMiddleMouse && (isBackgroundClick || isClickOnLockedLayer) && this.layerManager && this.layerManager.getSelectedLayer()) {
-					this.layerManager.selectLayer(null);
-				}
 				// --- End Panning Start ---
 			}
-			// If none of the conditions to start panning are met (e.g., click on something else
-			// outside canvas/wrapper/layer, or an unlocked layer), do nothing here.
 		});
 		
 		// --- Mouse Move for Panning (No changes needed here) ---
@@ -262,52 +236,28 @@ class CanvasManager {
 		const oldZoom = this.currentZoom;
 		const clampedZoom = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, newZoom));
 		
-		if (clampedZoom === oldZoom) return; // No change
+		// If the zoom level doesn't actually change, no need to proceed.
+		// This prevents unnecessary re-centering if zoom is already at min/max or target.
+		if (clampedZoom === oldZoom) {
+			// However, if you *always* want to recenter even if zoom level is unchanged,
+			// you might call this.centerCanvas() here and then return.
+			// For now, assume centering is only needed if zoom *changes*.
+			return;
+		}
 		
-		// --- Calculate center point before zoom ---
-		const areaWidth = this.$canvasArea.innerWidth();
-		const areaHeight = this.$canvasArea.innerHeight();
-		const scrollLeftBefore = this.$canvasArea.scrollLeft();
-		const scrollTopBefore = this.$canvasArea.scrollTop();
-		const wrapperPosBefore = this.$canvasWrapper.position(); // Relative to canvas-area
-		
-		// Center of the viewport relative to the canvas-area's scrollable content
-		const viewCenterX = scrollLeftBefore + areaWidth / 2;
-		const viewCenterY = scrollTopBefore + areaHeight / 2;
-		
-		// Center of the viewport relative to the wrapper's top-left
-		const centerRelativeToWrapperX = viewCenterX - wrapperPosBefore.left;
-		const centerRelativeToWrapperY = viewCenterY - wrapperPosBefore.top;
-		
-		// Corresponding point on the unscaled canvas
-		const centerOnCanvasX = centerRelativeToWrapperX / oldZoom;
-		const centerOnCanvasY = centerRelativeToWrapperY / oldZoom;
-		
-		// --- Apply the new zoom ---
 		this.currentZoom = clampedZoom;
 		
 		if (this.$canvasArea && this.$canvasArea.length) {
 			this.inverseZoomMultiplier = 1 / this.currentZoom;
 		}
 		
-		// Update wrapper size and canvas transform (scale from top-left)
+		// Update wrapper size (which depends on currentZoom) and canvas transform
 		this.updateWrapperSize();
 		
-		// Calculate where the target canvas point *should* be relative to the wrapper's top-left at the new zoom
-		const newCenterRelativeToWrapperX = centerOnCanvasX * this.currentZoom;
-		const newCenterRelativeToWrapperY = centerOnCanvasY * this.currentZoom;
+		// After zoom and wrapper resize, center the canvas wrapper
+		this.centerCanvas();
 		
-		// Calculate the new scroll position needed to place this point back at the center of the viewport
-		// Use wrapperPosBefore for calculating scroll, as it represents the pre-zoom layout state
-		const newScrollLeft = (wrapperPosBefore.left + newCenterRelativeToWrapperX) - (areaWidth / 2);
-		const newScrollTop = (wrapperPosBefore.top + newCenterRelativeToWrapperY) - (areaHeight / 2);
-		
-		
-		// Apply the new scroll position
-		this.$canvasArea.scrollLeft(newScrollLeft);
-		this.$canvasArea.scrollTop(newScrollTop);
-		
-		// Update UI (via callback)
+		// Update UI (e.g., zoom percentage display, button states)
 		if (triggerCallbacks) {
 			this.onZoomChange(this.currentZoom, this.MIN_ZOOM, this.MAX_ZOOM);
 		}
@@ -315,44 +265,54 @@ class CanvasManager {
 	
 	zoomToFit() {
 		requestAnimationFrame(() => {
+			if (!this.$canvasArea || !this.$canvasArea.length || this.currentCanvasWidth <= 0 || this.currentCanvasHeight <= 0) {
+				console.warn("Cannot zoomToFit, invalid dimensions or missing canvasArea.");
+				return;
+			}
 			const areaWidth = this.$canvasArea.innerWidth() - 40; // Subtract padding/scrollbar allowance
 			const areaHeight = this.$canvasArea.innerHeight() - 40; // Subtract padding/scrollbar allowance
-			const canvasWidth = this.currentCanvasWidth;
-			const canvasHeight = this.currentCanvasHeight;
 			
-			if (areaWidth <= 0 || areaHeight <= 0 || canvasWidth <= 0 || canvasHeight <= 0) {
-				console.warn("Cannot zoomToFit, invalid dimensions.");
+			if (areaWidth <= 0 || areaHeight <= 0) {
+				console.warn("Cannot zoomToFit, invalid area dimensions after padding.");
 				return;
 			}
 			
-			const scaleX = areaWidth / canvasWidth;
-			const scaleY = areaHeight / canvasHeight;
-			const newZoom = Math.min(scaleX, scaleY); // Fit entirely within view
+			const scaleX = areaWidth / this.currentCanvasWidth;
+			const scaleY = areaHeight / this.currentCanvasHeight;
+			const newZoom = Math.min(scaleX, scaleY);
 			
-			this.setZoom(newZoom); // setZoom handles clamping, applying, and centering logic
-			this.centerCanvas(); // Ensure it's centered after fitting
+			this.setZoom(newZoom);
+			// this.centerCanvas(); // No longer needed here, setZoom now handles centering.
 		});
 	}
 	
+	/**
+	 * Centers the canvas-wrapper within the canvas-area.
+	 * This version correctly accounts for margins on the canvas-wrapper.
+	 */
 	centerCanvas() {
-		// Use requestAnimationFrame to ensure layout calculations are up-to-date
 		requestAnimationFrame(() => {
-			const areaWidth = this.$canvasArea.innerWidth(); // Use innerWidth for visible area
+			if (!this.$canvasArea || !this.$canvasArea.length || !this.$canvasWrapper || !this.$canvasWrapper.length) {
+				// console.warn("CanvasManager.centerCanvas: Missing elements for centering.");
+				return;
+			}
+			
+			const areaWidth = this.$canvasArea.innerWidth();
 			const areaHeight = this.$canvasArea.innerHeight();
-			const wrapperWidth = this.$canvasWrapper.outerWidth(); // Use outerWidth including padding/border
+			
+			const wrapperWidth = this.$canvasWrapper.outerWidth(); // Includes padding & border, not margin
 			const wrapperHeight = this.$canvasWrapper.outerHeight();
 			
-			// Calculate desired scroll position to center the wrapper
-			let scrollLeft = (wrapperWidth - areaWidth) / 2;
-			let scrollTop = (wrapperHeight - areaHeight) / 2;
+			console.log("Centering canvas: areaWidth=", areaWidth, "areaHeight=", areaHeight, "wrapperWidth=", wrapperWidth, "wrapperHeight=", wrapperHeight);
+			//set canvasArea scroll position to half the width - half the wrapper width
+			const scrollLeft = ((wrapperWidth ) / 2) + 250;
+			const scrollTop = ((wrapperHeight) / 2) + 150;
 			
-			// Ensure scroll position isn't negative
-			scrollLeft = Math.max(0, scrollLeft);
-			scrollTop = Math.max(0, scrollTop);
-			
-			// Apply the scroll position
+
 			this.$canvasArea.scrollLeft(scrollLeft);
 			this.$canvasArea.scrollTop(scrollTop);
+			
+			
 		});
 	}
 	

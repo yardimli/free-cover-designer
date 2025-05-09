@@ -14,6 +14,7 @@
 	}
 	$cover_types_json = json_encode($cover_types_data);
 
+
 	// --- Fetch Covers ---
 	$covers_data = [];
 	// Added cover_type_id to the SELECT statement
@@ -39,7 +40,7 @@
 
 	// --- Fetch Overlays ---
 	$overlays_data = [];
-	$sql_overlays = "SELECT id, name, thumbnail_path, image_path, keywords FROM overlays ORDER BY name ASC";
+	$sql_overlays = "SELECT id, name, thumbnail_path, image_path, keywords FROM overlays ORDER BY name ASC"; // Added default_blend_mode
 	if ($result = $mysqlDBConn->query($sql_overlays)) {
 		while ($row = $result->fetch_assoc()) {
 			$overlays_data[] = [
@@ -47,7 +48,7 @@
 				'name' => $row['name'],
 				'thumbnailPath' => $row['thumbnail_path'],
 				'imagePath' => $row['image_path'],
-				'keywords' => $row['keywords'] ? json_decode($row['keywords'], true) : []
+				'keywords' => $row['keywords'] ? json_decode($row['keywords'], true) : [],
 			];
 		}
 		$result->free();
@@ -55,6 +56,7 @@
 		error_log("Error fetching overlays from database: " . $mysqlDBConn->error);
 	}
 	$overlays_json = json_encode($overlays_data);
+
 
 	// --- Fetch Templates ---
 	$templates_data = [];
@@ -81,6 +83,7 @@
 	}
 	$templates_json = json_encode($templates_data);
 
+
 	// --- Fetch Elements ---
 	$elements_data = [];
 	$sql_elements = "SELECT id, name, thumbnail_path, image_path, keywords FROM elements ORDER BY name ASC"; // Corrected variable name
@@ -100,10 +103,12 @@
 	}
 	$elements_json = json_encode($elements_data);
 
+
 	// --- Close DB Connection ---
 	if (isset($mysqlDBConn)) {
 		$mysqlDBConn->close();
 	}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -132,8 +137,10 @@
 			<span class="navbar-brand mb-0 h1">Free Cover Designer</span>
 		</div>
 	</nav>
+
 	<!-- Hidden input for loading designs -->
 	<input type="file" id="loadDesignInput" accept=".json" style="display: none;">
+
 	<!-- Main Content Area -->
 	<div class="d-flex flex-grow-1 overflow-hidden main-content position-relative">
 		<!-- Icon Bar (Fixed Width) -->
@@ -151,6 +158,7 @@
 			<li class="nav-item"><a class="nav-link" href="#" id="redoBtn" title="Redo"><i class="fas fa-redo fa-lg"></i></a></li>
 			<li class="nav-item"><a class="nav-link" href="#" id="downloadBtn" title="Download Image (PNG)"><i class="fas fa-download fa-lg"></i></a></li>
 		</ul>
+
 		<!-- Sliding Panels Container (Absolute Position) -->
 		<div id="sidebar-panels-container" class="closed">
 			<!-- Covers Panel -->
@@ -166,6 +174,7 @@
 					<div id="coverList" class="row item-grid panel-scrollable-content"><p>Loading covers...</p></div>
 				</div>
 			</div>
+
 			<!-- Templates Panel -->
 			<div id="templatesPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
@@ -179,6 +188,7 @@
 					<div id="templateList" class="row item-grid panel-scrollable-content"><p>Loading templates...</p></div>
 				</div>
 			</div>
+
 			<!-- Elements Panel -->
 			<div id="elementsPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
@@ -188,6 +198,7 @@
 					<div id="elementList" class="row item-grid panel-scrollable-content"><p>Loading elements...</p></div>
 				</div>
 			</div>
+
 			<!-- Overlays Panel -->
 			<div id="overlaysPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
@@ -197,6 +208,7 @@
 					<div id="overlayList" class="row item-grid panel-scrollable-content"><p>Loading overlays...</p></div>
 				</div>
 			</div>
+
 			<!-- Upload Panel -->
 			<div id="uploadPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
@@ -208,6 +220,7 @@
 					</div>
 				</div>
 			</div>
+
 			<!-- Layers Panel -->
 			<div id="layersPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
@@ -220,6 +233,7 @@
 				</div>
 			</div>
 		</div> <!-- End Sliding Panels Container -->
+
 
 		<!-- Canvas Area (Takes remaining space) -->
 		<div id="canvas-area" class="bg-secondary overflow-auto position-relative flex-grow-1">
@@ -253,6 +267,7 @@
 
 		<!-- Inspector Panel (Remains on the right) -->
 		<?php include 'inspectorPanel.php'; ?>
+
 	</div> <!-- End Main Content Area -->
 </div> <!-- End App Container -->
 
@@ -269,12 +284,34 @@
 <!-- Canvas Size Modal -->
 <?php include 'canvasSizeModal.php'; ?>
 
+<!-- Overlay Confirmation Modal -->
+<div class="modal fade" id="overlayConfirmModal" tabindex="-1" aria-labelledby="overlayConfirmModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="overlayConfirmModalLabel">Add Overlay</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				An overlay layer already exists. Would you like to replace the existing overlay(s) or add this as an additional one?
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+				<button type="button" class="btn btn-outline-primary" id="addOverlayAsNewBtn">Add as New</button>
+				<button type="button" class="btn btn-primary" id="replaceOverlayBtn">Replace Existing</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+
 <!-- Embed data -->
 <script id="coverTypesData" type="application/json"><?php echo $cover_types_json; ?></script>
 <script id="templateData" type="application/json"><?php echo $templates_json; ?></script>
 <script id="coverData" type="application/json"><?php echo $covers_json; ?></script>
 <script id="elementData" type="application/json"><?php echo $elements_json; ?></script>
 <script id="overlayData" type="application/json"><?php echo $overlays_json; ?></script>
+
 
 <!-- Scripts -->
 <script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script>
@@ -284,6 +321,7 @@
 <script type="module" src="vendors/modern-screenshot.js"></script>
 <script src="vendors/tinycolor-min.js"></script>
 <script src="vendors/moveable.min.js"></script>
+
 <script src="js/LayerManager.js"></script>
 <script src="js/HistoryManager.js"></script>
 <script src="js/CanvasManager.js"></script>
@@ -291,5 +329,6 @@
 <script src="js/SidebarItemManager.js"></script>
 <script src="js/CanvasSizeModal.js"></script>
 <script src="js/App.js"></script>
+
 </body>
 </html>

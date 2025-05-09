@@ -218,9 +218,10 @@ $(document).ready(function () {
 		// Layer Actions
 		$('#deleteBtn').on('click', () => layerManager.deleteSelectedLayer());
 		$('#lockBtn').on('click', () => layerManager.toggleSelectedLayerLock());
-		$('#bringToFrontBtn').on('click', () => layerManager.moveSelectedLayer('front'));
-		$('#sendToBackBtn').on('click', () => layerManager.moveSelectedLayer('back'));
-		
+		$("#visibilityBtn").on('click', () => layerManager.toggleSelectedLayerVisibility());
+		$('#bringToFrontBtn').on('click', () => layerManager.moveSelectedLayer('up'));
+		$('#sendToBackBtn').on('click', () => layerManager.moveSelectedLayer('down'));
+
 		// File Menu Actions
 		$('#saveDesign').on('click', (e) => preventDisabled(e, () => canvasManager.saveDesign()));
 		$('#loadDesignIconBtn').on('click', (e) => { // New listener for the icon
@@ -279,8 +280,8 @@ $(document).ready(function () {
 			isAtFront = true;
 			isAtBack = true;
 		}
-		$('#bringToFrontBtn').prop('disabled', !hasSelection || isLocked || isAtFront);
-		$('#sendToBackBtn').prop('disabled', !hasSelection || isLocked || isAtBack);
+		$('#bringToFrontBtn').prop('disabled', !hasSelection || isAtFront);
+		$('#sendToBackBtn').prop('disabled', !hasSelection || isAtBack);
 		
 		
 		// History buttons

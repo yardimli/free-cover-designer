@@ -21,16 +21,29 @@ body {
 /* --- Icon Bar --- */
 .sidebar-nav {
     width: var(--sidebar-icon-width);
-    background-color: #343a40; /* Darker background for icon bar */
+    background-color: #343a40;
     padding-top: 0.5rem;
+
+
     flex-shrink: 0;
     z-index: 1050;
     height: 100%;
     border-right: 1px solid #495057;
+
+
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+
+.sidebar-nav::-webkit-scrollbar {
+    display: none;
 }
 
 .sidebar-nav .nav-link {
-    color: #adb5bd; /* Lighter grey */
+    color: #adb5bd;
     padding: 0.8rem 0;
     border-radius: 0;
     cursor: pointer;
@@ -59,37 +72,37 @@ body {
 #sidebar-panels-container {
     position: absolute;
     top: 0;
-    left: 0; /* Start at the very left edge */
+    left: 0;
     width: var(--sidebar-panel-width);
     height: 100%;
-    background-color: #f8f9fa; /* Light background for panels */
-    z-index: 1045; /* Above icon bar and canvas, below modals */
-    transform: translateX(calc(-1 * var(--sidebar-panel-width))); /* Start hidden */
+    background-color: #f8f9fa;
+    z-index: 1045;
+    transform: translateX(calc(-1 * var(--sidebar-panel-width)));
     transition: transform 0.3s ease-in-out;
     box-shadow: 3px 0 6px rgba(0, 0, 0, 0.15);
     border-right: 1px solid #dee2e6;
-    display: flex; /* Use flex for panel content wrapper */
+    display: flex;
     flex-direction: column;
 }
 
 #sidebar-panels-container.open {
-    transform: translateX(var(--sidebar-icon-width)); /* Slide into view next to icon bar */
+    transform: translateX(var(--sidebar-icon-width));
 }
 
 /* --- Individual Sidebar Panels --- */
 .sidebar-panel {
-    display: none; /* Hidden by default */
+    display: none;
     width: 100%;
     height: 100%;
-    position: absolute; /* Position within the container */
+    position: absolute;
     top: 0;
     left: 0;
-    flex-direction: column; /* Ensure vertical layout */
-    background-color: #f8f9fa; /* Match container background */
+    flex-direction: column;
+    background-color: #f8f9fa;
 }
 
 .sidebar-panel.active {
-    display: flex; /* Show active panel as flex container */
+    display: flex;
 }
 
 /* Panel Content Structure */
@@ -97,32 +110,32 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow: hidden; /* Prevent wrapper from scrolling */
+    overflow: hidden;
 }
 
 .panel-header {
     padding: 0.5rem 0.75rem;
-    background-color: #e9ecef; /* Header background */
+    background-color: #e9ecef;
     border-bottom: 1px solid #dee2e6;
     font-weight: bold;
     color: #495057;
-    flex-shrink: 0; /* Prevent header shrinking */
-    position: sticky; /* Make header sticky */
-    top: 0; /* Stick to top */
-    z-index: 10; /* Above scrolling content */
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
-/* Adjust header padding if it contains input */
+
 .panel-header input.form-control {
-    margin-bottom: 0; /* Remove default margin if needed */
+    margin-bottom: 0;
 }
 
 
 .panel-scrollable-content {
-    /*flex-grow: 1; !* Allow content to take remaining space *!*/
-    overflow-y: auto; /* Enable scrolling for the content area */
-    overflow-x: hidden; /* Prevent horizontal scrolling */
-    /*padding: 5px; !* Add padding to scrollable area *!*/
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
 }
 
 /* --- Item Grids (General) --- */
@@ -143,7 +156,7 @@ body {
     position: relative;
     border: 1px solid #ddd;
     cursor: pointer;
-    text-align: center; /* For text content if not flex-aligned */
+    text-align: center;
     background-color: #fff;
     transition: transform 0.1s ease-in-out, border-color 0.1s ease-in-out;
     overflow: hidden;
@@ -159,14 +172,14 @@ body {
 .item-grid .element-thumbnail,
 .item-grid .overlay-thumbnail {
     margin-bottom:10px;
-    background-color: #fff; /* Base color */
-    /* Checkered pattern */
+    background-color: #fff;
+
     background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%);
-    background-size: 16px 16px; /* Size of the squares */
+    background-size: 16px 16px;
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
-/* --- General Thumbnail Hover/Active States --- */
+
 .item-grid .item-thumbnail:hover {
     border-color: #0d6efd;
     transform: translateY(-2px);
@@ -178,26 +191,26 @@ body {
 
 /* --- Thumbnail Image Styling & Loading --- */
 .item-grid .item-thumbnail img {
-    /* General properties for all thumbnail images */
-    object-fit: contain; /* Ensure whole image is visible, maintaining aspect ratio */
-    margin-bottom: 3px; /* Default space for name span below image */
-    display: block; /* Remove extra space below image */
+
+    object-fit: contain;
+    margin-bottom: 3px;
+    display: block;
     transition: opacity 0.3s ease-in-out;
-    opacity: 0; /* Hidden until loaded */
-    position: relative; /* Needed for z-index if other elements overlap */
-    z-index: 1; /* Below spinner overlay */
-    /* width, height, max-height will be set by more specific rules */
+    opacity: 0;
+    position: relative;
+    z-index: 1;
+
 }
 
 
-/* Images within variable height thumbnails (templates, covers, elements) */
+
 .item-grid .template-thumbnail img,
 .item-grid .cover-thumbnail img,
 .item-grid .element-thumbnail img,
 .item-grid .overlay-thumbnail img {
-    width: 100%; /* Make image fill the content width of the thumbnail */
-    height: auto; /* Adjust height automatically to maintain aspect ratio */
-    max-height: none; /* Remove any artificial max-height limit */
+    width: 100%;
+    height: auto;
+    max-height: none;
 }
 
 
@@ -206,47 +219,47 @@ body {
 }
 
 .item-grid .item-thumbnail.loading img {
-    opacity: 0 !important; /* Force hide image while loading */
+    opacity: 0 !important;
 }
 
-/* --- Thumbnail Spinner --- */
+
 .item-grid .thumbnail-spinner-overlay {
     position: absolute;
-    top: 0; /* Cover entire thumbnail area */
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.85); /* Semi-transparent background */
+    background: rgba(255, 255, 255, 0.85);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2; /* Above the image and text span */
-    border-radius: inherit; /* Inherit border-radius from .item-thumbnail (4px) */
+    z-index: 2;
+    border-radius: inherit;
     transition: opacity 0.3s ease-in-out;
-    opacity: 0; /* Hidden by default */
-    pointer-events: none; /* Don't block clicks */
+    opacity: 0;
+    pointer-events: none;
 }
 
 
 .item-grid .item-thumbnail.loading .thumbnail-spinner-overlay {
-    opacity: 1; /* Show spinner when loading */
+    opacity: 1;
 }
 
 /* --- Thumbnail Name Span --- */
 .item-grid .item-thumbnail span {
-    display: block; /* Ensure it takes full width */
-    background-color: #fff; /* White background for text */
+    display: block;
+    background-color: #fff;
     font-size: 0.75rem;
-    /* margin-top: auto; */ /* Not strictly needed with justify-content: space-between on parent, but harmless */
-    padding-top: 3px; /* Add a little space above name if image is directly above */
+
+    padding-top: 3px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: calc(100% - 6px); /* Prevent overflow, accounts for 3px L/R padding of parent */
+    width: calc(100% - 6px);
     color: #495057;
     line-height: 1.2;
-    position: relative; /* Ensure it's rendered correctly with absolute spinner overlay */
-    z-index: 1; /* Same level as image, below spinner */
+    position: relative;
+    z-index: 1;
 }
 
 /* --- Canvas Area --- */
@@ -256,7 +269,7 @@ body {
     overflow: auto;
     cursor: grab;
     flex-grow: 1;
-    /*height: 100%; !* Fill height *!*/
+
 }
 
 #canvas-area.panning {
@@ -264,7 +277,7 @@ body {
 }
 
 #canvas-wrapper {
-    margin: 100px auto;
+    margin: 500px 1000px;
     padding: 0;
     position: relative;
     display: block;
@@ -285,7 +298,7 @@ body {
 .canvas-element {
     position: absolute;
     cursor: grab;
-    /*border: 1px dashed transparent;*/
+
     border: none;
     box-sizing: border-box;
 }
@@ -314,12 +327,12 @@ body {
     width: 10px !important;
     height: 10px !important;
     border-radius: 50% !important;
-    margin-top: -5px !important; /* Adjust based on size */
-    margin-left: -5px !important; /* Adjust based on size */
+    margin-top: -5px !important;
+    margin-left: -5px !important;
 }
 
 .moveable-line.moveable-guideline {
-    background: #ff4444 !important; /* Guideline color */
+    background: #ff4444 !important;
     opacity: 0.9;
     border: 1px solid #ccc;
 }
@@ -345,12 +358,12 @@ body {
     box-sizing: border-box;
 }
 
-/* Allow text selection when editing (future enhancement) */
-/* .canvas-element.editing .text-content { user-select: text; } */
+
+
 
 /* --- Layers Panel (Inside Sliding Panel) --- */
 #layerList {
-    /* Remove background/border, handled by panel */
+
     background-color: transparent;
 }
 
@@ -358,19 +371,19 @@ body {
     padding: 0.5rem 0.75rem;
     cursor: pointer;
     user-select: none;
-    background-color: transparent; /* Inherit from panel */
-    border: none; /* Remove individual borders */
-    border-bottom: 1px solid #eee; /* Keep bottom separator */
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid #eee;
     transition: background-color 0.15s ease-in-out;
-    color: #212529; /* Default text color */
+    color: #212529;
 }
 
 #layerList .list-group-item:first-child {
-    border-top: none; /* No top border */
+    border-top: none;
 }
 
 #layerList .list-group-item:last-child {
-    border-bottom: none; /* No bottom border on last */
+    border-bottom: none;
 }
 
 #layerList .list-group-item:hover:not(.active) {
@@ -407,23 +420,23 @@ body {
 #layerList .layer-name-display {
     font-size: 0.9em;
     line-height: 1.2;
-    display: inline-block; /* Needed for ellipsis */
-    width: 100%; /* Take full width of container */
+    display: inline-block;
+    width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    vertical-align: middle; /* Align better with icons/buttons */
-    cursor: text; /* Indicate it's editable */
+    vertical-align: middle;
+    cursor: text;
 }
 
 #layerList .layer-name-input {
-    padding: 0.1rem 0.25rem; /* Smaller padding */
-    height: auto; /* Adjust height */
-    line-height: inherit; /* Match list item line height */
-    font-size: 0.9em; /* Match display font size */
+    padding: 0.1rem 0.25rem;
+    height: auto;
+    line-height: inherit;
+    font-size: 0.9em;
     width: 100%;
-    box-sizing: border-box; /* Include padding/border in width */
-    border: 1px solid #0d6efd; /* Highlight input */
+    box-sizing: border-box;
+    border: 1px solid #0d6efd;
     outline: none;
 }
 
@@ -574,32 +587,32 @@ body {
 .inspector-panel {
     position: absolute;
     top: 0;
-    right: 0; /* Position on the right */
+    right: 0;
     width: var(--inspector-panel-width);
-    height: 100%; /* Fill height of parent (.main-content) */
+    height: 100%;
     background-color: #f8f9fa;
     border-left: 1px solid #dee2e6;
     overflow-y: auto;
     font-size: 0.85rem;
-    z-index: 1045; /* Same as left panels, above canvas */
-    transform: translateX(var(--inspector-panel-width)); /* Start hidden off-screen */
+    z-index: 1045;
+    transform: translateX(var(--inspector-panel-width));
     transition: transform 0.3s ease-in-out;
-    box-shadow: -3px 0 6px rgba(0, 0, 0, 0.15); /* Shadow on the left */
-    /* Remove flex-shrink if it was there */
-    display: flex; /* Use flex for internal layout */
-    flex-direction: column; /* Stack sections vertically */
+    box-shadow: -3px 0 6px rgba(0, 0, 0, 0.15);
+
+    display: flex;
+    flex-direction: column;
 }
 
 .inspector-panel.open {
-    transform: translateX(0); /* Slide into view */
+    transform: translateX(0);
 }
 
-/* Inspector Close Button */
+
 .close-inspector-btn {
     position: absolute;
-    top: 8px; /* Adjust as needed */
-    right: 8px; /* Adjust as needed */
-    z-index: 15; /* Above panel header */
+    top: 8px;
+    right: 8px;
+    z-index: 15;
     padding: 0.25rem 0.5rem;
     background-color: transparent;
     border: none;
@@ -663,9 +676,9 @@ body {
 }
 
 .inspector-panel .form-control-color {
-    padding: 0.1rem; /* Adjust color picker padding */
-    min-width: 30px; /* Ensure minimum size */
-    height: calc(1.5em + 0.5rem + 2px); /* Match other controls height */
+    padding: 0.1rem;
+    min-width: 30px;
+    height: calc(1.5em + 0.5rem + 2px);
 }
 
 .inspector-panel .alignment-icons .btn {
@@ -679,17 +692,17 @@ body {
 
 .inspector-panel .color-input-group .form-control-color {
     flex-shrink: 0;
-    width: 40px; /* Fixed width for color picker */
+    width: 40px;
     margin-right: 5px;
 }
 
 .inspector-panel .color-input-group .form-control {
-    flex-grow: 1; /* Text input takes remaining space */
+    flex-grow: 1;
     min-width: 80px;
 }
 
 .inspector-panel .opacity-label {
-    width: 50px; /* Align with % display */
+    width: 50px;
     text-align: right;
 }
 
@@ -719,17 +732,17 @@ body {
 }
 
 #inspector-layer-info-actions .section-header {
-    border-bottom: none; /* Remove bottom border if header only contains name */
+    border-bottom: none;
     padding-bottom: 0;
-    padding-top: 0.5rem; /* Adjust padding */
+    padding-top: 0.5rem;
 }
 
 #inspector-layer-name {
-    font-size: 0.95rem; /* Slightly larger */
+    font-size: 0.95rem;
     font-weight: bold;
-    color: #343a40; /* Darker color */
-    display: block; /* Ensure it takes full width for truncation */
-    max-width: calc(var(--inspector-panel-width) - 3rem); /* Prevent overflow */
+    color: #343a40;
+    display: block;
+    max-width: calc(var(--inspector-panel-width) - 3rem);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -737,28 +750,28 @@ body {
 }
 
 #inspector-layer-info-actions .section-content {
-    border-bottom: 1px solid #e9ecef; /* Add separator below buttons */
+    border-bottom: 1px solid #e9ecef;
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
 }
 
 #inspector-layer-info-actions .btn-group .btn {
-    padding: 0.25rem 0.5rem; /* Slightly smaller padding */
-    font-size: 0.8rem; /* Match other inspector controls */
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
 }
 
 #export-overlay {
-    position: fixed; /* Cover the entire viewport */
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent dark background */
-    z-index: 9999; /* Ensure it's on top of everything */
-    display: flex; /* Use flexbox for centering */
-    align-items: center; /* Vertical centering */
-    justify-content: center; /* Horizontal centering */
-    cursor: wait; /* Indicate processing */
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: wait;
 }
 
 #export-overlay .export-spinner-content {
@@ -766,30 +779,30 @@ body {
 }
 
 #export-overlay .spinner-border {
-    width: 3rem; /* Make spinner larger */
+    width: 3rem;
     height: 3rem;
 }
 
 #export-overlay p {
     font-size: 1.1rem;
-    margin-top: 1rem; /* Space between spinner and text */
+    margin-top: 1rem;
 }
 
 
 #canvasPreviewContainer {
-    min-height: 250px; /* Ensure minimum height for the column */
-    background-color: #e9ecef; /* Light background for the preview column */
+    min-height: 250px;
+    background-color: #e9ecef;
     border-radius: 0.25rem;
     padding: 10px;
 }
 
 #canvasPreviewArea {
-    display: flex; /* Arrange back, spine, front horizontally */
-    align-items: center; /* Vertically center items if heights differ slightly */
-    justify-content: center; /* Horizontally center the group */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     height: 100%;
-    overflow: hidden; /* Hide parts if scaling is imperfect */
+    overflow: hidden;
     transition: opacity 0.2s ease-in-out;
 }
 
@@ -797,8 +810,8 @@ body {
 #previewSpine,
 #previewFront {
     box-sizing: border-box;
-    border: 1px solid #6c757d; /* Darker border */
-    flex-shrink: 0; /* Prevent shrinking */
+    border: 1px solid #6c757d;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -806,30 +819,30 @@ body {
     font-size: 0.7rem;
     color: #495057;
     overflow: hidden;
-    white-space: normal; /* Allow text wrapping */
+    white-space: normal;
     padding: 2px;
     transition: width 0.2s ease-in-out, height 0.2s ease-in-out, opacity 0.2s ease-in-out;
 }
 
 #previewBack {
-    background-color: #f8f9fa; /* Lighter background */
-    border-right: none; /* Remove right border if spine exists */
+    background-color: #f8f9fa;
+    border-right: none;
 }
 
 #previewSpine {
-    background-color: #dee2e6; /* Slightly darker for spine */
-    border-left: 1px dashed #6c757d; /* Dashed left border */
-    border-right: 1px dashed #6c757d; /* Dashed right border */
-    writing-mode: vertical-rl; /* Optional: Vertical text for spine */
-    text-orientation: mixed; /* Optional: Vertical text orientation */
+    background-color: #dee2e6;
+    border-left: 1px dashed #6c757d;
+    border-right: 1px dashed #6c757d;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
 }
 
 #previewFront {
-    background-color: #f8f9fa; /* Lighter background */
-    border-left: none; /* Remove left border if spine exists */
+    background-color: #f8f9fa;
+    border-left: none;
 }
 
-/* Adjust borders when elements are hidden */
+
 #canvasPreviewArea > #previewSpine:not([style*="display: none"]) + #previewFront {
     border-left: none;
 }
@@ -839,46 +852,46 @@ body {
 }
 
 #canvasPreviewArea > #previewBack:not([style*="display: none"]) + #previewFront:only-child {
-    /* This case shouldn't happen with current logic, but good fallback */
+
     border-left: 1px solid #6c757d;
 }
 
 
-/* Style for radio button group */
+
 #canvasSizePresetGroup .form-check {
     margin-bottom: 0.5rem;
 }
 
-/* Ensure error messages have some space */
+
 .modal-body .invalid-feedback {
     margin-top: 0.25rem;
-    width: 100%; /* Ensure it takes full width */
+    width: 100%;
 }
 
 /* --- Canvas Size Modal Theming --- */
 #canvasSizeModal .modal-content-editor-theme {
-    background-color: #f8f9fa; /* Match panel background */
-    border: 1px solid #dee2e6; /* Match panel border */
-    border-radius: 4px; /* Reduced radius */
-    color: #495057; /* Match panel text */
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    color: #495057;
 }
 
 #canvasSizeModal .modal-header {
-    background-color: #e9ecef; /* Match panel header */
+    background-color: #e9ecef;
     border-bottom: 1px solid #dee2e6;
-    padding: 0.6rem 0.8rem; /* Reduced padding */
-    border-top-left-radius: 3px; /* Match content radius */
+    padding: 0.6rem 0.8rem;
+    border-top-left-radius: 3px;
     border-top-right-radius: 3px;
 }
 
 #canvasSizeModal .modal-header .modal-title {
-    font-size: 1rem; /* Slightly smaller title */
+    font-size: 1rem;
     font-weight: bold;
     color: #495057;
 }
 
 #canvasSizeModal .modal-header .btn-close {
-    filter: invert(30%) grayscale(100%) brightness(100%); /* Make close button darker */
+    filter: invert(30%) grayscale(100%) brightness(100%);
     opacity: 0.7;
 }
 
@@ -888,19 +901,19 @@ body {
 
 
 #canvasSizeModal .modal-body {
-    padding: 0.8rem; /* Reduced padding */
-    font-size: 0.85rem; /* Match inspector font size */
+    padding: 0.8rem;
+    font-size: 0.85rem;
 }
 
 #canvasSizeModal .modal-footer {
-    background-color: #f8f9fa; /* Match content background */
-    border-top: 1px solid #e9ecef; /* Lighter separator */
-    padding: 0.6rem 0.8rem; /* Reduced padding */
-    border-bottom-left-radius: 3px; /* Match content radius */
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    padding: 0.6rem 0.8rem;
+    border-bottom-left-radius: 3px;
     border-bottom-right-radius: 3px;
 }
 
-/* Reduce margins on form elements */
+
 #canvasSizeModal .modal-body .mb-1 {
     margin-bottom: 0.25rem !important;
 }
@@ -913,22 +926,22 @@ body {
     margin-bottom: 0.75rem !important;
 }
 
-/* Keep slightly larger for main sections if needed */
+
 #canvasSizeModal .modal-body .mt-1 {
     margin-top: 0.25rem !important;
 }
 
-/* Style form elements */
+
 #canvasSizeModal .form-label-sm {
-    font-size: 0.75rem; /* Smaller labels */
+    font-size: 0.75rem;
     margin-bottom: 0.15rem;
     color: #6c757d;
 }
 
 #canvasSizeModal .form-control-sm,
 #canvasSizeModal .form-select-sm {
-    font-size: 0.8rem; /* Match inspector controls */
-    border-radius: 3px; /* Reduced radius */
+    font-size: 0.8rem;
+    border-radius: 3px;
     border-color: #ced4da;
 }
 
@@ -946,14 +959,14 @@ body {
 }
 
 #canvasSizeModal .form-check-sm .form-check-label {
-    font-size: 0.85rem; /* Match body font size */
+    font-size: 0.85rem;
     padding-left: 0.3em;
 }
 
 #canvasSizeModal .btn-sm {
-    font-size: 0.8rem; /* Match inspector buttons */
-    padding: 0.25rem 0.6rem; /* Adjust padding */
-    border-radius: 3px; /* Reduced radius */
+    font-size: 0.8rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 3px;
 }
 
 #canvasSizeModal .btn-primary {
@@ -967,23 +980,23 @@ body {
 }
 
 #canvasSizeModal .invalid-feedback {
-    font-size: 0.75rem; /* Smaller error messages */
+    font-size: 0.75rem;
     margin-top: 0.15rem;
 }
 
 /* Preview Area Adjustments */
 #canvasPreviewContainer {
-    background-color: #e9ecef; /* Match header background */
-    border-radius: 3px; /* Reduced radius */
-    padding: 8px; /* Reduced padding */
-    min-height: 200px; /* Slightly reduced min-height */
+    background-color: #e9ecef;
+    border-radius: 3px;
+    padding: 8px;
+    min-height: 200px;
 }
 
 #previewBack, #previewSpine, #previewFront {
-    border: 1px solid #adb5bd; /* Slightly lighter border */
-    font-size: 0.65rem; /* Smaller text */
-    padding: 1px; /* Tighter padding */
-    border-radius: 2px; /* Slight radius */
+    border: 1px solid #adb5bd;
+    font-size: 0.65rem;
+    padding: 1px;
+    border-radius: 2px;
 }
 
 #previewSpine {
@@ -996,7 +1009,7 @@ body {
     background-color: #f8f9fa;
 }
 
-/* Ensure borders connect correctly */
+
 #canvasPreviewArea > #previewSpine:not([style*="display: none"]) + #previewFront {
     border-left: none;
 }
@@ -1008,11 +1021,21 @@ body {
 .canvas-guide {
     position: absolute;
     top: 0;
-    bottom: 0; /* Or height: 100% */
-    width: 1px; /* Adjust thickness if needed */
-    background-color: rgba(255, 0, 255, 0.7); /* Visible color (e.g., magenta) */
-    border-left: 1px dashed rgba(0, 0, 0, 0.5); /* Dashed line effect */
-    z-index: 500; /* Above canvas content, below moveable handles */
-    pointer-events: none; /* Make them non-interactive */
+    bottom: 0;
+    width: 1px;
+    background-color: rgba(255, 0, 255, 0.7);
+    border-left: 1px dashed rgba(0, 0, 0, 0.5);
+    z-index: 500;
+    pointer-events: none;
     box-sizing: border-box;
+}
+
+#locked-selection-highlight {
+    position: absolute;
+    border: 2px dashed #0d6efd;
+    pointer-events: none;
+    z-index: 990;
+    box-sizing: border-box;
+    display: none;
+    transform-origin: center center;
 }
