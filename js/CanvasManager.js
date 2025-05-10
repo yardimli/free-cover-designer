@@ -71,7 +71,7 @@ class CanvasManager {
 			spineWidth = 0,
 			backWidth = 0
 		} = config;
-		
+
 		this.currentCanvasWidth = parseFloat(totalWidth) || this.DEFAULT_CANVAS_WIDTH;
 		this.currentCanvasHeight = parseFloat(height) || this.DEFAULT_CANVAS_HEIGHT;
 		this.frontCoverWidth = parseFloat(frontWidth) || this.currentCanvasWidth;
@@ -102,6 +102,8 @@ class CanvasManager {
 		if (this.$guideRight) this.$guideRight.remove();
 		this.$guideLeft = null;
 		this.$guideRight = null;
+		
+		console.log("Guide: " + this.spineWidth + " " + this.backCoverWidth);
 		
 		// Only add guides if spine and back cover exist
 		if (this.spineWidth > 0 && this.backCoverWidth > 0) {
@@ -141,6 +143,83 @@ class CanvasManager {
 		});
 	}
 	
+	calculateLayerBoundingRect(layer) {
+		let layerX = layer.x;
+		let layerY = layer.y;
+		let layerWidth = layer.width;
+		let layerHeight = layer.height;
+		
+		// Store the center point of the layer (this will remain fixed)
+		const centerX = layerX + layerWidth / 2;
+		const centerY = layerY + layerHeight / 2;
+		
+		//apply layer scale as percentage and rotation in degrees to layerX, layerY, layerWidth, layerHeight
+		if (layer.scale) {
+			// Apply scale as percentage (scale is expected to be a value like 100 for 100%)
+			const scaleRatio = layer.scale / 100;
+			
+			// Calculate new dimensions while maintaining the center
+			const newWidth = layerWidth * scaleRatio;
+			const newHeight = layerHeight * scaleRatio;
+			
+			// Recalculate top-left position to maintain the center
+			layerX = centerX - newWidth / 2;
+			layerY = centerY - newHeight / 2;
+			
+			// Update width and height
+			layerWidth = newWidth;
+			layerHeight = newHeight;
+		}
+		
+		if (layer.rotation) {
+			// Convert rotation from degrees to radians
+			const angleRad = layer.rotation * Math.PI / 180;
+			
+			// Calculate the corners of the rectangle before rotation (relative to center)
+			const halfWidth = layerWidth / 2;
+			const halfHeight = layerHeight / 2;
+			
+			const corners = [
+				{x: -halfWidth, y: -halfHeight}, // top-left
+				{x: halfWidth, y: -halfHeight},  // top-right
+				{x: halfWidth, y: halfHeight},   // bottom-right
+				{x: -halfWidth, y: halfHeight}   // bottom-left
+			];
+			
+			// Rotate each corner and find the new bounds
+			let minX = Number.MAX_VALUE;
+			let minY = Number.MAX_VALUE;
+			let maxX = Number.MIN_VALUE;
+			let maxY = Number.MIN_VALUE;
+			
+			for (const corner of corners) {
+				// Apply rotation
+				const rotatedX = corner.x * Math.cos(angleRad) - corner.y * Math.sin(angleRad);
+				const rotatedY = corner.x * Math.sin(angleRad) + corner.y * Math.cos(angleRad);
+				
+				// Update bounds
+				minX = Math.min(minX, rotatedX);
+				minY = Math.min(minY, rotatedY);
+				maxX = Math.max(maxX, rotatedX);
+				maxY = Math.max(maxY, rotatedY);
+			}
+			
+			// Calculate new bounding box (centered at the original center)
+			layerX = centerX + minX;
+			layerY = centerY + minY;
+			layerWidth = maxX - minX;
+			layerHeight = maxY - minY;
+		}
+		return {
+			x: layerX,
+			y: layerY,
+			width: layerWidth,
+			height: layerHeight,
+			x2: layerX + layerWidth,
+			y2: layerY + layerHeight
+		};
+	}
+	
 	initializeCanvasInteractivity() {
 		const div = document.getElementById('canvas');
 		const self = this;
@@ -156,80 +235,54 @@ class CanvasManager {
 			mouseX = mouseX / self.currentZoom;
 			mouseY = mouseY / self.currentZoom;
 			
-			// if (self.layerManager.moveableInstance) {
-			// 	console.log("Destroying moveableInstance ",self.layerManager.moveableInstance);
-			// 	self.layerManager.moveableInstance.destroy();
-			// 	self.layerManager.moveableInstance = null;
-			// 	self.layerManager.moveableTargetElement = null;
-			// }
-			
 			console.log(`Clicked at position: x=${mouseX}, y=${mouseY}`);
 			
-			//find highest z-index text layer first.
-			let highestZIndex = -1;
-			let clickedLayer = null;
+			// Find clickable layers at this position
+			let clickableLayers = [];
 			
 			for (let i = 0; i < self.layerManager.getLayers().length; i++) {
 				const layer = self.layerManager.getLayers()[i];
-				if (layer.x <= mouseX && layer.x + layer.width >= mouseX && layer.y <= mouseY && layer.y + layer.height >= mouseY) {
-					if (!layer.locked && layer.type === 'text') {
-						if (layer.zIndex > highestZIndex) {
-							highestZIndex = layer.zIndex;
-							clickedLayer = layer;
-						}
-						console.log("Click inside text layer: " + layer.id + ' z-index: ' + layer.zIndex);
+				const layer_bounding = self.calculateLayerBoundingRect(layer);
+				
+				if (layer_bounding.x <= mouseX && layer_bounding.x2 >= mouseX &&
+					layer_bounding.y <= mouseY && layer_bounding.y2 >= mouseY) {
+					if (!layer.locked) {
+						// Calculate the area of the layer to determine its size
+						const layerArea = layer_bounding.width * layer_bounding.height;
+						
+						clickableLayers.push({
+							layer: layer,
+							zIndex: layer.zIndex,
+							area: layerArea
+						});
+						
+						console.log("Click inside layer: " + layer.id +
+							' z-index: ' + layer.zIndex +
+							' area: ' + layerArea);
 					}
 				}
 			}
-			if (clickedLayer) {
-				self.layerManager.selectLayer(clickedLayer.id);
-				console.log("Selected layer: " + clickedLayer.id);
-			} else {
-				//look for non-text layers that are not locked
-				let highestZIndex = -1;
-				for (let i = 0; i < self.layerManager.getLayers().length; i++) {
-					const layer = self.layerManager.getLayers()[i];
-					if (layer.x <= mouseX && layer.x + layer.width >= mouseX && layer.y <= mouseY && layer.y + layer.height >= mouseY) {
-						if (!layer.locked && layer.type !== 'text') {
-							if (layer.zIndex > highestZIndex) {
-								highestZIndex = layer.zIndex;
-								clickedLayer = layer;
-							}
-							console.log("Click inside layer: " + layer.id + ' z-index: ' + layer.zIndex);
-						}
+			
+			let selectedLayer = null;
+			
+			if (clickableLayers.length > 0) {
+				// Sort layers by area (ascending) first, then by z-index (descending) if areas are equal
+				clickableLayers.sort((a, b) => {
+					if (a.area !== b.area) {
+						return a.area - b.area; // Smaller area first
 					}
-				}
+					return b.zIndex - a.zIndex; // Higher z-index first if areas are the same
+				});
 				
-				if (clickedLayer) {
-					self.layerManager.selectLayer(clickedLayer.id);
-					console.log("Selected layer: " + clickedLayer.id);
-				} else {
-					
-					let highestZIndex = -1;
-					let clickedLayer = null;
-					for (let i = 0; i < self.layerManager.getLayers().length; i++) {
-						const layer = self.layerManager.getLayers()[i];
-						if (layer.x <= mouseX && layer.x + layer.width >= mouseX && layer.y <= mouseY && layer.y + layer.height >= mouseY) {
-							// console.log(layer);
-							if (layer.locked) {
-								// Check if this layer is the highest z-index so far
-								if (layer.zIndex > highestZIndex) {
-									highestZIndex = layer.zIndex;
-									clickedLayer = layer;
-								}
-								console.log("Click inside locked layer: " + layer.id + ' z-index: ' + layer.zIndex);
-							}
-						}
-					}
-					if (clickedLayer) {
-						self.layerManager.selectLayer(clickedLayer.id);
-						console.log("Selected locked layer: " + clickedLayer.id);
-					} else
-					{
-						self.layerManager.selectLayer(null); // Deselect if no layer is clicked
-						console.log("No layer selected.");
-					}
-				}
+				// Select the smallest area layer (or highest z-index if areas are equal)
+				selectedLayer = clickableLayers[0].layer;
+				self.layerManager.selectLayer(selectedLayer.id);
+				console.log("Selected layer: " + selectedLayer.id +
+					" (area: " + clickableLayers[0].area +
+					", z-index: " + selectedLayer.zIndex + ")");
+			} else {
+				self.layerManager.selectLayer(null); // Deselect if no layer is clicked
+				console.log("No layer selected.");
 			}
 		});
 	}

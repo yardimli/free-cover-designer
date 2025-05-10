@@ -480,7 +480,9 @@ class LayerManager {
 		}
 		
 		if (!keepNonTextLayers) {
-			this.$canvas.empty();
+			// this.$canvas.empty(); // This removes everything, including guides
+			// Only remove elements that are actual layers managed by LayerManager
+			this.$canvas.find('.canvas-element').remove();
 			this.layers = [];
 		} else {
 			console.warn("setLayers called with keepNonTextLayers=true");
@@ -595,8 +597,8 @@ class LayerManager {
 			rotatable: false,
 			keepRatio: false, // Allow free transform, Shift key usually enforces ratio
 			snappable: true,
-			isDisplayInnerSnapDigit:false,
-			isDisplaySnapDigit:false,
+			isDisplayInnerSnapDigit: false,
+			isDisplaySnapDigit: false,
 			snapDirections: {
 				top: true,
 				left: true,
@@ -778,6 +780,13 @@ class LayerManager {
 		
 		// Canvas Guidelines
 		const verticalGuidelines = [0, canvasWidth / 2, canvasWidth];
+		// add #canvas-guide-right and #canvas-guide-left if they exist
+		if (this.canvasManager.backCoverWidth>0) {
+			verticalGuidelines.push(this.canvasManager.backCoverWidth);
+			verticalGuidelines.push(this.canvasManager.backCoverWidth+this.canvasManager.spineWidth);
+		}
+
+		console.log("Vertical guidelines:", verticalGuidelines);
 		const horizontalGuidelines = [0, canvasHeight / 2, canvasHeight];
 		
 		// Element Guidelines (other visible)

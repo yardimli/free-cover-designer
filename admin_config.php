@@ -220,8 +220,8 @@
 		$data = [
 			'model' => $model,
 			'messages' => $messages,
-			'temperature' => (float)$temperature,
-			'max_tokens' => (int)$max_tokens,
+//			'temperature' => (float)$temperature,
+//			'max_tokens' => (int)$max_tokens,
 			'top_p' => 1,
 			'frequency_penalty' => 0,
 			'presence_penalty' => 0,

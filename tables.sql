@@ -65,6 +65,5 @@ CREATE TABLE `cover_types` (
 -- Populate initial cover types
 INSERT INTO `cover_types` (`type_name`) VALUES
 ('Book Cover'),
-('Spine'),
-('Back Cover'),
+('Print Cover'),
 ('Album Cover');

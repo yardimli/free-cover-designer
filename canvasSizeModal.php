@@ -106,13 +106,6 @@
 									<div class="form-text text-muted mt-1" id="calculatedSpineInfo" style="display: none;"></div>
 									<div class="invalid-feedback" id="spineCalculationError" style="display: none;">Could not calculate spine width. Check options.</div>
 								</div>
-
-								<?php /* REMOVED Back Cover Checkbox
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" value="" id="addBackCoverCheckbox">
-                                    <label class="form-check-label" for="addBackCoverCheckbox"> Add Back Cover </label>
-                                </div>
-                                */ ?>
 							</div> <!-- End spineControls -->
 						</form>
 					</div>

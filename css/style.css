@@ -315,13 +315,13 @@ body {
 .canvas-element.selected {
     /*border: 1px dashed #0d6efd;*/
     z-index: 1001 !important;
+    /*opacity: 0.7 !important;*/
 }
 
 .canvas-element.locked {
     cursor: default;
     pointer-events: none;
 }
-
 
 .canvas-element.interactions-disabled {
     cursor: default !important;
@@ -1044,4 +1044,8 @@ body {
     box-sizing: border-box;
     display: none;
     transform-origin: center center;
+}
+
+.font-picker {
+    min-width: 200px !important;
 }

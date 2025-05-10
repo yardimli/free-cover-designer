@@ -166,7 +166,6 @@
 				<div class="panel-content-wrapper">
 					<div class="panel-header d-flex align-items-center gap-2"> <!-- Modified for flex layout -->
 						<select id="coverTypeFilter" class="form-select form-select-sm" aria-label="Filter by cover type" style="flex-basis: 130px; flex-shrink: 0;">
-							<option value="" selected>All Types</option>
 							<!-- Options will be populated by JavaScript -->
 						</select>
 						<input type="search" id="coverSearch" class="form-control form-control-sm" placeholder="Search covers..." style="flex-grow: 1;">
@@ -180,7 +179,6 @@
 				<div class="panel-content-wrapper">
 					<div class="panel-header d-flex align-items-center gap-2"> <!-- Modified for flex layout -->
 						<select id="templateTypeFilter" class="form-select form-select-sm" aria-label="Filter by template type" style="flex-basis: 130px; flex-shrink: 0;">
-							<option value="" selected>All Types</option>
 							<!-- Options will be populated by JavaScript -->
 						</select>
 						<input type="search" id="templateSearch" class="form-control form-control-sm" placeholder="Search templates..." style="flex-grow: 1;">

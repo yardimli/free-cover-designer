@@ -22,9 +22,6 @@ class CanvasSizeModal {
 		this.$paperTypeSelect = $('#paperTypeSelect');
 		this.$calculatedSpineInfo = $('#calculatedSpineInfo');
 		this.$spineCalculationError = $('#spineCalculationError');
-		// --- REMOVED Back Cover Checkbox Reference ---
-		// this.$addBackCoverCheckbox = $('#addBackCoverCheckbox');
-		// --- END REMOVED ---
 		this.$applyBtn = $('#setCanvasSizeBtn');
 		this.$previewContainer = $('#canvasPreviewContainer');
 		this.$previewArea = $('#canvasPreviewArea');
@@ -72,10 +69,6 @@ class CanvasSizeModal {
 			this._toggleSpineInputMethod();
 			this._updatePreview();
 		});
-		
-		// --- REMOVED: Back cover change listener ---
-		// this.$addBackCoverCheckbox.on('change', () => { ... });
-		// --- END REMOVED ---
 		
 		let pixelDebounceTimer;
 		this.$spineWidthInput.on('input', () => {
@@ -342,12 +335,7 @@ class CanvasSizeModal {
 		const [presetWidthStr, presetHeightStr] = presetValue.split('x');
 		const frontWidth = parseInt(presetWidthStr, 10);
 		const coverHeight = parseInt(presetHeightStr, 10);
-		// --- UPDATED: Use new checkbox state ---
 		const addSpineAndBack = this.$addSpineAndBackCheckbox.is(':checked');
-		// --- END UPDATED ---
-		// --- REMOVED: Old back cover variable ---
-		// const addBackCover = this.$addBackCoverCheckbox.is(':checked');
-		// --- END REMOVED ---
 		
 		let spineWidth = 0;
 		let spineDisplayError = false;

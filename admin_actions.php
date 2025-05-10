@@ -658,7 +658,7 @@
 		$common_keywords_prompt = "Generate a list of 10-15 relevant keywords for this image, suitable for search or tagging. Include single words and relevant two-word phrases. Focus on visual elements, style, and potential use case. Output only a comma-separated list.";
 		$ai_generated_data = [];
 		local_log("AI: Requesting keywords for {$item_type} ID {$id}");
-		$keywords_response = generate_metadata_from_image_base64($common_keywords_prompt, $base64_image, $mime_type, 'gpt-4o-mini');
+		$keywords_response = generate_metadata_from_image_base64($common_keywords_prompt, $base64_image, $mime_type, 'o4-mini-2025-04-16');
 		if (isset($keywords_response['content'])) {
 			$parsed_keywords = parse_ai_list_response($keywords_response['content']);
 			if (!empty($parsed_keywords)) {
@@ -673,7 +673,7 @@
 		if ($item_type === 'covers') {
 			$caption_prompt = "Describe this book cover image concisely for use as an alt text or short caption. Focus on the main visual elements and mood. Do not include or describe any text visible on the image. Maximum 140 characters.";
 			local_log("AI: Requesting caption for cover ID {$id}");
-			$caption_response = generate_metadata_from_image_base64($caption_prompt, $base64_image, $mime_type, 'gpt-4o-mini');
+			$caption_response = generate_metadata_from_image_base64($caption_prompt, $base64_image, $mime_type, 'o4-mini-2025-04-16');
 			if (isset($caption_response['content'])) {
 				$ai_generated_data['caption'] = trim($caption_response['content']);
 				if (strlen($ai_generated_data['caption']) > 255) {
@@ -685,7 +685,7 @@
 			}
 			$categories_prompt = "Categorize this book cover image into 1-3 relevant genres from the following list: Mystery, Thriller & Suspense, Fantasy, Science Fiction, Horror, Romance, Erotica, Children's, Action & Adventure, Chick Lit, Historical Fiction, Literary Fiction, Teen & Young Adult, Royal Romance, Western, Surreal, Paranormal & Urban, Apocalyptic, Nature, Poetry, Travel, Religion & Spirituality, Business, Self-Improvement, Education, Health & Wellness, Cookbooks & Food, Environment, Politics & Society, Family & Parenting, Abstract, Medical, Fitness, Sports, Science, Music. Output only a comma-separated list of the chosen categories.";
 			local_log("AI: Requesting categories for cover ID {$id}");
-			$categories_response = generate_metadata_from_image_base64($categories_prompt, $base64_image, $mime_type, 'gpt-4o-mini');
+			$categories_response = generate_metadata_from_image_base64($categories_prompt, $base64_image, $mime_type, 'o4-mini-2025-04-16');
 			if (isset($categories_response['content'])) {
 				$parsed_categories = parse_ai_list_response($categories_response['content']);
 				if (!empty($parsed_categories)) {
@@ -788,7 +788,7 @@
 
 		local_log("AI Similar Template: Requesting generation for template ID {$original_template_id}. User prompt: {$user_prompt_text}");
 
-		$ai_response = call_openAI_question($messages, 0.6, 4000, 'gpt-4o');
+		$ai_response = call_openAI_question($messages, 0.6, 4000, 'o3-2025-04-16');
 
 		if (isset($ai_response['error'])) {
 			local_log("AI Similar Template: Error for ID {$original_template_id}: " . $ai_response['error']);
@@ -808,26 +808,19 @@
 			respond_error('AI returned invalid JSON: ' . json_last_error_msg() . ". Please try rephrasing your prompt or try again. Raw AI output: " . htmlspecialchars(substr($ai_response['content'], 0, 200)) . "...");
 		}
 
-		$ai_templates_dir = ADMIN_AI_TEMPLATES_DIR;
-		if (!is_dir($ai_templates_dir)) {
-			if (!@mkdir($ai_templates_dir, 0775, true)) {
-				local_log("AI Similar Template: Failed to create directory {$ai_templates_dir}");
-				respond_error('Could not create directory for AI-generated templates.');
-			}
-		}
-
+		// Prepare for download instead of saving
 		$timestamp = time();
 		$filename = "template_ai_origID{$original_template_id}_{$timestamp}.json";
-		$filepath = $ai_templates_dir . '/' . $filename;
 		$pretty_json_to_save = json_encode($decoded_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-		if (file_put_contents($filepath, $pretty_json_to_save) === false) {
-			local_log("AI Similar Template: Failed to write file {$filepath}");
-			respond_error('Failed to save AI-generated template file.');
-		}
+		// The ADMIN_AI_TEMPLATES_DIR and file saving logic is removed from here.
+		// The directory might still be created by admin_config.php for other purposes.
 
-		local_log("AI Similar Template: Successfully generated and saved {$filename}");
-		respond_success('AI-generated template file created successfully.', ['filename' => $filename, 'directory' => basename(ADMIN_AI_TEMPLATES_DIR), 'google_fonts' => $google_font_string]);
+		local_log("AI Similar Template: Successfully generated content for {$filename} (for download).");
+		respond_success('AI-generated template ready for download.', [
+			'filename' => $filename,
+			'generated_json_content' => $pretty_json_to_save
+		]);
 	}
 
 	$mysqlDBConn->close();

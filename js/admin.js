@@ -647,7 +647,7 @@ $(document).ready(function() {
 						showAlert('Original template JSON is not valid, showing raw content.', 'warning');
 					}
 					
-					const defaultPrompt = `Create a JSON file similar to the example above. Make sure all fields for each layer are present. Change the resolution to 3000x3000 and update the theme to something new. Change fonts, colors, shadows and other properties to make it unique.`;
+					const defaultPrompt = `Create a JSON file similar to the example above. Make sure all fields for each layer are present. Make the ID's unique and human readable like title-1, author-1, artist-1, etc. Change the resolution to 3000x3000 and update the theme to something new. Change fonts, colors, shadows and other properties to make it unique.`;
 					$('#aiTemplatePrompt').val(defaultPrompt);
 					
 					$generateSimilarTemplateModal.find('.modal-title').text(`Generate Similar to: ${escapeHtml(item.name)}`);
@@ -684,11 +684,30 @@ $(document).ready(function() {
 			data: formData,
 			dataType: 'json',
 			success: function(response) {
-				if (response.success) {
-					showAlert(`AI-generated template saved successfully: ${escapeHtml(response.data.filename)}`, 'success');
+				if (response.success && response.data && response.data.generated_json_content && response.data.filename) {
+					const filename = response.data.filename;
+					const jsonContent = response.data.generated_json_content;
+					const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+					const link = document.createElement("a");
+					
+					if (link.download !== undefined) { // Check if HTML5 download attribute is supported
+						const url = URL.createObjectURL(blob);
+						link.setAttribute("href", url);
+						link.setAttribute("download", filename);
+						link.style.visibility = 'hidden';
+						document.body.appendChild(link);
+						link.click();
+						document.body.removeChild(link);
+						URL.revokeObjectURL(url);
+						showAlert(`AI-generated template "${escapeHtml(filename)}" is being downloaded.`, 'success');
+					} else {
+						// Fallback for older browsers
+						showAlert('Generated JSON content is ready, but your browser does not support direct download. Please copy the content manually if needed.', 'warning');
+						console.log("Generated JSON for manual copy:", jsonContent);
+					}
 					generateSimilarTemplateModal.hide();
 				} else {
-					showAlert(`Error generating similar template: ${escapeHtml(response.message)}`, 'danger');
+					showAlert(`Error generating similar template: ${escapeHtml(response.message || 'Unknown error. Check console.')}`, 'danger');
 				}
 			},
 			error: function(xhr, status, error) {

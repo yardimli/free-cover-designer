@@ -4,6 +4,7 @@ class InspectorPanel {
 	constructor(options) {
 		this.$panel = $('#inspectorPanel');
 		this.$closeBtn = this.$panel.find('.close-inspector-btn');
+		this.$cloneLayerBtn = this.$panel.find('#cloneLayerBtn');
 		this.layerManager = options.layerManager;
 		this.historyManager = options.historyManager;
 		this.canvasManager = options.canvasManager;
@@ -64,6 +65,37 @@ class InspectorPanel {
 			this.hide();
 		});
 		
+		// --- Clone Layer Button ---
+		this.$cloneLayerBtn.on('click', () => {
+			if (!this.currentLayer || !this.layerManager || !this.historyManager) {
+				console.warn("Cannot clone layer: Missing current layer or managers.");
+				return;
+			}
+			
+			const originalLayer = this.currentLayer;
+			const clonedProps = JSON.parse(JSON.stringify(originalLayer));
+			
+			// Modify properties for the clone
+			delete clonedProps.id; // Let LayerManager generate a new ID
+			clonedProps.name = (originalLayer.name || `Layer ${originalLayer.id}`) + " (Copy)";
+			clonedProps.x = (parseFloat(clonedProps.x) || 0) + 50;
+			clonedProps.y = (parseFloat(clonedProps.y) || 0) + 50;
+			clonedProps.zIndex = (parseInt(clonedProps.zIndex) || 0) + 1; // Increment zIndex
+			clonedProps.locked = false; // Cloned layer is unlocked by default
+			
+			// Add the layer using LayerManager
+			const newLayer = this.layerManager.addLayer(clonedProps.type, clonedProps);
+			
+			if (newLayer) {
+				this.layerManager.selectLayer(newLayer.id); // Select the newly cloned layer
+				this.historyManager.saveState(); // Save the state
+			} else {
+				console.error("Failed to add cloned layer.");
+				alert("Could not clone the layer. Please try again.");
+			}
+		});
+		
+		
 		// --- Helper to update layer and potentially schedule history save ---
 		const updateLayer = (prop, value, saveNow = false, saveDebounced = true) => {
 			if (this.currentLayer) {
@@ -72,7 +104,7 @@ class InspectorPanel {
 				if (prop.startsWith('filters.')) {
 					const filterKey = prop.split('.')[1];
 					// Ensure currentLayer.filters exists
-					const currentFilters = this.currentLayer.filters || { ...this.layerManager.defaultFilters };
+					const currentFilters = this.currentLayer.filters || {...this.layerManager.defaultFilters};
 					updateData = {
 						filters: {
 							...currentFilters, // Spread existing filters
@@ -80,7 +112,7 @@ class InspectorPanel {
 						}
 					};
 				} else {
-					updateData = { [prop]: value };
+					updateData = {[prop]: value};
 				}
 				
 				this.layerManager.updateLayerData(this.currentLayer.id, updateData);
@@ -176,7 +208,7 @@ class InspectorPanel {
 		bindColorInputGroup('background', 'backgroundColor');
 		
 		// --- Generic Range Slider + Number Input ---
-		const bindRangeAndNumber =(rangeId, displayId, layerProp, min, max, step, unit = '', saveDebounced = true, isFilter = false, skipUpdateLayer = false) => {
+		const bindRangeAndNumber = (rangeId, displayId, layerProp, min, max, step, unit = '', saveDebounced = true, isFilter = false, skipUpdateLayer = false) => {
 			const $range = $(`#${rangeId}`);
 			const $display = $(`#${displayId}`);
 			
@@ -265,7 +297,7 @@ class InspectorPanel {
 		});
 		
 		bindRangeAndNumber('inspector-shading-blur', 'inspector-shading-blur-value', 'shadowBlur', 0, 100, 1);
-
+		
 		const updateShadowOffset = () => {
 			const offset = parseFloat($('#inspector-shading-offset').val());
 			const angleRad = parseFloat($('#inspector-shading-angle').val()) * Math.PI / 180;
@@ -276,7 +308,7 @@ class InspectorPanel {
 		};
 		
 		bindRangeAndNumber('inspector-shading-offset', 'inspector-shading-offset-value', 'shadowOffsetInternal', 0, 100, 1, '', false, false, true);
-
+		
 		bindRangeAndNumber('inspector-shading-angle', 'inspector-shading-angle-value', 'shadowAngleInternal', -180, 180, 1, '', false, false, true);
 		
 		$('#inspector-shading-offset, #inspector-shading-angle').on('input', updateShadowOffset);
@@ -291,7 +323,7 @@ class InspectorPanel {
 		});
 		
 		bindRangeAndNumber('inspector-background-padding', 'inspector-background-padding-value', 'backgroundPadding', 0, 200, 1);
-
+		
 		bindRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', 'backgroundCornerRadius', 0, 100, 0.5);
 		
 		const $textContentArea = this.$panel.find('#inspector-text-content');
@@ -301,7 +333,7 @@ class InspectorPanel {
 				const newContent = $textContentArea.val();
 				// Update layer data immediately (live update)
 				// Don't save history on every keystroke, let 'change' handle it
-				this.layerManager.updateLayerData(this.currentLayer.id, { content: newContent });
+				this.layerManager.updateLayerData(this.currentLayer.id, {content: newContent});
 				
 				// Clear existing timeout if user is still typing
 				clearTimeout(this.textareaChangeTimeout);
@@ -378,13 +410,27 @@ class InspectorPanel {
 			let newY = parseFloat(layer.y);
 			
 			switch (alignType) {
-				case 'left': newX = 0; break;
-				case 'h-center': newX = (canvasWidth / 2) - (layerWidth / 2); break;
-				case 'right': newX = canvasWidth - layerWidth; break;
-				case 'top': newY = 0; break;
-				case 'v-center': newY = (canvasHeight / 2) - (layerHeight / 2); break;
-				case 'bottom': newY = canvasHeight - layerHeight; break;
-				default: console.warn("Alignment: Unknown alignment type:", alignType); return;
+				case 'left':
+					newX = 0;
+					break;
+				case 'h-center':
+					newX = (canvasWidth / 2) - (layerWidth / 2);
+					break;
+				case 'right':
+					newX = canvasWidth - layerWidth;
+					break;
+				case 'top':
+					newY = 0;
+					break;
+				case 'v-center':
+					newY = (canvasHeight / 2) - (layerHeight / 2);
+					break;
+				case 'bottom':
+					newY = canvasHeight - layerHeight;
+					break;
+				default:
+					console.warn("Alignment: Unknown alignment type:", alignType);
+					return;
 			}
 			
 			newX = Math.round(newX);
@@ -394,7 +440,7 @@ class InspectorPanel {
 			if (newX !== Math.round(parseFloat(layer.x)) || newY !== Math.round(parseFloat(layer.y))) {
 				console.log(`Alignment: Aligning ${layer.id} to ${alignType}. New pos: (${newX}, ${newY})`);
 				// Use LayerManager to update, which will also update the element's CSS
-				this.layerManager.updateLayerData(layer.id, { x: newX, y: newY });
+				this.layerManager.updateLayerData(layer.id, {x: newX, y: newY});
 				this.historyManager.saveState(); // Save the change
 				
 				// --- OPTIONAL: Re-populate inspector AFTER update to reflect new state ---
@@ -442,14 +488,14 @@ class InspectorPanel {
 		if (this.currentLayer) {
 			// Store previous value to compare
 			const previousValue = this.currentLayer[property];
-			this.layerManager.updateLayerData(this.currentLayer.id, { [property]: value });
+			this.layerManager.updateLayerData(this.currentLayer.id, {[property]: value});
 			
 			if (saveNow) {
 				this.historyManager.saveState();
 			}
-
+			
 			const updatedLayer = this.layerManager.getLayerById(this.currentLayer.id);
-			if(updatedLayer && updatedLayer[property] !== previousValue) {
+			if (updatedLayer && updatedLayer[property] !== previousValue) {
 				this.populate(updatedLayer);
 			}
 		}
@@ -463,6 +509,7 @@ class InspectorPanel {
 			this.$panel.addClass('open');
 			// Hide sections that require a layer
 			this.$panel.find('#inspector-layer-info-actions').hide(); // Hide actions if no layer
+			this.$cloneLayerBtn.hide();
 			this.$panel.find('#inspector-alignment').hide();
 			this.$panel.find('#inspector-layer').hide();
 			this.$panel.find('#inspector-text').hide();
@@ -478,6 +525,8 @@ class InspectorPanel {
 		this.currentLayer = layerData;
 		this.populate(layerData);
 		this.$panel.addClass('open');
+		this.$panel.find('#inspector-layer-info-actions').show();
+		this.$cloneLayerBtn.show();
 	}
 	
 	hide() {
@@ -567,7 +616,6 @@ class InspectorPanel {
 		this.$panel.find('#inspector-layer').show();
 		
 		
-		
 		// --- Populate Common Controls ---
 		const opacity = layerData.opacity ?? 1;
 		$('#inspector-opacity').val(opacity);
@@ -591,8 +639,13 @@ class InspectorPanel {
 			
 			// Font
 			const font = layerData.fontFamily || 'Arial';
-			$('#inspector-font-family').val(font);
-			try { $('#inspector-font-family').data('fontpicker')?.set(font); } catch(e) { console.warn("Couldn't update fontpicker selection visually", e)}
+			$('#inspector-font-family').val(font).trigger('change');
+			console.log("Font family set to:", font);
+			try {
+				$('#inspector-font-family').data('fontpicker')?.set(font);
+			} catch (e) {
+				console.warn("Couldn't update fontpicker selection visually", e)
+			}
 			this._populateRangeAndNumber('inspector-font-size', 'inspector-font-size', layerData.fontSize, 24);
 			this._populateRangeAndNumber('inspector-letter-spacing', 'inspector-letter-spacing', layerData.letterSpacing, 0);
 			this._populateRangeAndNumber('inspector-line-height', 'inspector-line-height', layerData.lineHeight, 1.3);
@@ -640,8 +693,7 @@ class InspectorPanel {
 				this._populateRangeAndNumber('inspector-background-padding', 'inspector-background-padding-value', layerData.backgroundPadding, 0);
 				this._populateRangeAndNumber('inspector-background-radius', 'inspector-background-radius-value', layerData.backgroundCornerRadius, 0);
 			}
-		} else
-		{
+		} else {
 			$('#inspector-text-content').val('');
 		}
 		

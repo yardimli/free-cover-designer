@@ -28,14 +28,15 @@ use ai to create template json files in admin ..................................
 in admin add table for template and cover types ...........................................OK
 add types for template and cover types: book, album, spine, back ..........................OK
 in ui panels use css rules for width and height for template and cover types ..............OK
-in ui snap back to left, cover to right and spine to center when adding.
 in ui add dropdown for type in search template and cover panels ...........................OK
-duplicate text layer
+duplicate text layer ......................................................................OK
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK
 add dark/light mode to ui
 make responsive ui
 
 v0.2
+if locked layer is selected, add an opacity class besides selected class
 add selecting multiple elements and move them together (https://github.com/daybrush/selecto)
 group elements
+in ui snap back to left, cover to right and spine to center when adding.

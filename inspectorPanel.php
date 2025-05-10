@@ -6,8 +6,8 @@
 
 	<!-- Layer Info & Actions -->
 	<div id="inspector-layer-info-actions" class="inspector-section">
-		<div class="section-header">
-			<span id="inspector-layer-name" title="Layer Name">No Layer Selected</span>
+		<div class="section-header d-flex justify-content-between align-items-center"> <!-- Added flex for alignment -->
+			<span id="inspector-layer-name" title="Layer Name" class="flex-grow-1 text-truncate me-2">No Layer Selected</span>
 		</div>
 		<div class="section-content">
 			<div class="btn-group btn-group-sm w-100" role="group" aria-label="Layer Actions">
@@ -37,7 +37,9 @@
 
 	<!-- Layer Properties -->
 	<div id="inspector-layer" class="inspector-section">
-		<div class="section-header">Layer</div>
+		<div class="section-header">Layer
+			<button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="cloneLayerBtn" title="Clone Layer" style="display: none;"><i class="fas fa-clone"></i> Clone Layer</button>
+		</div>
 		<div class="section-content">
 			<!-- Opacity -->
 			<div class="mb-2">
