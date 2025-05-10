@@ -55,6 +55,7 @@ class CanvasManager {
 		}
 		
 		this.initializePan();
+		this.initializeCanvasInteractivity();
 		this.initializeZoomControls();
 		this.setZoom(this.currentZoom, false);
 		this.centerCanvas();
@@ -140,6 +141,99 @@ class CanvasManager {
 		});
 	}
 	
+	initializeCanvasInteractivity() {
+		const div = document.getElementById('canvas');
+		const self = this;
+		div.addEventListener('mousedown', function (event) {
+			// Get the bounding rectangle of the div
+			const rect = div.getBoundingClientRect();
+			
+			// Calculate the x,y coordinates relative to the div
+			let mouseX = event.clientX - rect.left;
+			let mouseY = event.clientY - rect.top;
+			
+			// adjust for zoom
+			mouseX = mouseX / self.currentZoom;
+			mouseY = mouseY / self.currentZoom;
+			
+			// if (self.layerManager.moveableInstance) {
+			// 	console.log("Destroying moveableInstance ",self.layerManager.moveableInstance);
+			// 	self.layerManager.moveableInstance.destroy();
+			// 	self.layerManager.moveableInstance = null;
+			// 	self.layerManager.moveableTargetElement = null;
+			// }
+			
+			console.log(`Clicked at position: x=${mouseX}, y=${mouseY}`);
+			
+			//find highest z-index text layer first.
+			let highestZIndex = -1;
+			let clickedLayer = null;
+			
+			for (let i = 0; i < self.layerManager.getLayers().length; i++) {
+				const layer = self.layerManager.getLayers()[i];
+				if (layer.x <= mouseX && layer.x + layer.width >= mouseX && layer.y <= mouseY && layer.y + layer.height >= mouseY) {
+					if (!layer.locked && layer.type === 'text') {
+						if (layer.zIndex > highestZIndex) {
+							highestZIndex = layer.zIndex;
+							clickedLayer = layer;
+						}
+						console.log("Click inside text layer: " + layer.id + ' z-index: ' + layer.zIndex);
+					}
+				}
+			}
+			if (clickedLayer) {
+				self.layerManager.selectLayer(clickedLayer.id);
+				console.log("Selected layer: " + clickedLayer.id);
+			} else {
+				//look for non-text layers that are not locked
+				let highestZIndex = -1;
+				for (let i = 0; i < self.layerManager.getLayers().length; i++) {
+					const layer = self.layerManager.getLayers()[i];
+					if (layer.x <= mouseX && layer.x + layer.width >= mouseX && layer.y <= mouseY && layer.y + layer.height >= mouseY) {
+						if (!layer.locked && layer.type !== 'text') {
+							if (layer.zIndex > highestZIndex) {
+								highestZIndex = layer.zIndex;
+								clickedLayer = layer;
+							}
+							console.log("Click inside layer: " + layer.id + ' z-index: ' + layer.zIndex);
+						}
+					}
+				}
+				
+				if (clickedLayer) {
+					self.layerManager.selectLayer(clickedLayer.id);
+					console.log("Selected layer: " + clickedLayer.id);
+				} else {
+					
+					let highestZIndex = -1;
+					let clickedLayer = null;
+					for (let i = 0; i < self.layerManager.getLayers().length; i++) {
+						const layer = self.layerManager.getLayers()[i];
+						if (layer.x <= mouseX && layer.x + layer.width >= mouseX && layer.y <= mouseY && layer.y + layer.height >= mouseY) {
+							// console.log(layer);
+							if (layer.locked) {
+								// Check if this layer is the highest z-index so far
+								if (layer.zIndex > highestZIndex) {
+									highestZIndex = layer.zIndex;
+									clickedLayer = layer;
+								}
+								console.log("Click inside locked layer: " + layer.id + ' z-index: ' + layer.zIndex);
+							}
+						}
+					}
+					if (clickedLayer) {
+						self.layerManager.selectLayer(clickedLayer.id);
+						console.log("Selected locked layer: " + clickedLayer.id);
+					} else
+					{
+						self.layerManager.selectLayer(null); // Deselect if no layer is clicked
+						console.log("No layer selected.");
+					}
+				}
+			}
+		});
+	}
+	
 	initializePan() {
 		// --- Panning ---
 		this.$canvasArea.on('mousedown', (e) => {
@@ -148,7 +242,10 @@ class CanvasManager {
 			const isMiddleMouse = e.which === 2;
 			
 			// Find the layer element if clicked inside one
-			const $clickedLayerElement = $(e.target).closest('#canvas .canvas-element');
+			let $clickedLayerElement = $(e.target).closest('#canvas .canvas-element:not(.locked)');
+			if ($clickedLayerElement.length === 0) {
+				$clickedLayerElement = $(e.target).closest('#canvas .canvas-element');
+			}
 			let isClickOnLayer = false;
 			
 			if ($clickedLayerElement.length > 0 && !isMiddleMouse) {
@@ -164,7 +261,6 @@ class CanvasManager {
 			
 			// Prevent panning ONLY if clicking on non-layer (and not middle mouse)
 			if (isClickOnLayer) {
-				console.log("Click on layer: " + $clickedLayerElement.attr('id'));
 				return;
 			}
 			
@@ -305,10 +401,10 @@ class CanvasManager {
 			
 			console.log("Centering canvas: areaWidth=", areaWidth, "areaHeight=", areaHeight, "wrapperWidth=", wrapperWidth, "wrapperHeight=", wrapperHeight);
 			//set canvasArea scroll position to half the width - half the wrapper width
-			const scrollLeft = ((wrapperWidth ) / 2) + 250;
+			const scrollLeft = ((wrapperWidth) / 2) + 250;
 			const scrollTop = ((wrapperHeight) / 2) + 150;
 			
-
+			
 			this.$canvasArea.scrollLeft(scrollLeft);
 			this.$canvasArea.scrollTop(scrollTop);
 			
@@ -507,7 +603,6 @@ class CanvasManager {
 					const el = clonedNode.querySelector(`#${id}`);
 					if (el) el.style.display = 'block';
 				});
-				clonedNode.querySelectorAll('.ui-resizable-handle').forEach(h => h.style.display = 'none');
 				
 				// Re-apply Filters, Blend Modes, Transforms, Text Styles... (SAME AS PREVIOUS VERSION)
 				layersData.forEach(layer => {
@@ -798,7 +893,7 @@ class CanvasManager {
 					
 					this.historyManager.saveState();
 					if (!isTemplate) {
-						this.setZoom(1.0); // Or a fit-to-screen zoom
+						this.zoomToFit(); //setZoom(1.0); // Or a fit-to-screen zoom
 						this.centerCanvas();
 					}
 					this.layerManager.selectLayer(null);
@@ -853,11 +948,6 @@ class CanvasManager {
 		$('#zoom-in').off('click');
 		$('#zoom-out').off('click');
 		$('#zoom-options-menu').off('click');
-		
-		this.$canvas.find('.canvas-element').each(function () {
-			if ($(this).hasClass('ui-draggable')) $(this).draggable('destroy');
-			if ($(this).hasClass('ui-resizable')) $(this).resizable('destroy');
-		});
 		
 		if (this.$guideLeft) this.$guideLeft.remove();
 		if (this.$guideRight) this.$guideRight.remove();

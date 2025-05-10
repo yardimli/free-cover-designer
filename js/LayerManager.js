@@ -562,7 +562,8 @@ class LayerManager {
 			
 			// --- Initialize Moveable for the new selection ---
 			this.moveableTargetElement = $element[0]; // Get the DOM element
-			if (this.moveableTargetElement && selectedLayer.visible) {
+			if (this.moveableTargetElement && selectedLayer.visible && !selectedLayer.locked) {
+				console.log("Creating Moveable instance for", selectedLayer.id);
 				this._createMoveableInstance(this.moveableTargetElement, selectedLayer);
 			}
 		}
@@ -573,6 +574,9 @@ class LayerManager {
 		if (this.moveableInstance) {
 			this.moveableInstance.destroy();
 		}
+		
+		$(".canvas-element").removeClass('moveable-dragging');
+		$(".canvas-element").removeClass('moveable-resizing');
 		
 		const self = this;
 		const layerId = layerData.id;
@@ -630,6 +634,7 @@ class LayerManager {
 		this.moveableInstance
 			.on("dragStart", ({inputEvent, set}) => {
 				const layer = self.getLayerById(layerId);
+				console.log("Moveable dragStart", layer);
 				if (!layer || layer.locked) {
 					inputEvent.stopPropagation();
 					return false;
@@ -982,10 +987,11 @@ class LayerManager {
 		this._applyTransform($element, layerData);
 		
 		this.$canvas.append($element);
-		this._makeElementInteractive($element, layerData);
+		//this._makeElementInteractive($element, layerData);
 	}
 	
 	_makeElementInteractive($element, layerData) {
+		return;
 		const layerId = layerData.id;
 		const self = this;
 		
@@ -1018,7 +1024,7 @@ class LayerManager {
 			this.moveableTargetElement = null;
 		}
 		// If the layer is currently selected AND becomes enabled, create Moveable (if not already present)
-		else if (this.selectedLayerId === layerData.id && !isHidden && !this.moveableInstance) {
+		else if (this.selectedLayerId === layerData.id && !isHidden && !isLocked && !this.moveableInstance) {
 			console.log("Recreating Moveable for enabled layer:", layerData.id);
 			this.moveableTargetElement = $element[0];
 			this._createMoveableInstance(this.moveableTargetElement, layerData);
@@ -1273,7 +1279,7 @@ class LayerManager {
 			// Click on the item (but not controls or name) to select the layer
 			$item.on('click', (e) => {
 				// Check if the click target or its parent is one of the controls or the editable name span
-				if (!$(e.target).closest('button, input, .layer-name-display').length) {
+				if (!$(e.target).closest('button, input').length) {
 					self.selectLayer(layer.id);
 				}
 			});

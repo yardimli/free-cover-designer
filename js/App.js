@@ -1,3 +1,5 @@
+// free-cover-designer/js/App.js:
+
 $(document).ready(function () {
 	// --- DOM References ---
 	const $canvas = $('#canvas');
@@ -20,14 +22,12 @@ $(document).ready(function () {
 		showLoadingOverlay: showGlobalLoadingOverlay,
 		hideLoadingOverlay: hideGlobalLoadingOverlay
 	});
-	
 	const canvasSizeModal = new CanvasSizeModal(canvasManager);
-	
 	let googleFonts = []; // Placeholder if needed elsewhere
 	
 	// LayerManager needs CanvasManager
 	const layerManager = new LayerManager($canvas, $layerList, {
-		onLayerSelect: handleLayerSelectionChange, // Connect the callback
+		onLayerSelect: handleLayerSelectionChange,
 		onLayerDataUpdate: handleLayerDataUpdate,
 		saveState: () => historyManager.saveState(),
 		canvasManager: canvasManager
@@ -54,8 +54,8 @@ $(document).ready(function () {
 		uploadPreviewSelector: '#uploadPreview',
 		uploadInputSelector: '#imageUploadInput',
 		addImageBtnSelector: '#addImageFromUpload',
-		overlaysListSelector: '#overlayList', // Corrected selector name
-		overlaysSearchSelector: '#overlaySearch', // Corrected selector name
+		overlaysListSelector: '#overlayList',
+		overlaysSearchSelector: '#overlaySearch',
 		sidebarPanelsContainerSelector: '#sidebar-panels-container',
 		applyTemplate: (jsonData) => {
 			console.log("Applying template via click, removing existing text layers...");
@@ -87,26 +87,82 @@ $(document).ready(function () {
 	// --- Initialization ---
 	sidebarManager.loadAll();
 	layerManager.initializeList();
-	canvasManager.initialize();
+	canvasManager.initialize(); // Sets default canvas size, zoom, etc.
 	initializeGlobalActions();
 	initializeSidebarPanelControls();
+	inspectorPanel.hide(); // Hide initially
 	
-	// --- Initial State ---
-	historyManager.saveState();
-	updateActionButtons();
-	hideGlobalLoadingOverlay();
-	inspectorPanel.hide();
+	// --- Initial State & Query Param Handling ---
+	hideGlobalLoadingOverlay(); // Ensure it's hidden before we start any custom loading
 	
-	try {
-		const kindlePresetValue = "1600x2560"; // Match the value in PHP/HTML
-		// Show the modal, passing the default value
-		canvasSizeModal.show({defaultPresetValue: kindlePresetValue});
-	} catch (error) {
-		console.error("Error showing initial canvas size modal:", error);
+	const urlParams = new URLSearchParams(window.location.search);
+	const queryCanvasWidth = urlParams.get('w');
+	const queryCanvasHeight = urlParams.get('h');
+	const queryFileUrl = urlParams.get('f');
+	
+	let designLoadedOrSizeSetFromQuery = false;
+	
+	function finalizeAppSetup() {
+		// This function is called after any query param processing (file load, w/h, or neither)
+		if (!designLoadedOrSizeSetFromQuery) {
+			try {
+				const kindlePresetValue = "1600x2560"; // Match the value in PHP/HTML
+				// Show the modal, passing the default value
+				canvasSizeModal.show({ defaultPresetValue: kindlePresetValue });
+			} catch (error) {
+				console.error("Error showing initial canvas size modal:", error);
+			}
+		}
+		historyManager.saveState(); // Save the true initial state after any loads/resizes
+		updateActionButtons(); // Update buttons based on the final initial state
+		hideGlobalLoadingOverlay(); // Ensure it's hidden if it was shown by file loading
+	}
+	
+	if (queryFileUrl) {
+		showGlobalLoadingOverlay("Loading design from URL...");
+		fetch(queryFileUrl)
+			.then(response => {
+				if (!response.ok) {
+					throw new Error(`HTTP error! status: ${response.status} for ${queryFileUrl}`);
+				}
+				return response.json();
+			})
+			.then(jsonData => {
+				console.log("Successfully fetched and parsed design from URL:", queryFileUrl);
+				canvasManager.loadDesign(jsonData, false); // Load full design, this will set canvas size
+				designLoadedOrSizeSetFromQuery = true;
+			})
+			.catch(error => {
+				console.error("Error loading/parsing design from URL:", queryFileUrl, error);
+				alert(`Failed to load design from URL: ${error.message}. Please check the URL and file format. Defaulting to initial setup.`);
+				// designLoadedOrSizeSetFromQuery remains false, so modal might be shown
+			})
+			.finally(() => {
+				finalizeAppSetup();
+			});
+	} else if (queryCanvasWidth && queryCanvasHeight) {
+		const width = parseInt(queryCanvasWidth, 10);
+		const height = parseInt(queryCanvasHeight, 10);
+		if (!isNaN(width) && width > 0 && !isNaN(height) && height > 0) {
+			console.log(`Setting initial canvas size from query params: ${width}x${height}`);
+			canvasManager.setCanvasSize({
+				totalWidth: width,
+				height: height,
+				frontWidth: width, // For simple query param init, frontWidth is totalWidth
+				spineWidth: 0,
+				backWidth: 0
+			});
+			designLoadedOrSizeSetFromQuery = true;
+		} else {
+			console.warn("Invalid canvasWidth or canvasHeight in query parameters. Will show modal.");
+		}
+		finalizeAppSetup(); // Call finalize to check if modal needs to be shown
+	} else {
+		// No file URL, no w/h params
+		finalizeAppSetup();
 	}
 	
 	// --- UI Update Callbacks ---
-	
 	function handleLayerSelectionChange(selectedLayer) {
 		if (selectedLayer) {
 			inspectorPanel.show(selectedLayer);
@@ -153,7 +209,9 @@ $(document).ready(function () {
 		});
 		
 		$canvasArea.on('mousedown', function(e) {
-			closeSidebarPanel();
+			if (e.target === $canvasArea[0] && !$sidebarPanelsContainer.hasClass('closing-by-click')) {
+				closeSidebarPanel();
+			}
 		});
 	}
 	
@@ -176,8 +234,13 @@ $(document).ready(function () {
 	function closeSidebarPanel() {
 		$sidebarPanelsContainer.removeClass('open');
 		$sidebarNavLinks.removeClass('active');
+		// Optional: Add a small delay before hiding panels to allow for slide-out animation
+		// setTimeout(() => {
+		//     if (!$sidebarPanelsContainer.hasClass('open')) { // Check again in case it was reopened
+		//         $sidebarPanels.removeClass('active').hide();
+		//     }
+		// }, 300); // Match CSS transition duration
 	}
-	
 	// --- END Sidebar Panel Logic ---
 	
 	
@@ -196,10 +259,9 @@ $(document).ready(function () {
 			$loadingOverlay.hide();
 		}
 	}
-
-// --- Global Action Button Setup & Updates ---
+	
+	// --- Global Action Button Setup & Updates ---
 	function initializeGlobalActions() {
-		
 		// --- Helper to prevent action on disabled links ---
 		const preventDisabled = (e, actionFn) => {
 			e.preventDefault(); // Always prevent default for links
@@ -209,7 +271,6 @@ $(document).ready(function () {
 			}
 			actionFn(); // Execute the action
 		};
-		
 		
 		// History Actions
 		$('#undoBtn').on('click', () => historyManager.undo());
@@ -221,21 +282,22 @@ $(document).ready(function () {
 		$("#visibilityBtn").on('click', () => layerManager.toggleSelectedLayerVisibility());
 		$('#bringToFrontBtn').on('click', () => layerManager.moveSelectedLayer('up'));
 		$('#sendToBackBtn').on('click', () => layerManager.moveSelectedLayer('down'));
-
+		
 		// File Menu Actions
 		$('#saveDesign').on('click', (e) => preventDisabled(e, () => canvasManager.saveDesign()));
 		$('#loadDesignIconBtn').on('click', (e) => { // New listener for the icon
-			e.preventDefault();
-			// No disabled check needed for load
+			e.preventDefault(); // No disabled check needed for load
 			$loadDesignInput.click();
 		});
 		$loadDesignInput.on('change', (event) => { // Keep the change listener
 			const file = event.target.files[0];
+			console.log("File selected:", file);
 			if (file) {
 				canvasManager.loadDesign(file, false); // Load full design
 			}
 			$(event.target).val(''); // Reset input
 		});
+		
 		
 		// Export Actions
 		$('#downloadBtn').on('click', (e) => preventDisabled(e, () => canvasManager.exportCanvas('png', true))); // Default to PNG
@@ -266,6 +328,7 @@ $(document).ready(function () {
 			$('#lockBtn').attr('title', 'Lock/Unlock Selected');
 		}
 		
+		
 		// Layer order buttons
 		let isAtFront = false;
 		let isAtBack = false;
@@ -280,8 +343,8 @@ $(document).ready(function () {
 			isAtFront = true;
 			isAtBack = true;
 		}
-		$('#bringToFrontBtn').prop('disabled', !hasSelection || isAtFront);
-		$('#sendToBackBtn').prop('disabled', !hasSelection || isAtBack);
+		$('#bringToFrontBtn').prop('disabled', !hasSelection || isAtFront || isLocked);
+		$('#sendToBackBtn').prop('disabled', !hasSelection || isAtBack || isLocked);
 		
 		
 		// History buttons
@@ -293,5 +356,4 @@ $(document).ready(function () {
 		$('#downloadBtn, #exportPng, #exportJpg').prop('disabled', !hasLayers);
 		$('#saveDesign').prop('disabled', !hasLayers);
 	}
-	
 }); // End document ready

@@ -292,6 +292,9 @@ body {
     display: block;
     background-color: #fff;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
 }
 
 /* --- Canvas Elements --- */
@@ -310,12 +313,15 @@ body {
 }
 
 .canvas-element.selected {
-    border: 1px dashed #0d6efd;
+    /*border: 1px dashed #0d6efd;*/
+    z-index: 1001 !important;
 }
 
 .canvas-element.locked {
     cursor: default;
+    pointer-events: none;
 }
+
 
 .canvas-element.interactions-disabled {
     cursor: default !important;
