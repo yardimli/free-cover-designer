@@ -35,6 +35,7 @@ add trim with back cover, spine and front cover, set papertype and page numbers 
 add layer definition dropdown .............................................................OK
 when loading template with spine and back cover adjust layers based on definition .........OK
 add guides for where text should not go ...................................................OK
+add mm to size modal
 add dark/light mode to ui
 make responsive ui
 

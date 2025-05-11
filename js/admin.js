@@ -647,7 +647,21 @@ $(document).ready(function() {
 						showAlert('Original template JSON is not valid, showing raw content.', 'warning');
 					}
 					
-					const defaultPrompt = `Create a JSON file similar to the example above. Make sure all fields for each layer are present. Make the ID's unique and human readable like title-1, author-1, artist-1, etc. Change the resolution to 3000x3000 and update the theme to something new. Change fonts, colors, shadows and other properties to make it unique.`;
+					const defaultPrompt = `Create a JSON file similar to the one above. Make sure all fields for each layer are present.
+Make the ID's unique and human-readable like title-1, author-1, artist-1, etc.
+This JSON is a front cover, change it to include back cover and spine.
+The theme of the cover is:
+Make the spine 300 width.
+Use rotation 90 on the spine text.
+Include both author name and book title on spine.
+On the back cover, add the title and author name on the top using the fonts and colors of the front cover.
+Under it add the back cover text, write 2–3 paragraphs relatable to the title.
+The location for new layers should be 100px away from the sides.
+The width of the back cover should not extend into the spine.
+The x position of the spine texts should be at the center of the cover.
+Update the canvas to include appropriate values like:
+"canvas": {"width": 4196, "height": 2958, "frontWidth": 2048, "spineWidth": 300, "backWidth": 2048 },
+updated based on the input size.`;
 					$('#aiTemplatePrompt').val(defaultPrompt);
 					
 					$generateSimilarTemplateModal.find('.modal-title').text(`Generate Similar to: ${escapeHtml(item.name)}`);
