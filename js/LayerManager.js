@@ -788,25 +788,50 @@ class LayerManager {
 	_calculateGuidelines(currentLayerId) {
 		const canvasWidth = this.canvasManager.currentCanvasWidth;
 		const canvasHeight = this.canvasManager.currentCanvasHeight;
+		const safeZoneMargin = 100; // px
 		
-		// Canvas Guidelines
-		const verticalGuidelines = [0, canvasWidth / 2, canvasWidth];
-		// add #canvas-guide-right and #canvas-guide-left if they exist
-		if (this.canvasManager.backCoverWidth>0) {
+		// Canvas Center Guidelines
+		let verticalGuidelines = [0, canvasWidth / 2, canvasWidth];
+		let horizontalGuidelines = [0, canvasHeight / 2, canvasHeight];
+		
+		// Spine/Back Cover Guidelines (from CanvasManager properties)
+		// These are only added if CanvasManager created the visual guides,
+		// which happens if spineWidth > 0 and backCoverWidth > 0.
+		if (this.canvasManager.spineWidth > 0 && this.canvasManager.backCoverWidth > 0) {
 			verticalGuidelines.push(this.canvasManager.backCoverWidth);
-			verticalGuidelines.push(this.canvasManager.backCoverWidth+this.canvasManager.spineWidth);
+			verticalGuidelines.push(this.canvasManager.backCoverWidth + this.canvasManager.spineWidth);
 		}
-
-		console.log("Vertical guidelines:", verticalGuidelines);
-		const horizontalGuidelines = [0, canvasHeight / 2, canvasHeight];
+		// console.log("After spine guides, Vertical guidelines:", verticalGuidelines);
 		
-		// Element Guidelines (other visible)
+		// Safe Zone Guidelines (100px inset from canvas edges)
+		if (canvasWidth > safeZoneMargin * 2) { // Ensure canvas is wide enough
+			verticalGuidelines.push(safeZoneMargin);
+			verticalGuidelines.push(canvasWidth - safeZoneMargin);
+		}
+		if (canvasHeight > safeZoneMargin * 2) { // Ensure canvas is tall enough
+			horizontalGuidelines.push(safeZoneMargin);
+			horizontalGuidelines.push(canvasHeight - safeZoneMargin);
+		}
+		// console.log("After safe zone, Vertical guidelines:", verticalGuidelines);
+		
+		// Element Guidelines (other visible, non-locked layers)
 		const elementGuidelines = this.layers
-			.filter(l => l.id !== currentLayerId && l.visible)
+			.filter(l => l.id !== currentLayerId && l.visible && !l.locked)
 			.map(l => document.getElementById(l.id))
 			.filter(el => el); // Filter out nulls if element not found
 		
-		return {verticalGuidelines, horizontalGuidelines, elementGuidelines};
+		// Remove duplicates and sort, filter out NaN/undefined
+		const uniqueVertical = [...new Set(verticalGuidelines.filter(v => typeof v === 'number' && !isNaN(v)))].sort((a, b) => a - b);
+		const uniqueHorizontal = [...new Set(horizontalGuidelines.filter(h => typeof h === 'number' && !isNaN(h)))].sort((a, b) => a - b);
+		
+		// console.log("Final Vertical guidelines for Moveable:", uniqueVertical);
+		// console.log("Final Horizontal guidelines for Moveable:", uniqueHorizontal);
+		
+		return {
+			verticalGuidelines: uniqueVertical,
+			horizontalGuidelines: uniqueHorizontal,
+			elementGuidelines
+		};
 	}
 	
 	// Call this if guidelines need refreshing (e.g., layer added/deleted/visibility changed)

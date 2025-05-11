@@ -71,11 +71,11 @@
 									<label class="form-label form-label-sm">Spine Width Method:</label> <?php // Smaller label ?>
 									<br>
 									<div class="form-check form-check-inline form-check-sm"> <?php // Smaller check ?>
-										<input class="form-check-input" type="radio" name="spineInputMethod" id="spineMethodPixels" value="pixels" checked>
+										<input class="form-check-input" type="radio" name="spineInputMethod" id="spineMethodPixels" value="pixels">
 										<label class="form-check-label" for="spineMethodPixels">Enter Pixels</label>
 									</div>
 									<div class="form-check form-check-inline form-check-sm"> <?php // Smaller check ?>
-										<input class="form-check-input" type="radio" name="spineInputMethod" id="spineMethodCalculate" value="calculate">
+										<input class="form-check-input" type="radio" name="spineInputMethod" id="spineMethodCalculate" value="calculate" checked>
 										<label class="form-check-label" for="spineMethodCalculate">Calculate from Pages</label>
 									</div>
 								</div>
@@ -83,7 +83,7 @@
 								<!-- Pixel Input Container -->
 								<div id="spinePixelInputContainer" class="mb-2"> <?php // Reduced margin ?>
 									<label for="spineWidthInput" class="form-label form-label-sm">Spine Width (pixels)</label> <?php // Smaller label ?>
-									<input type="number" class="form-control form-control-sm" id="spineWidthInput" value="100" min="1" step="1">
+									<input type="number" class="form-control form-control-sm" id="spineWidthInput" value="200" min="1" step="1" max="500">
 									<div class="invalid-feedback" id="spineWidthError" style="display: none;">Please enter a valid positive number.</div>
 								</div>
 
@@ -92,7 +92,7 @@
 									<div class="row g-1"> <?php // Reduced gutter ?>
 										<div class="col-md-6">
 											<label for="pageCountInput" class="form-label form-label-sm">Page Count</label> <?php // Smaller label ?>
-											<input type="number" class="form-control form-control-sm" id="pageCountInput" value="100" min="1" step="1">
+											<input type="number" class="form-control form-control-sm" id="pageCountInput" value="200" min="1" step="1" max="1000">
 											<div class="invalid-feedback" id="pageCountError" style="display: none;">Enter valid page count.</div>
 										</div>
 										<div class="col-md-6">

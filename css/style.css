@@ -1036,6 +1036,13 @@ body {
     box-sizing: border-box;
 }
 
+.canvas-safe-zone {
+    border: 2px dashed rgba(255, 0, 255, 0.7);
+    z-index: 500;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
 #locked-selection-highlight {
     position: absolute;
     border: 2px dashed #0d6efd;

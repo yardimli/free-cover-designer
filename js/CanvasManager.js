@@ -7,6 +7,7 @@ class CanvasManager {
 		this.$canvas = $canvas;
 		this.$guideLeft = null; // Reference for left guide div
 		this.$guideRight = null; // Reference for right guide div
+		this.$safeZoneGuideRect = null;
 		
 		// Dependencies
 		this.layerManager = options.layerManager; // Should be passed in App.js
@@ -71,7 +72,7 @@ class CanvasManager {
 			spineWidth = 0,
 			backWidth = 0
 		} = config;
-
+		
 		this.currentCanvasWidth = parseFloat(totalWidth) || this.DEFAULT_CANVAS_WIDTH;
 		this.currentCanvasHeight = parseFloat(height) || this.DEFAULT_CANVAS_HEIGHT;
 		this.frontCoverWidth = parseFloat(frontWidth) || this.currentCanvasWidth;
@@ -92,6 +93,7 @@ class CanvasManager {
 		});
 		
 		this._updateCanvasGuides(); // Update guides based on new dimensions
+		this._updateSafeZoneGuide();
 		this.updateWrapperSize(); // Update wrapper after guides (doesn't matter much)
 		this.centerCanvas();
 	}
@@ -129,6 +131,34 @@ class CanvasManager {
 		} else {
 			console.log("No spine/back cover, removing guides.");
 		}
+	}
+	
+	_updateSafeZoneGuide() {
+		if (this.$safeZoneGuideRect) {
+			this.$safeZoneGuideRect.remove();
+			this.$safeZoneGuideRect = null;
+		}
+		
+		const safeZoneMargin = 100; // px
+		
+		// Ensure canvas is large enough for the guide
+		if (this.currentCanvasWidth <= safeZoneMargin * 2 || this.currentCanvasHeight <= safeZoneMargin * 2) {
+			console.warn("Canvas too small for safe zone guide. Guide not added.");
+			return;
+		}
+		
+		this.$safeZoneGuideRect = $('<div>')
+			.attr('id', 'canvas-safe-zone-guide')
+			.css({
+				position: 'absolute',
+				left: `${safeZoneMargin}px`,
+				top: `${safeZoneMargin}px`,
+				width: `${this.currentCanvasWidth - (safeZoneMargin * 2)}px`,
+				height: `${this.currentCanvasHeight - (safeZoneMargin * 2)}px`
+			})
+			.addClass('canvas-safe-zone')
+			.appendTo(this.$canvas);
+		console.log("Safe zone guide updated.");
 	}
 	
 	updateWrapperSize() {
@@ -635,6 +665,13 @@ class CanvasManager {
 				if (clonedGuideRight) clonedGuideRight.remove();
 				console.log("Removed guides from cloned node for export.");
 				
+				// Remove safe zone guide
+				const clonedSafeZoneGuide = clonedNode.querySelector('#canvas-safe-zone-guide');
+				if (clonedSafeZoneGuide) {
+					clonedSafeZoneGuide.remove();
+					console.log("Removed safe zone guide from cloned node for export.");
+				}
+				
 				if (transparentBackground) {
 					clonedNode.style.backgroundColor = 'transparent';
 				}
@@ -930,6 +967,91 @@ class CanvasManager {
 								layer.y = (parseFloat(layer.y) || 0) + offsetY;
 							});
 						}
+						
+						// --- START: New adjustment logic for specific layer definitions ---
+						if (this.frontCoverWidth > 0 && this.spineWidth > 0 && this.backCoverWidth > 0) {
+							console.log("Applying definition-based constraints for template layers after centering.");
+							const frontCoverStartX = this.backCoverWidth + this.spineWidth + 100;
+							
+							designData.layers.forEach(layer => {
+								let currentX = layer.x; // Already a number from centering
+								let currentY = layer.y; // Already a number from centering
+								let currentWidth = (layer.width === 'auto' || isNaN(parseFloat(layer.width))) ? 'auto' : parseFloat(layer.width);
+								let currentHeight = (layer.height === 'auto' || isNaN(parseFloat(layer.height))) ? 'auto' : parseFloat(layer.height);
+								
+								const originalX = currentX;
+								const originalY = currentY;
+								const originalWidth = currentWidth;
+								const originalHeight = currentHeight;
+								let modified = false;
+								
+								// Common Vertical Adjustments
+								if (layer.definition === "back_cover_text" || layer.definition === "back_cover_title" ||
+									layer.definition === "cover_title" || layer.definition === "cover_text") {
+									
+									// Adjust Y (Top position)
+									if (currentY < 0) {
+										currentY = 100;
+										modified = true;
+									}
+									if (layer.y !== currentY) layer.y = currentY;
+									
+									
+									// Adjust Height (only if numeric)
+									if (currentHeight !== 'auto') {
+										if (currentY + currentHeight > (this.currentCanvasHeight - 100)) {
+											const newHeight = (this.currentCanvasHeight - 100) - currentY;
+											currentHeight = Math.max(0, newHeight);
+											modified = true;
+										}
+										if (layer.height !== currentHeight) layer.height = currentHeight;
+									}
+								}
+								
+								if (layer.definition === "back_cover_text" || layer.definition === "back_cover_title") {
+									// Adjust X for back cover (Left position)
+									if (currentX < 0) {
+										currentX = 100;
+										modified = true;
+									}
+									if (layer.x !== currentX) layer.x = currentX;
+									
+									// Adjust Width for back cover (only if numeric)
+									if (currentWidth !== 'auto') {
+										if (currentX + currentWidth > (this.backCoverWidth - 100)) {
+											const newWidth = (this.backCoverWidth - 100) - currentX;
+											currentWidth = Math.max(0, newWidth);
+											modified = true;
+										}
+										if (layer.width !== currentWidth) layer.width = currentWidth;
+									}
+								} else if (layer.definition === "cover_title" || layer.definition === "cover_text") {
+									// Adjust X for front cover (Left position)
+									if (currentX < frontCoverStartX) {
+										currentX = frontCoverStartX;
+										modified = true;
+									}
+									if (layer.x !== currentX) layer.x = currentX;
+									
+									// Adjust Width for front cover (only if numeric)
+									if (currentWidth !== 'auto') {
+										if (currentX + currentWidth > (this.currentCanvasWidth-70)) {
+											const newWidth = (this.currentCanvasWidth-70) - currentX;
+											currentWidth = Math.max(0, newWidth);
+											modified = true;
+										}
+										if (layer.width !== currentWidth) layer.width = currentWidth;
+									}
+								}
+								
+								if (modified) {
+									console.log(`Layer ${layer.id} (${layer.definition}): Constrained. ` +
+										`Original: x=${originalX.toFixed(2)}, y=${originalY.toFixed(2)}, w=${originalWidth}, h=${originalHeight}. ` +
+										`New: x=${layer.x.toFixed(2)}, y=${layer.y.toFixed(2)}, w=${layer.width}, h=${layer.height}`);
+								}
+							});
+						}
+						// --- END: New adjustment logic ---
 					}
 					
 					
@@ -1004,6 +1126,11 @@ class CanvasManager {
 		
 		if (this.$guideLeft) this.$guideLeft.remove();
 		if (this.$guideRight) this.$guideRight.remove();
+		if (this.$safeZoneGuideRect) { // Cleanup safe zone guide
+			this.$safeZoneGuideRect.remove();
+			this.$safeZoneGuideRect = null;
+		}
+		
 		
 		// Nullify references
 		this.$canvasArea = null;

@@ -18,7 +18,7 @@ $(document).ready(function () {
 	// --- Configuration ---
 	// IMPORTANT: Set this ID to an existing cover_type ID from your database
 	// This will be the default selected type in "Covers" and "Templates" panels.
-	const DEFAULT_COVER_TYPE_ID = 4; // Example: 1 for 'eBook', 2 for 'Paperback', etc.
+	const DEFAULT_COVER_TYPE_ID = 2; // Example: 1 for 'eBook', 2 for 'Paperback', etc.
 	
 	// --- Instantiate Managers ---
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {

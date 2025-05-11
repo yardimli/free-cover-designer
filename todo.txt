@@ -33,7 +33,8 @@ duplicate text layer ...........................................................
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK
 add layer definition dropdown .............................................................OK
-when loading template with spine and back cover adjust layers based on definition
+when loading template with spine and back cover adjust layers based on definition .........OK
+add guides for where text should not go ...................................................OK
 add dark/light mode to ui
 make responsive ui
 

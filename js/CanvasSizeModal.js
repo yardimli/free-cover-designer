@@ -406,13 +406,10 @@ class CanvasSizeModal {
 		this.$addSpineAndBackCheckbox.prop('checked', false);
 		// --- END UPDATED ---
 		this.$spineControls.hide();
-		// --- REMOVED: Reset old back cover checkbox ---
-		// this.$addBackCoverCheckbox.prop('checked', false);
-		// --- END REMOVED ---
 		
-		this.$spineInputMethodRadios.filter('[value="pixels"]').prop('checked', true);
-		this.$spineWidthInput.val(100);
-		this.$pageCountInput.val(100);
+		this.$spineInputMethodRadios.filter('[value="calculate"]').prop('checked', true);
+		this.$spineWidthInput.val(200);
+		this.$pageCountInput.val(200);
 		this.$paperTypeSelect.val('bw');
 		this._toggleSpineInputMethod();
 		
