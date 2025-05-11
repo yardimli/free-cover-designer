@@ -1,5 +1,4 @@
 // free-cover-designer/js/App.js:
-
 $(document).ready(function () {
 	// --- DOM References ---
 	const $canvas = $('#canvas');
@@ -15,6 +14,11 @@ $(document).ready(function () {
 	const $sidebarPanelsContainer = $('#sidebar-panels-container');
 	const $sidebarPanels = $('.sidebar-panel');
 	const $sidebarNavLinks = $('.sidebar-nav .nav-link[data-panel-target]');
+	
+	// --- Configuration ---
+	// IMPORTANT: Set this ID to an existing cover_type ID from your database
+	// This will be the default selected type in "Covers" and "Templates" panels.
+	const DEFAULT_COVER_TYPE_ID = 4; // Example: 1 for 'eBook', 2 for 'Paperback', etc.
 	
 	// --- Instantiate Managers ---
 	const canvasManager = new CanvasManager($canvasArea, $canvasWrapper, $canvas, {
@@ -57,13 +61,13 @@ $(document).ready(function () {
 		overlaysListSelector: '#overlayList',
 		overlaysSearchSelector: '#overlaySearch',
 		sidebarPanelsContainerSelector: '#sidebar-panels-container',
+		defaultCoverTypeId: DEFAULT_COVER_TYPE_ID, // Pass the default ID
 		applyTemplate: (jsonData) => {
 			console.log("Applying template via click, removing existing text layers...");
 			const existingLayers = layerManager.getLayers();
 			const textLayerIdsToDelete = existingLayers
 				.filter(layer => layer.type === 'text')
 				.map(layer => layer.id);
-			
 			if (textLayerIdsToDelete.length > 0) {
 				textLayerIdsToDelete.forEach(id => layerManager.deleteLayer(id, false));
 				console.log(`Removed ${textLayerIdsToDelete.length} text layers.`);
@@ -85,7 +89,7 @@ $(document).ready(function () {
 	canvasManager.historyManager = historyManager;
 	
 	// --- Initialization ---
-	sidebarManager.loadAll();
+	sidebarManager.loadAll(); // This will now use the defaultCoverTypeId
 	layerManager.initializeList();
 	canvasManager.initialize(); // Sets default canvas size, zoom, etc.
 	initializeGlobalActions();
@@ -94,12 +98,10 @@ $(document).ready(function () {
 	
 	// --- Initial State & Query Param Handling ---
 	hideGlobalLoadingOverlay(); // Ensure it's hidden before we start any custom loading
-	
 	const urlParams = new URLSearchParams(window.location.search);
 	const queryCanvasWidth = urlParams.get('w');
 	const queryCanvasHeight = urlParams.get('h');
 	const queryFileUrl = urlParams.get('f');
-	
 	let designLoadedOrSizeSetFromQuery = false;
 	
 	function finalizeAppSetup() {
@@ -194,7 +196,6 @@ $(document).ready(function () {
 			const $link = $(this);
 			const targetPanelId = $link.data('panel-target');
 			const $targetPanel = $(targetPanelId);
-			
 			if (!$targetPanel.length) {
 				console.warn("Target panel not found:", targetPanelId);
 				return;
@@ -236,9 +237,9 @@ $(document).ready(function () {
 		$sidebarNavLinks.removeClass('active');
 		// Optional: Add a small delay before hiding panels to allow for slide-out animation
 		// setTimeout(() => {
-		//     if (!$sidebarPanelsContainer.hasClass('open')) { // Check again in case it was reopened
-		//         $sidebarPanels.removeClass('active').hide();
-		//     }
+		// if (!$sidebarPanelsContainer.hasClass('open')) { // Check again in case it was reopened
+		// $sidebarPanels.removeClass('active').hide();
+		// }
 		// }, 300); // Match CSS transition duration
 	}
 	// --- END Sidebar Panel Logic ---
@@ -298,7 +299,6 @@ $(document).ready(function () {
 			$(event.target).val(''); // Reset input
 		});
 		
-		
 		// Export Actions
 		$('#downloadBtn').on('click', (e) => preventDisabled(e, () => canvasManager.exportCanvas('png', true))); // Default to PNG
 		
@@ -328,7 +328,6 @@ $(document).ready(function () {
 			$('#lockBtn').attr('title', 'Lock/Unlock Selected');
 		}
 		
-		
 		// Layer order buttons
 		let isAtFront = false;
 		let isAtBack = false;
@@ -338,14 +337,12 @@ $(document).ready(function () {
 			const selectedIndex = sortedLayers.findIndex(l => l.id === selectedLayer.id);
 			isAtBack = selectedIndex === 0;
 			isAtFront = selectedIndex === sortedLayers.length - 1;
-		} else if (layers.length <= 1) {
-			// If only one layer (or none), it's both front and back
+		} else if (layers.length <= 1) { // If only one layer (or none), it's both front and back
 			isAtFront = true;
 			isAtBack = true;
 		}
 		$('#bringToFrontBtn').prop('disabled', !hasSelection || isAtFront || isLocked);
 		$('#sendToBackBtn').prop('disabled', !hasSelection || isAtBack || isLocked);
-		
 		
 		// History buttons
 		$('#undoBtn').prop('disabled', !historyManager.canUndo());

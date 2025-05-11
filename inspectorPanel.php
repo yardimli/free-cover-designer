@@ -363,5 +363,21 @@
 		</div>
 	</div>
 
+	<!-- Layer Definition -->
+	<div id="inspector-definition" class="inspector-section">
+		<div class="section-header">Definition</div>
+		<div class="section-content">
+		<select id="inspector-layer-definition" class="form-select form-select-sm">
+			<option value="general">General</option>
+			<option value="back_cover_text">Back Cover Text</option>
+			<option value="back_cover_title">Back Cover Title</option>
+			<option value="back_cover_image">Back Cover Image</option>
+			<option value="spine_text">Spine Text</option>
+			<option value="cover_title">Cover Title</option>
+			<option value="cover_text">Cover Text</option>
+			<option value="cover_image">Cover Image</option>
+			<option value="cover_background">Cover Background</option>
+		</select>
+	</div>
 
 </div>

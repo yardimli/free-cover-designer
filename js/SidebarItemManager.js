@@ -7,8 +7,12 @@ class SidebarItemManager {
 		this.saveState = options.saveState;
 		this.layerManager = options.layerManager;
 		this.canvasManager = options.canvasManager;
-		this.showLoadingOverlay = options.showLoadingOverlay || function (msg) { console.warn("showLoadingOverlay not provided", msg); };
-		this.hideLoadingOverlay = options.hideLoadingOverlay || function () { console.warn("hideLoadingOverlay not provided"); };
+		this.showLoadingOverlay = options.showLoadingOverlay || function (msg) {
+			console.warn("showLoadingOverlay not provided", msg);
+		};
+		this.hideLoadingOverlay = options.hideLoadingOverlay || function () {
+			console.warn("hideLoadingOverlay not provided");
+		};
 		
 		// Upload specific elements
 		this.$uploadPreview = $(options.uploadPreviewSelector);
@@ -22,6 +26,8 @@ class SidebarItemManager {
 		this.overlayConfirmModal = null; // Will be initialized Bootstrap modal instance
 		this.pendingOverlayData = null; // To store itemData for modal
 		
+		this.defaultCoverTypeId = options.defaultCoverTypeId || null; // Store the default ID
+		
 		// Configuration for different item types
 		this.itemTypesConfig = {
 			templates: {
@@ -30,7 +36,7 @@ class SidebarItemManager {
 				listSelector: '#templateList',
 				searchSelector: '#templateSearch',
 				coverTypeFilterSelector: '#templateTypeFilter',
-				selectedCoverTypeId: '',
+				selectedCoverTypeId: '', // Will be set in loadItems
 				scrollAreaSelector: '#templatesPanel .panel-scrollable-content',
 				itemsToShow: 12,
 				allData: [],
@@ -75,7 +81,7 @@ class SidebarItemManager {
 				listSelector: '#coverList',
 				searchSelector: '#coverSearch',
 				coverTypeFilterSelector: '#coverTypeFilter',
-				selectedCoverTypeId: '',
+				selectedCoverTypeId: '', // Will be set in loadItems
 				scrollAreaSelector: '#coversPanel .panel-scrollable-content',
 				itemsToShow: 12,
 				allData: [],
@@ -90,17 +96,17 @@ class SidebarItemManager {
 				createThumbnail: (item) => {
 					const title = item.caption ? `${item.name} - ${item.caption}` : item.name;
 					return `
-                    <div class="item-thumbnail col-6 loading" title="${title}">
-                        <div class="thumbnail-spinner-overlay">
-                            <div class="spinner-border spinner-border-sm text-secondary" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                        <div class="item-thumbnail col-6 loading" title="${title}">
+                            <div class="thumbnail-spinner-overlay">
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
+                            <div class="${this.itemTypesConfig.covers.thumbnailClass}">
+                                <img src="${item.thumbnailPath}" alt="${item.name}">
+                            </div>
+                            <span>${item.name}</span>
                         </div>
-                        <div class="${this.itemTypesConfig.covers.thumbnailClass}">
-                            <img src="${item.thumbnailPath}" alt="${item.name}">
-                        </div>
-                        <span>${item.name}</span>
-                    </div>
                     `;
 				},
 				handleClick: (itemData, manager) => {
@@ -189,17 +195,17 @@ class SidebarItemManager {
 				createThumbnail: (item) => {
 					const title = item.caption ? `${item.name} - ${item.caption}` : item.name;
 					return `
-                    <div class="item-thumbnail col-6 loading" title="${title}">
-                        <div class="thumbnail-spinner-overlay">
-                            <div class="spinner-border spinner-border-sm text-secondary" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                        <div class="item-thumbnail col-6 loading" title="${title}">
+                            <div class="thumbnail-spinner-overlay">
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
+                            <div class="${this.itemTypesConfig.elements.thumbnailClass}">
+                                <img src="${item.thumbnailPath}" alt="${item.name}">
+                            </div>
+                            <span>${item.name}</span>
                         </div>
-                        <div class="${this.itemTypesConfig.elements.thumbnailClass}">
-                            <img src="${item.thumbnailPath}" alt="${item.name}">
-                        </div>
-                        <span>${item.name}</span>
-                    </div>
                     `;
 				},
 				handleClick: (itemData, manager) => {
@@ -216,7 +222,6 @@ class SidebarItemManager {
 								const canvasHeight = manager.canvasManager.currentCanvasHeight;
 								const finalX = Math.max(0, (canvasWidth / 2) - (elemWidth / 2));
 								const finalY = Math.max(0, (canvasHeight / 2) - (elemHeight / 2));
-								
 								const newLayer = manager.addLayer('image', {
 									content: imgSrc,
 									x: finalX,
@@ -278,27 +283,28 @@ class SidebarItemManager {
 				createThumbnail: (item) => {
 					const title = item.caption ? `${item.name} - ${item.caption}` : item.name;
 					return `
-                    <div class="item-thumbnail col-6 loading" title="${title}">
-                        <div class="thumbnail-spinner-overlay">
-                            <div class="spinner-border spinner-border-sm text-secondary" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                        <div class="item-thumbnail col-6 loading" title="${title}">
+                            <div class="thumbnail-spinner-overlay">
+                                <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </div>
+                            <div class="${this.itemTypesConfig.overlays.thumbnailClass}">
+                                <img src="${item.thumbnailPath}" alt="${item.name}">
+                            </div>
+                            <span>${item.name}</span>
                         </div>
-                        <div class="${this.itemTypesConfig.overlays.thumbnailClass}">
-                            <img src="${item.thumbnailPath}" alt="${item.name}">
-                        </div>
-                        <span>${item.name}</span>
-                    </div>
                     `;
 				},
-				handleClick: (itemData, manager) => { // `manager` is `this` (SidebarItemManager instance)
+				handleClick: (itemData, manager) => {
+					// `manager` is `this` (SidebarItemManager instance)
 					const imgSrc = itemData.imagePath;
 					if (!imgSrc || !manager.addLayer || !manager.canvasManager || !manager.layerManager || !manager.showLoadingOverlay || !manager.hideLoadingOverlay) {
 						console.error("Missing dependencies for overlay click.");
 						return;
 					}
-					
 					console.log("Overlay clicked:", imgSrc);
+					
 					const existingLayers = manager.layerManager.getLayers();
 					const existingOverlayIds = existingLayers
 						.filter(layer => layer.type === 'image' && layer.layerSubType === 'overlay')
@@ -306,7 +312,7 @@ class SidebarItemManager {
 					
 					if (existingOverlayIds.length > 0) {
 						// Store data for modal handlers
-						manager.pendingOverlayData = { itemData, existingOverlayIds };
+						manager.pendingOverlayData = {itemData, existingOverlayIds};
 						// Show the modal
 						if (manager.overlayConfirmModal) {
 							manager.overlayConfirmModal.show();
@@ -354,13 +360,10 @@ class SidebarItemManager {
 			try {
 				const canvasWidth = manager.canvasManager.currentCanvasWidth;
 				const canvasHeight = manager.canvasManager.currentCanvasHeight;
-				
 				let layerWidth = img.width;
 				let layerHeight = img.height;
 				
 				// Optional: Scale down if larger than canvas, maintaining aspect ratio
-				// This ensures the overlay fits within the canvas boundaries if it's very large.
-				// If you want overlays to always be their natural size, remove this block.
 				if (img.width > canvasWidth || img.height > canvasHeight) {
 					const scaleFactor = Math.min(canvasWidth / img.width, canvasHeight / img.height);
 					layerWidth = img.width * scaleFactor;
@@ -383,12 +386,10 @@ class SidebarItemManager {
 				
 				if (newLayer) {
 					const addedLayerData = manager.layerManager.getLayerById(newLayer.id);
-					
 					if (addedLayerData) {
 						const allCurrentLayers = manager.layerManager.layers; // Use the live array
 						const coverLayers = allCurrentLayers.filter(l => l.type === 'image' && l.layerSubType === 'cover');
 						const maxCoverZIndex = coverLayers.length > 0 ? Math.max(0, ...coverLayers.map(l => l.zIndex || 0)) : 0;
-						
 						let targetZIndex = maxCoverZIndex + 1;
 						
 						// Shift layers that would be at or above the targetZIndex to make space
@@ -426,7 +427,6 @@ class SidebarItemManager {
 		img.src = imgSrc;
 	}
 	
-	
 	closeSidebarPanel() {
 		const $sidebarPanelsContainer = $('#sidebar-panels-container');
 		const $sidebarNavLinks = $('.sidebar-nav .nav-link[data-panel-target]');
@@ -446,12 +446,11 @@ class SidebarItemManager {
 			console.error("Error parsing cover types data:", error);
 			this.coverTypes = [];
 		}
-		
 		Object.keys(this.itemTypesConfig).forEach(type => {
 			this.loadItems(type);
 		});
 		this.initializeUpload();
-		this.initializeOverlayConfirmModal(); // Initialize the modal
+		this.initializeOverlayConfirmModal();
 	}
 	
 	initializeOverlayConfirmModal() {
@@ -471,16 +470,13 @@ class SidebarItemManager {
 				}
 				this.overlayConfirmModal.hide();
 			});
-			
 			this.$overlayConfirmModalElement.off('hidden.bs.modal').on('hidden.bs.modal', () => {
 				this.pendingOverlayData = null; // Clear pending data when modal is hidden
 			});
-			
 		} else {
 			console.error("Overlay confirmation modal element (#overlayConfirmModal) not found for initialization.");
 		}
 	}
-	
 	
 	loadItems(type) {
 		const config = this.itemTypesConfig[type];
@@ -500,7 +496,7 @@ class SidebarItemManager {
 				throw new Error(`Data element not found: #${config.dataElementId}`);
 			}
 			config.allData = JSON.parse(dataElement.textContent || '[]');
-			config.filteredData = config.allData;
+			// config.filteredData will be set by filterItems
 			
 			if (config.allData.length === 0) {
 				$list.html(`<p class="text-muted p-2">No ${type} found.</p>`);
@@ -509,20 +505,53 @@ class SidebarItemManager {
 			if (config.coverTypeFilterSelector && (type === 'covers' || type === 'templates')) {
 				const $filterSelect = $(config.coverTypeFilterSelector);
 				if ($filterSelect.length) {
+					$filterSelect.empty(); // Clear any pre-existing options
+					let defaultSelected = false;
+					let firstOptionValue = null;
+					
 					if (this.coverTypes.length > 0) {
-						$filterSelect.find('option:not(:first-child)').remove();
-						this.coverTypes.forEach(coverType => {
-							$filterSelect.append(new Option(coverType.type_name, coverType.id.toString()));
+						this.coverTypes.forEach((coverType, index) => {
+							const optionValue = coverType.id.toString();
+							const optionText = coverType.type_name;
+							const $option = new Option(optionText, optionValue);
+							
+							if (index === 0) {
+								firstOptionValue = optionValue; // Store the first available option value
+							}
+							
+							if (this.defaultCoverTypeId && optionValue === this.defaultCoverTypeId.toString()) {
+								$option.selected = true;
+								config.selectedCoverTypeId = optionValue;
+								defaultSelected = true;
+							}
+							$filterSelect.append($option);
 						});
-					} else {
+						
+						// If defaultCoverTypeId was not found or not provided, and there are types, select the first one
+						if (!defaultSelected && firstOptionValue) {
+							$filterSelect.val(firstOptionValue);
+							config.selectedCoverTypeId = firstOptionValue;
+						} else if (!defaultSelected && this.coverTypes.length === 0) {
+							// This case should ideally not be hit if the outer if (this.coverTypes.length > 0) is structured well
+							// but as a fallback:
+							config.selectedCoverTypeId = "";
+						}
+						
+					} else { // No cover types available
 						console.warn(`No cover types loaded to populate filter for ${type}.`);
+						$filterSelect.append(new Option(`No types available`, ""));
+						$filterSelect.prop('disabled', true);
+						config.selectedCoverTypeId = "";
 					}
 					this.initializeCoverTypeFilterListener(type);
 				} else {
 					console.warn(`Cover type filter select not found for ${type}: ${config.coverTypeFilterSelector}`);
 				}
 			}
-			this.displayMoreItems(type, true);
+			
+			this.filterItems(type); // Apply initial filter based on selectedCoverTypeId
+			this.displayMoreItems(type, true); // Display items based on the initial filter
+			
 			if (config.searchSelector) {
 				this.initializeSearchListener(type);
 			}
@@ -533,6 +562,7 @@ class SidebarItemManager {
 		}
 	}
 	
+	
 	initializeCoverTypeFilterListener(type) {
 		const config = this.itemTypesConfig[type];
 		if (!config || !config.coverTypeFilterSelector) return;
@@ -542,22 +572,27 @@ class SidebarItemManager {
 		$filterSelect.off('change.typefilter').on('change.typefilter', () => {
 			config.selectedCoverTypeId = $filterSelect.val();
 			this.filterItems(type);
-			this.displayMoreItems(type, true);
+			this.displayMoreItems(type, true); // Reset and display new filtered items
 		});
 	}
 	
 	filterItems(type) {
 		const config = this.itemTypesConfig[type];
 		if (!config) return;
+		
 		let tempFilteredData = [...config.allData];
 		
+		// Filter by cover type ID if applicable and selected
 		if (config.selectedCoverTypeId && config.selectedCoverTypeId !== "" && (type === 'covers' || type === 'templates')) {
 			const selectedId = parseInt(config.selectedCoverTypeId, 10);
-			tempFilteredData = tempFilteredData.filter(item => item.coverTypeId === selectedId);
+			if (!isNaN(selectedId)) { // Ensure selectedId is a valid number
+				tempFilteredData = tempFilteredData.filter(item => item.coverTypeId === selectedId);
+			}
 		}
 		
+		// Filter by search term
 		if (config.searchTerm && config.filterFn) {
-			const term = config.searchTerm.toLowerCase();
+			const term = config.searchTerm; // searchTerm is already lowercased by search listener
 			tempFilteredData = tempFilteredData.filter(item => config.filterFn(item, term));
 		}
 		config.filteredData = tempFilteredData;
@@ -567,8 +602,8 @@ class SidebarItemManager {
 		const config = this.itemTypesConfig[type];
 		if (!config) return;
 		if (config.isLoading && !reset) return;
-		config.isLoading = true;
 		
+		config.isLoading = true;
 		const $list = $(config.listSelector);
 		const $scrollArea = $list.closest('.panel-scrollable-content');
 		
@@ -586,7 +621,7 @@ class SidebarItemManager {
 		);
 		
 		if (itemsToRender.length === 0) {
-			if (config.currentlyDisplayed === 0) {
+			if (config.currentlyDisplayed === 0) { // Only show "no items" if list is truly empty after filtering
 				let message = `No ${type} found.`;
 				if (config.searchTerm || (config.selectedCoverTypeId && config.selectedCoverTypeId !== "")) {
 					message = `No ${type} match your criteria.`;
@@ -613,8 +648,11 @@ class SidebarItemManager {
 		
 		$list.append($newThumbs);
 		this._setupImageLoading($newThumbs);
+		
 		config.currentlyDisplayed += itemsToRender.length;
-		setTimeout(() => { config.isLoading = false; }, 100);
+		setTimeout(() => {
+			config.isLoading = false;
+		}, 100);
 	}
 	
 	initializeSearchListener(type) {
@@ -625,6 +663,7 @@ class SidebarItemManager {
 			console.warn(`Search input not found for type "${type}": ${config.searchSelector}`);
 			return;
 		}
+		
 		$search.off('input.searchfilter').on('input.searchfilter', () => {
 			clearTimeout(config.searchTimeout);
 			config.searchTimeout = setTimeout(() => {
@@ -648,6 +687,7 @@ class SidebarItemManager {
 			const scrolledElement = this;
 			const threshold = 200;
 			if (config.isLoading) return;
+			
 			if (scrolledElement.scrollTop + scrolledElement.clientHeight >= scrolledElement.scrollHeight - threshold) {
 				if (config.currentlyDisplayed < config.filteredData.length) {
 					self.displayMoreItems(type);
@@ -667,7 +707,9 @@ class SidebarItemManager {
 				$spinnerOverlay.hide();
 				return;
 			}
+			
 			const img = $img[0];
+			
 			const onImageLoad = () => {
 				$spinnerOverlay.hide();
 				$thumb.removeClass('loading').addClass('loaded');
@@ -724,15 +766,18 @@ class SidebarItemManager {
 						try {
 							const canvasWidth = self.canvasManager.currentCanvasWidth;
 							const canvasHeight = self.canvasManager.currentCanvasHeight;
+							
 							const maxWidth = Math.min(canvasWidth * 0.8, 300);
 							let layerWidth = Math.min(img.width, maxWidth);
 							const aspectRatio = img.height / img.width;
 							let layerHeight = layerWidth * aspectRatio;
+							
 							const maxHeight = canvasHeight * 0.8;
 							if (layerHeight > maxHeight) {
 								layerHeight = maxHeight;
 								layerWidth = layerHeight / aspectRatio;
 							}
+							
 							const layerX = Math.max(0, (canvasWidth - layerWidth) / 2);
 							const layerY = Math.max(0, (canvasHeight - layerHeight) / 2);
 							

@@ -127,6 +127,11 @@ class InspectorPanel {
 			}
 		};
 		
+		this.$panel.find('#inspector-layer-definition').on('change', (e) => {
+			const definition = $(e.target).val();
+			updateLayer('definition', definition, true); // Save immediately
+		});
+		
 		// --- Helper for color inputs (Picker + Hex + Opacity) ---
 		const bindColorInputGroup = (groupId, layerPropPrefix) => {
 			const $picker = $(`#inspector-${groupId}-color`);
@@ -519,6 +524,7 @@ class InspectorPanel {
 			this.$panel.find('#inspector-border').hide();
 			this.$panel.find('#inspector-image-filters').hide();
 			this.$panel.find('#inspector-image-blend-mode').hide();
+			this.$panel.find('#inspector-definition').hide();
 			$('#inspector-layer-name').text('No Layer Selected').attr('title', 'No Layer Selected'); // Explicitly set here too
 			return;
 		}
@@ -613,7 +619,7 @@ class InspectorPanel {
 		// Generic sections always visible (or based on layer type if needed later)
 		this.$panel.find('#inspector-alignment').show();
 		this.$panel.find('#inspector-layer').show();
-		this.$panel.find('#inspector-layer').show();
+		this.$panel.find('#inspector-definition').show();
 		
 		
 		// --- Populate Common Controls ---
@@ -624,6 +630,9 @@ class InspectorPanel {
 		this._populateRangeAndNumber('inspector-rotation', 'inspector-rotation-value', rotation, 0, '°');
 		const scale = layerData.scale ?? 100;
 		this._populateRangeAndNumber('inspector-scale', 'inspector-scale-value', scale, 100, '%');
+		
+		const definition = layerData.definition || 'general';
+		$('#inspector-layer-definition').val(definition);
 		
 		// --- Populate Text Controls (if Text Layer) ---
 		if (isText) {

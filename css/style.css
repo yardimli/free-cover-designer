@@ -748,7 +748,7 @@ body {
     font-weight: bold;
     color: #343a40;
     display: block;
-    max-width: calc(var(--inspector-panel-width) - 3rem);
+    max-width: calc(var(--inspector-panel-width) - 100px);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

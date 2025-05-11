@@ -38,6 +38,7 @@
 	}
 	$covers_json = json_encode($covers_data);
 
+
 	// --- Fetch Overlays ---
 	$overlays_data = [];
 	$sql_overlays = "SELECT id, name, thumbnail_path, image_path, keywords FROM overlays ORDER BY name ASC"; // Added default_blend_mode
@@ -164,7 +165,7 @@
 			<!-- Covers Panel -->
 			<div id="coversPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
-					<div class="panel-header d-flex align-items-center gap-2"> <!-- Modified for flex layout -->
+					<div class="panel-header d-flex align-items-center gap-2">
 						<select id="coverTypeFilter" class="form-select form-select-sm" aria-label="Filter by cover type" style="flex-basis: 130px; flex-shrink: 0;">
 							<!-- Options will be populated by JavaScript -->
 						</select>
@@ -177,7 +178,7 @@
 			<!-- Templates Panel -->
 			<div id="templatesPanel" class="sidebar-panel">
 				<div class="panel-content-wrapper">
-					<div class="panel-header d-flex align-items-center gap-2"> <!-- Modified for flex layout -->
+					<div class="panel-header d-flex align-items-center gap-2">
 						<select id="templateTypeFilter" class="form-select form-select-sm" aria-label="Filter by template type" style="flex-basis: 130px; flex-shrink: 0;">
 							<!-- Options will be populated by JavaScript -->
 						</select>
@@ -263,9 +264,9 @@
 			</div>
 		</div> <!-- End Canvas Area -->
 
+
 		<!-- Inspector Panel (Remains on the right) -->
 		<?php include 'inspectorPanel.php'; ?>
-
 	</div> <!-- End Main Content Area -->
 </div> <!-- End App Container -->
 
@@ -310,7 +311,6 @@
 <script id="elementData" type="application/json"><?php echo $elements_json; ?></script>
 <script id="overlayData" type="application/json"><?php echo $overlays_json; ?></script>
 
-
 <!-- Scripts -->
 <script src="vendors/bootstrap5.3.5/js/bootstrap.bundle.min.js"></script>
 <script src="vendors/jquery-ui-1.14.1/external/jquery/jquery.js"></script>
@@ -327,6 +327,5 @@
 <script src="js/SidebarItemManager.js"></script>
 <script src="js/CanvasSizeModal.js"></script>
 <script src="js/App.js"></script>
-
 </body>
 </html>

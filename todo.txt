@@ -32,6 +32,8 @@ in ui add dropdown for type in search template and cover panels ................
 duplicate text layer ......................................................................OK
 add trim size .............................................................................OK
 add trim with back cover, spine and front cover, set papertype and page numbers ...........OK
+add layer definition dropdown .............................................................OK
+when loading template with spine and back cover adjust layers based on definition
 add dark/light mode to ui
 make responsive ui
 

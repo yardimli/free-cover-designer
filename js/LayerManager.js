@@ -164,6 +164,7 @@ class LayerManager {
 			zIndex: initialZIndex,
 			rotation: this.defaultTransform.rotation,
 			scale: this.defaultTransform.scale,
+			definition: 'general',
 			// Text specific defaults
 			content: type === 'text' ? 'New Text' : '',
 			fontSize: 24,
@@ -212,6 +213,7 @@ class LayerManager {
 		layerData.zIndex = parseInt(layerData.zIndex) || initialZIndex;
 		layerData.rotation = parseFloat(layerData.rotation) || this.defaultTransform.rotation;
 		layerData.scale = parseFloat(layerData.scale) || this.defaultTransform.scale;
+		layerData.definition = (typeof layerData.definition === 'string' && layerData.definition.trim() !== '') ? layerData.definition : 'general';
 		
 		if (type === 'text') {
 			layerData.fontSize = Math.max(1, parseFloat(layerData.fontSize) || defaultProps.fontSize);
@@ -330,6 +332,12 @@ class LayerManager {
 						}
 					}
 					continue; // Skip the generic assignment below for 'filters'
+				}
+				
+				if (key === 'definition') { // Handle definition
+					if (typeof value !== 'string' || value.trim() === '') {
+						value = 'general'; // Fallback if invalid
+					}
 				}
 				
 				// Parse/Validate specific properties
@@ -517,6 +525,9 @@ class LayerManager {
 			}
 			if (keepNonTextLayers || !layerData.id || this.getLayerById(layerData.id)) {
 				layerData.id = this._generateId();
+			}
+			if (layerData.definition === undefined) {
+				layerData.definition = 'general';
 			}
 			const addedLayer = this.addLayer(layerData.type, layerData);
 			if (layerData.zIndex !== undefined && addedLayer) {
